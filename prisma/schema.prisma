@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  COORDINATOR
+  LEADER
+}
+
+enum MemberStatus {
+  PRELIMINARY
+  SEMI_CONSISTENT
+  ESTABLISHED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String
+  passwordHash  String         @map("password_hash")
+  role          UserRole       @default(LEADER)
+  managedGroups MinistryGroup[] @relation("GroupLeader")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model MinistryGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique // Huiothesia, Doxasmus, Paligenasia
+  leaderId  String?  @map("leader_id")
+  leader    User?    @relation("GroupLeader", fields: [leaderId], references: [id])
+  members   Member[]
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ministry_groups")
+}
+
+model Member {
+  id          String       @id @default(uuid())
+  name        String
+  phoneNumber String?      @map("phone_number")
+  groupId     String       @map("group_id")
+  group       MinistryGroup @relation(fields: [groupId], references: [id])
+  status      MemberStatus @default(PRELIMINARY)
+  attendance  Attendance[]
+  joinedAt    DateTime     @default(now()) @map("joined_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@map("members")
+}
+
+model Attendance {
+  id        String   @id @default(uuid())
+  memberId  String   @map("member_id")
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  isPresent Boolean  @default(false) @map("is_present")
+  quarter   Int      // 1, 2, 3, 4
+  year      Int
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([memberId, date])
+  @@map("attendance")
+}
+
+model AIInsight {
+  id        String   @id @default(uuid())
+  type      String   // 'GROUP_PERFORMANCE', 'MEMBER_RETENTION', 'GROWTH_PREDICTION'
+  content   String   @db.Text
+  targetId  String?  // Optional ID of group or member
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ai_insights")
+}
