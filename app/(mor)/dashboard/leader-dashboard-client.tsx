@@ -80,7 +80,7 @@ export function LeaderDashboardClient({
     const [isTakeAttendanceOpen, setIsTakeAttendanceOpen] = useState(false)
     const [newMemberName, setNewMemberName] = useState("")
     const [newMemberPhone, setNewMemberPhone] = useState("")
-    const [newMemberGroupId, setNewMemberGroupId] = useState("")
+    const [newMemberGroupId, setNewMemberGroupId] = useState(leaderGroups[0]?.id || "")
     const [isSubmittingMember, setIsSubmittingMember] = useState(false)
 
     // Attendance modal state
@@ -334,9 +334,13 @@ export function LeaderDashboardClient({
                                     <SelectValue placeholder="Select group" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {leaderGroups.map(group => (
-                                        <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
-                                    ))}
+                                    {leaderGroups && leaderGroups.length > 0 ? (
+                                        leaderGroups.map(group => (
+                                            <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                                        ))
+                                    ) : (
+                                        <SelectItem value="no-groups" disabled>No groups available</SelectItem>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -371,9 +375,13 @@ export function LeaderDashboardClient({
                                         <SelectValue placeholder="Select group" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {leaderGroups.map(group => (
-                                            <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
-                                        ))}
+                                        {leaderGroups && leaderGroups.length > 0 ? (
+                                            leaderGroups.map(group => (
+                                                <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                                            ))
+                                        ) : (
+                                            <SelectItem value="no-groups" disabled>No groups available</SelectItem>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>

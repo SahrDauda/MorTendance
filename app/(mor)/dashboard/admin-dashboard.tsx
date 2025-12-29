@@ -8,57 +8,72 @@ import {
 import { AdminDashboardClient } from "./admin-dashboard-client"
 
 export async function AdminDashboard() {
-    // Fetch admin-specific stats
-    const totalMembers = await db.member.count()
-    const totalLeaders = await db.user.count({ where: { role: "LEADER" } })
-    const totalGroups = await db.ministryGroup.count()
-    const establishedMembers = await db.member.count({ where: { status: "ESTABLISHED" } })
+    try {
+        // Fetch admin-specific stats
+        const totalMembers = await db.member.count()
+        const totalLeaders = await db.user.count({ where: { role: "LEADER" } })
+        const totalGroups = await db.ministryGroup.count()
+        const establishedMembers = await db.member.count({ where: { status: "ESTABLISHED" } })
 
-    // Calculate average attendance
-    const totalAttendanceRecords = await db.attendance.count()
-    const presentRecords = await db.attendance.count({ where: { isPresent: true } })
-    const attendanceRate = totalAttendanceRecords > 0
-        ? Math.round((presentRecords / totalAttendanceRecords) * 100)
-        : 0
+        // Calculate average attendance
+        const totalAttendanceRecords = await db.attendance.count()
+        const presentRecords = await db.attendance.count({ where: { isPresent: true } })
+        const attendanceRate = totalAttendanceRecords > 0
+            ? Math.round((presentRecords / totalAttendanceRecords) * 100)
+            : 0
 
-    // Get leaders with their groups
-    const leaders = await db.user.findMany({
-        where: { role: "LEADER" },
-        include: {
-            managedGroups: {
-                include: {
-                    _count: {
-                        select: { members: true },
+        // Get leaders with their groups
+        const leaders = await db.user.findMany({
+            where: { role: "LEADER" },
+            include: {
+                managedGroups: {
+                    include: {
+                        _count: {
+                            select: { members: true },
+                        },
                     },
                 },
             },
-        },
-        take: 5,
-        orderBy: { createdAt: "desc" },
-    })
+            take: 5,
+            orderBy: { createdAt: "desc" },
+        })
 
-    // Get all groups for the add member modal
-    const groups = await db.ministryGroup.findMany({
-        select: {
-            id: true,
-            name: true,
-        },
-        orderBy: { name: "asc" },
-    })
+        // Get all groups for the add member modal
+        const groups = await db.ministryGroup.findMany({
+            select: {
+                id: true,
+                name: true,
+            },
+            orderBy: { name: "asc" },
+        })
 
-    const stats = [
-        { name: "Total Members", value: totalMembers.toString(), icon: Users, color: "text-blue-500", trend: "Across all groups" },
-        { name: "Leaders", value: totalLeaders.toString(), icon: ShieldCheck, color: "text-purple-500", trend: "Active leaders" },
-        { name: "Groups", value: totalGroups.toString(), icon: Building2, color: "text-green-500", trend: "Ministry groups" },
-        { name: "Attendance Rate", value: `${attendanceRate}%`, icon: ClipboardCheck, color: "text-amber-500", trend: "Overall consistency" },
-    ]
+        const stats = [
+            { name: "Total Members", value: totalMembers.toString(), icon: Users, color: "text-blue-500", trend: "Across all groups" },
+            { name: "Leaders", value: totalLeaders.toString(), icon: ShieldCheck, color: "text-purple-500", trend: "Active leaders" },
+            { name: "Groups", value: totalGroups.toString(), icon: Building2, color: "text-green-500", trend: "Ministry groups" },
+            { name: "Attendance Rate", value: `${attendanceRate}%`, icon: ClipboardCheck, color: "text-amber-500", trend: "Overall consistency" },
+        ]
 
-    return (
-        <AdminDashboardClient
-            stats={stats}
-            leaders={leaders}
-            groups={groups}
-        />
-    )
+        return (
+            <AdminDashboardClient
+                stats={stats}
+                leaders={leaders}
+                groups={groups}
+            />
+        )
+    } catch (error) {
+        console.error("AdminDashboard error:", error)
+        return (
+            <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                <h1 className="text-2xl font-bold">Error Loading Admin Dashboard</h1>
+                <p className="text-muted-foreground">
+                    There was an error loading the dashboard. Please try again later.
+                </p>
+                {process.env.NODE_ENV === "development" && (
+                    <pre className="text-xs bg-muted p-4 rounded">{String(error)}</pre>
+                )}
+            </div>
+        )
+    }
 }
 

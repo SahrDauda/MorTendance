@@ -66,7 +66,7 @@ export function AdminDashboardClient({
     const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
     const [newMemberName, setNewMemberName] = useState("")
     const [newMemberPhone, setNewMemberPhone] = useState("")
-    const [newMemberGroupId, setNewMemberGroupId] = useState("")
+    const [newMemberGroupId, setNewMemberGroupId] = useState(groups[0]?.id || "")
     const [isSubmittingMember, setIsSubmittingMember] = useState(false)
 
     const quickActions = [
@@ -266,9 +266,13 @@ export function AdminDashboardClient({
                                     <SelectValue placeholder="Select group" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {groups.map(group => (
-                                        <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
-                                    ))}
+                                    {groups && groups.length > 0 ? (
+                                        groups.map(group => (
+                                            <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                                        ))
+                                    ) : (
+                                        <SelectItem value="no-groups" disabled>No groups available</SelectItem>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>

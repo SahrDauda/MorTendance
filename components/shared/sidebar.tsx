@@ -30,7 +30,7 @@ const adminNavigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const { session } = useSession()
 
   const navigation = session?.user?.role === "ADMIN"
     ? [...baseNavigation, ...adminNavigation]
