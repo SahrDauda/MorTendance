@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { ReportsClient } from "./reports-client"
 import { BarChart3, Users, Calendar } from "lucide-react"
-import { Suspense } from "react"
 
 export default async function ReportsPage({
   searchParams,
@@ -82,15 +81,13 @@ export default async function ReportsPage({
     })
 
     return (
-      <Suspense fallback={<div className="flex items-center justify-center p-8">Loading reports...</div>}>
-        <ReportsClient
-          reportStats={reportStats}
-          groups={groups}
-          attendanceData={attendanceData}
-          initialYear={year}
-          initialQuarter={quarter}
-        />
-      </Suspense>
+      <ReportsClient
+        reportStats={reportStats}
+        groups={groups}
+        attendanceData={attendanceData}
+        initialYear={year}
+        initialQuarter={quarter}
+      />
     )
   } catch (error) {
     console.error("Error loading reports:", error)

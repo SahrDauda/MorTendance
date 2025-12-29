@@ -20,6 +20,19 @@ export async function saveAttendanceAction({ groupId, date, records }: SaveAtten
     const session = await auth()
     if (!session) throw new Error("Unauthorized")
 
+    // Check permissions: Leaders can only save attendance for their own groups
+    if (session.user.role === "LEADER") {
+        const group = await db.ministryGroup.findUnique({
+            where: { id: groupId },
+            select: { leaderId: true },
+        })
+
+        if (!group || group.leaderId !== session.user.id) {
+            throw new Error("Unauthorized: You can only record attendance for your own groups")
+        }
+    }
+    // Admin can record attendance for any group - no additional check needed
+
     const year = date.getFullYear()
     const month = date.getMonth() + 1
     const quarter = Math.ceil(month / 3)

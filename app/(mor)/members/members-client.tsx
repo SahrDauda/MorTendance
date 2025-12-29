@@ -55,9 +55,10 @@ interface Group {
 interface MembersClientProps {
     initialMembers: Member[]
     groups: Group[]
+    userRole?: "ADMIN" | "LEADER" | "COORDINATOR"
 }
 
-export function MembersClient({ initialMembers, groups }: MembersClientProps) {
+export function MembersClient({ initialMembers, groups, userRole = "LEADER" }: MembersClientProps) {
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedGroup, setSelectedGroup] = useState("all")
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)

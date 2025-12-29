@@ -1,6 +1,7 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import {
     BarChart3,
@@ -57,19 +58,25 @@ export function ReportsClient({
     initialQuarter,
 }: ReportsClientProps) {
     const router = useRouter()
-    const searchParams = useSearchParams()
+    const [year, setYear] = useState(initialYear)
+    const [quarter, setQuarter] = useState(initialQuarter)
 
-    const year = searchParams.get("year") || initialYear
-    const quarter = searchParams.get("quarter") || initialQuarter
+    // Sync with initial props when they change (e.g., after navigation)
+    useEffect(() => {
+        setYear(initialYear)
+        setQuarter(initialQuarter)
+    }, [initialYear, initialQuarter])
 
     const handleYearChange = (value: string) => {
-        const params = new URLSearchParams(searchParams.toString())
+        setYear(value)
+        const params = new URLSearchParams(window.location.search)
         params.set("year", value)
         router.push(`/reports?${params.toString()}`)
     }
 
     const handleQuarterChange = (value: string) => {
-        const params = new URLSearchParams(searchParams.toString())
+        setQuarter(value)
+        const params = new URLSearchParams(window.location.search)
         params.set("quarter", value)
         router.push(`/reports?${params.toString()}`)
     }

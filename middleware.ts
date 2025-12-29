@@ -15,7 +15,12 @@ export default auth(async (req) => {
 
   // Redirect authenticated users away from auth pages
   if (isAuthPage && req.auth) {
-    return NextResponse.redirect(new URL("/", req.url))
+    return NextResponse.redirect(new URL("/dashboard", req.url))
+  }
+
+  // Block signup page - only login allowed
+  if (pathname === "/auth/signup") {
+    return NextResponse.redirect(new URL("/auth/signin", req.url))
   }
 
   // Redirect unauthenticated users from root and dashboard routes to signin

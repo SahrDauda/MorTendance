@@ -15,16 +15,26 @@ import { cn } from "@/lib/utils"
 import { ROUTES } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useSession } from "@/lib/hooks/use-session"
 
-const navigation = [
+const baseNavigation = [
   { name: "Dashboard", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { name: "Attendance", href: ROUTES.ATTENDANCE, icon: ClipboardCheck },
   { name: "Members", href: ROUTES.MEMBERS, icon: Users },
   { name: "Reports", href: ROUTES.REPORTS, icon: BarChart3 },
 ]
 
+const adminNavigation = [
+  { name: "Leaders", href: "/admin/leaders", icon: ShieldCheck },
+]
+
 export function Sidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+
+  const navigation = session?.user?.role === "ADMIN"
+    ? [...baseNavigation, ...adminNavigation]
+    : baseNavigation
 
   return (
     <aside className="hidden border-r border-border bg-gradient-to-b from-card to-card/95 backdrop-blur-sm lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col lg:pt-16">
