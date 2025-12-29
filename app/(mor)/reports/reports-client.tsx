@@ -88,6 +88,16 @@ export function ReportsClient({
         window.location.href = url.toString()
     }
 
+    // Safety check
+    if (!reportStats || !groups || !attendanceData) {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                <h1 className="text-2xl font-bold">Loading Reports...</h1>
+                <p className="text-muted-foreground">Please wait while we load the reports data.</p>
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-8 pb-12">
             {/* Header with filters */}
@@ -214,25 +224,32 @@ export function ReportsClient({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/50">
-                                {groups.map((group) => {
-                                    const groupMembers = group.members.length
-                                    const establishedInGroup = group.members.filter((m) => m.status === "ESTABLISHED").length
-                                    const groupMemberIds = group.members.map((m) => m.id)
-                                    const groupAttendance = attendanceData.filter((a) => groupMemberIds.includes(a.memberId))
-                                    const groupPresent = groupAttendance.filter((a) => a.isPresent).length
-                                    const groupRate = groupAttendance.length > 0 ? Math.round((groupPresent / groupAttendance.length) * 100) : 0
-                                    return (
-                                        <tr key={group.id} className="hover:bg-primary/5 transition-colors">
-                                            <td className="p-4 font-semibold">{group.name}</td>
-                                            <td className="p-4 text-center">{groupMembers}</td>
-                                            <td className="p-4 text-center text-primary font-bold">{groupRate}%</td>
-                                            <td className="p-4 text-center">{establishedInGroup}</td>
-                                            <td className="p-4 text-right text-green-500 font-medium">
-                                                {groupRate > 80 ? "+5%" : groupRate > 60 ? "+2%" : "0%"}
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
+                                {groups.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                                            No groups found. Add groups and members to see reports.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    groups.map((group) => {
+                                        const groupMembers = group.members.length
+                                        const establishedInGroup = group.members.filter((m) => m.status === "ESTABLISHED").length
+                                        const groupMemberIds = group.members.map((m) => m.id)
+                                        const groupAttendance = attendanceData.filter((a) => groupMemberIds.includes(a.memberId))
+                                        const groupPresent = groupAttendance.filter((a) => a.isPresent).length
+                                        const groupRate = groupAttendance.length > 0 ? Math.round((groupPresent / groupAttendance.length) * 100) : 0
+                                        return (
+                                            <tr key={group.id} className="hover:bg-primary/5 transition-colors">
+                                                <td className="p-4 font-semibold">{group.name}</td>
+                                                <td className="p-4 text-center">{groupMembers}</td>
+                                                <td className="p-4 text-center text-primary font-bold">{groupRate}%</td>
+                                                <td className="p-4 text-center">{establishedInGroup}</td>
+                                                <td className="p-4 text-right text-muted-foreground font-medium">
+                                                    —
+                                                </td>
+                                            </tr>
+                                        )
+                                    }))}
                             </tbody>
                         </table>
                     </div>

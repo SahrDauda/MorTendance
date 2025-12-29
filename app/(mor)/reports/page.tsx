@@ -44,28 +44,92 @@ export default async function ReportsPage({
       where: { joinedAt: { gte: quarterStart, lte: quarterEnd } },
     })
 
+    // Calculate previous quarter for comparison
+    const prevQuarterStart = new Date(parseInt(year), quarterStartMonth - 3, 1)
+    const prevQuarterEnd = new Date(parseInt(year), quarterStartMonth, 0)
+
+    // Previous quarter attendance
+    const prevAttendanceRecords = await db.attendance.count({
+      where: { date: { gte: prevQuarterStart, lte: prevQuarterEnd } },
+    })
+    const prevPresentRecords = await db.attendance.count({
+      where: { isPresent: true, date: { gte: prevQuarterStart, lte: prevQuarterEnd } },
+    })
+    const prevAttendanceRate = prevAttendanceRecords > 0 ? Math.round((prevPresentRecords / prevAttendanceRecords) * 100) : 0
+
+    // Previous quarter members
+    const prevTotalMembers = await db.member.count({
+      where: { joinedAt: { lte: prevQuarterEnd } },
+    })
+
+    // Previous quarter new members
+    const prevNewMembers = await db.member.count({
+      where: { joinedAt: { gte: prevQuarterStart, lte: prevQuarterEnd } },
+    })
+
+    // Previous quarter established
+    const prevEstablishedMembers = await db.member.count({
+      where: {
+        status: "ESTABLISHED",
+        joinedAt: { lte: prevQuarterEnd }
+      },
+    })
+    const prevEstablishedRatio = prevTotalMembers > 0 ? Math.round((prevEstablishedMembers / prevTotalMembers) * 100) : 0
+
+    // Calculate trends (only if we have previous quarter data)
+    const hasPrevQuarter = prevQuarterStart.getTime() > 0 && prevQuarterEnd.getTime() > 0
+
+    const attendanceTrend = hasPrevQuarter && prevAttendanceRate > 0
+      ? ((attendanceRate - prevAttendanceRate) / prevAttendanceRate * 100).toFixed(1)
+      : "0.0"
+    const memberTrend = hasPrevQuarter && prevTotalMembers > 0
+      ? (totalMembers - prevTotalMembers).toString()
+      : totalMembers.toString()
+    const newMembersTrend = hasPrevQuarter && prevNewMembers > 0
+      ? ((newMembers - prevNewMembers) / prevNewMembers * 100).toFixed(1)
+      : "0.0"
+    const establishedRatio = totalMembers > 0 ? Math.round((establishedMembers / totalMembers) * 100) : 0
+    const establishedTrend = hasPrevQuarter && prevEstablishedRatio > 0
+      ? ((establishedRatio - prevEstablishedRatio) / prevEstablishedRatio * 100).toFixed(1)
+      : "0.0"
+
     // Prepare stat cards
     const reportStats = [
       {
         label: "Overall Attendance",
         value: `${attendanceRate}%`,
-        trend: "+2.4%",
-        trendUp: true,
+        trend: hasPrevQuarter ? `${parseFloat(attendanceTrend) >= 0 ? "+" : ""}${attendanceTrend}%` : "N/A",
+        trendUp: parseFloat(attendanceTrend) >= 0,
         icon: BarChart3,
       },
-      { label: "Member Growth", value: totalMembers.toString(), trend: "+12", trendUp: true, icon: Users },
-      { label: "New Members", value: newMembers.toString(), trend: "+5%", trendUp: true, icon: Calendar },
+      {
+        label: "Total Members",
+        value: totalMembers.toString(),
+        trend: hasPrevQuarter ? `${parseInt(memberTrend) >= 0 ? "+" : ""}${memberTrend}` : "N/A",
+        trendUp: parseInt(memberTrend) >= 0,
+        icon: Users
+      },
+      {
+        label: "New Members",
+        value: newMembers.toString(),
+        trend: hasPrevQuarter ? `${parseFloat(newMembersTrend) >= 0 ? "+" : ""}${newMembersTrend}%` : "N/A",
+        trendUp: parseFloat(newMembersTrend) >= 0,
+        icon: Calendar
+      },
       {
         label: "Established Ratio",
-        value: `${totalMembers > 0 ? Math.round((establishedMembers / totalMembers) * 100) : 0}%`,
-        trend: "+5.1%",
-        trendUp: true,
+        value: `${establishedRatio}%`,
+        trend: hasPrevQuarter ? `${parseFloat(establishedTrend) >= 0 ? "+" : ""}${establishedTrend}%` : "N/A",
+        trendUp: parseFloat(establishedTrend) >= 0,
         icon: Calendar,
       },
     ]
 
-    // Fetch groups and attendance for detailed table
+    // Fetch groups and attendance for detailed table (role-based)
     const groups = await db.ministryGroup.findMany({
+      where: session.user.role === "LEADER"
+        ? { leaderId: session.user.id }
+        : {},
       include: {
         members: {
           select: {
@@ -75,12 +139,20 @@ export default async function ReportsPage({
         },
       },
     })
-    const attendanceData = await db.attendance.findMany({
-      select: {
-        memberId: true,
-        isPresent: true,
-      },
-    })
+
+    // Get member IDs from the groups
+    const groupMemberIds = groups.flatMap((g) => g.members.map((m) => m.id))
+
+    // Fetch attendance data for these members
+    const attendanceData = groupMemberIds.length > 0
+      ? await db.attendance.findMany({
+        where: { memberId: { in: groupMemberIds } },
+        select: {
+          memberId: true,
+          isPresent: true,
+        },
+      })
+      : []
 
     return (
       <ReportsClient

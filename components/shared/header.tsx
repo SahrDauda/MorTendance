@@ -26,9 +26,20 @@ export function Header() {
   const { user } = useSession()
 
   const handleSignOut = async () => {
-    await signOut({ redirect: false })
-    router.push("/auth/signin")
-    router.refresh()
+    try {
+      // Use signOut from next-auth/react which works with NextAuth v5
+      const result = await signOut({
+        redirect: false,
+        callbackUrl: "/auth/signin"
+      })
+
+      // Force navigation to signin page
+      window.location.href = "/auth/signin"
+    } catch (error) {
+      console.error("Sign out error:", error)
+      // Fallback: force redirect to signin
+      window.location.href = "/auth/signin"
+    }
   }
 
   const initials = user?.name

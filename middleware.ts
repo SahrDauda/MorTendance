@@ -23,8 +23,9 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL("/auth/signin", req.url))
   }
 
-  // Redirect unauthenticated users from root and dashboard routes to signin
-  if ((isRoot || !isAuthPage) && !req.auth) {
+  // Allow root page to be accessible (it will show landing page for unauthenticated users)
+  // Redirect unauthenticated users from dashboard routes to signin
+  if (!isRoot && !isAuthPage && !req.auth) {
     return NextResponse.redirect(new URL("/auth/signin", req.url))
   }
 
