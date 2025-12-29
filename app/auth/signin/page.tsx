@@ -8,28 +8,45 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { Logo } from "@/components/shared/logo"
-import { Mail, Lock, ArrowRight } from "lucide-react"
+import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { cn } from "@/lib/utils"
 
 export default function SignInPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
 
+  // Map error codes to user-friendly messages
+  const getErrorMessage = (errorCode: string | null): string => {
+    if (!errorCode) return "An error occurred"
+
+    const errorMap: Record<string, string> = {
+      "CredentialsSignin": "Invalid email or password. Please check your credentials and try again.",
+      "ACCOUNT_NOT_FOUND": "No account found with this email address.",
+      "INVALID_PASSWORD": "Incorrect password. Please try again.",
+      "MISSING_CREDENTIALS": "Please enter both email and password.",
+      "DATABASE_ERROR": "A database error occurred. Please try again later.",
+      "Configuration": "Authentication is not properly configured. Please contact support.",
+    }
+
+    return errorMap[errorCode] || "Invalid email or password. Please check your credentials and try again."
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null) // Clear previous errors
 
     if (!formData.email.trim() || !formData.password.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter both email and password",
-        variant: "destructive",
-      })
+      const errorMsg = "Please enter both email and password"
+      setError(errorMsg)
+      toast.error(errorMsg)
       return
     }
 
@@ -42,30 +59,32 @@ export default function SignInPage() {
         redirect: false,
       })
 
-      if (result?.error) {
-        let errorDescription = "Invalid email or password"
-        if (result.error === "Configuration") {
-          errorDescription = "Auth is not properly configured"
-        }
+      console.log("Sign in result:", result)
 
-        toast({
-          title: "Sign In Failed",
-          description: errorDescription,
-          variant: "destructive",
+      if (result?.error) {
+        const errorMessage = getErrorMessage(result.error)
+        setError(errorMessage)
+        toast.error("Sign In Failed", {
+          description: errorMessage,
         })
-      } else {
-        toast({
-          title: "Success",
-          description: "Signed in successfully",
-        })
+      } else if (result?.ok) {
+        toast.success("Signed in successfully")
         router.push("/")
         router.refresh()
+      } else {
+        // If no error but also not ok, show generic error
+        const errorMessage = "Failed to sign in. Please check your credentials."
+        setError(errorMessage)
+        toast.error("Sign In Failed", {
+          description: errorMessage,
+        })
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
+    } catch (error: any) {
+      console.error("Sign in error:", error)
+      const errorMessage = error?.message || "An unexpected error occurred. Please try again."
+      setError(errorMessage)
+      toast.error("Error", {
+        description: errorMessage,
       })
     } finally {
       setLoading(false)
@@ -97,6 +116,14 @@ export default function SignInPage() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-5">
+            {/* Error Alert */}
+            {error && (
+              <Alert variant="destructive" className="animate-in fade-in-0 slide-in-from-top-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2.5">
               <Label htmlFor="email" className="text-sm font-medium">
                 Email Address
@@ -108,10 +135,16 @@ export default function SignInPage() {
                   type="email"
                   placeholder="you@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value })
+                    setError(null) // Clear error when user types
+                  }}
                   required
                   disabled={loading}
-                  className="pl-10 h-11 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className={cn(
+                    "pl-10 h-11 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/20",
+                    error && "border-destructive focus-visible:ring-destructive"
+                  )}
                 />
               </div>
             </div>
@@ -126,10 +159,16 @@ export default function SignInPage() {
                   type="password"
                   placeholder="••••••••"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value })
+                    setError(null) // Clear error when user types
+                  }}
                   required
                   disabled={loading}
-                  className="pl-10 h-11 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/20"
+                  className={cn(
+                    "pl-10 h-11 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/20",
+                    error && "border-destructive focus-visible:ring-destructive"
+                  )}
                 />
               </div>
             </div>
