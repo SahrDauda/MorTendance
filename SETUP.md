@@ -1,6 +1,6 @@
-# 🚀 Bridge Platform - Setup Guide
+# 🚀 MorTendance - Setup Guide
 
-This guide will help you set up the Bridge Platform with a real database and authentication.
+This guide will help you set up the MorTendance Attendance System with a real database and authentication.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ cp .env.example .env
 
 ```env
 # Database - Replace with your PostgreSQL connection string
-DATABASE_URL="postgresql://user:password@localhost:5432/bridge_platform?schema=public"
+DATABASE_URL="postgresql://user:password@localhost:5432/mor_attendance?schema=public"
 
 # NextAuth - Generate a secret key
 NEXTAUTH_URL="http://localhost:3000"
@@ -55,12 +55,12 @@ Copy the output and paste it as your `NEXTAUTH_SECRET` value.
 1. Install PostgreSQL if you haven't already
 2. Create a new database:
 ```sql
-CREATE DATABASE bridge_platform;
+CREATE DATABASE mor_attendance;
 ```
 
 3. Update your `DATABASE_URL` in `.env`:
 ```env
-DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/bridge_platform?schema=public"
+DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/mor_attendance?schema=public"
 ```
 
 ### Option B: Cloud Database (Recommended for Production)
@@ -84,20 +84,6 @@ npm run db:push
 ```
 
 This will create all tables in your database based on the Prisma schema.
-
-### Alternative: Use SQL Scripts
-
-If you prefer using the SQL scripts directly:
-
-```bash
-psql -U your_user -d bridge_platform -f scripts/01-create-tables.sql
-psql -U your_user -d bridge_platform -f scripts/02-seed-data.sql
-```
-
-Then generate Prisma Client:
-```bash
-npm run db:generate
-```
 
 ## Step 5: Seed Initial Data (Optional)
 
@@ -200,11 +186,10 @@ npx prisma migrate reset
 
 ## Next Steps
 
-- Add more skills to the database
-- Create opportunities/jobs
+- Add more members to the database
+- Create attendance records
 - Set up email notifications (optional)
-- Configure file uploads for project media
-- Set up blockchain verification (for credentials)
+- Generate reports
 
 ## Support
 
@@ -213,4 +198,3 @@ If you encounter issues:
 2. Review the Prisma logs
 3. Verify all environment variables are set
 4. Ensure database migrations ran successfully
-
