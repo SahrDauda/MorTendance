@@ -5,6 +5,8 @@ import { LeadersClient } from "./leaders-client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ShieldCheck, Users, Building2 } from "lucide-react"
 
+export const dynamic = 'force-dynamic'
+
 export default async function LeadersPage() {
     const session = await auth()
     if (!session) redirect("/auth/signin")

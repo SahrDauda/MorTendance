@@ -16,6 +16,8 @@ import { ShieldCheck, Users, Building2, Mail, Calendar, Phone, ArrowLeft } from 
 import Link from "next/link"
 import { format } from "date-fns"
 
+export const dynamic = 'force-dynamic'
+
 export default async function LeaderDetailPage({ params }: { params: { id: string } }) {
     const session = await auth()
     if (!session) redirect("/auth/signin")

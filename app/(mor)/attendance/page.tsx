@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { AttendanceClient } from "./attendance-client"
 
+export const dynamic = 'force-dynamic'
+
 export default async function AttendancePage() {
     const session = await auth()
     if (!session) redirect("/auth/signin")
@@ -44,7 +46,7 @@ export default async function AttendancePage() {
             </div>
 
             <AttendanceClient
-                initialGroups={groups}
+                initialGroups={groups as any}
                 allMembers={allMembers as any}
                 userRole={session.user.role}
             />

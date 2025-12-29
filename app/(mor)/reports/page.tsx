@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 import { ReportsClient } from "./reports-client"
 import { BarChart3, Users, Calendar } from "lucide-react"
 
+export const dynamic = 'force-dynamic'
+
 export default async function ReportsPage({
   searchParams,
 }: {
