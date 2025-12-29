@@ -1,11 +1,9 @@
 import { auth } from "@/lib/auth"
 import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
 
 export default auth(async (req) => {
   const { pathname } = req.nextUrl
   const isAuthPage = pathname.startsWith("/auth")
-  const isOnboardingPage = pathname.startsWith("/onboarding")
   const isApiRoute = pathname.startsWith("/api")
   const isPublicRoute = pathname.startsWith("/public")
   const isRoot = pathname === "/"
@@ -21,7 +19,7 @@ export default auth(async (req) => {
   }
 
   // Redirect unauthenticated users from root and dashboard routes to signin
-  if ((isRoot || (!isAuthPage && !isOnboardingPage)) && !req.auth) {
+  if ((isRoot || !isAuthPage) && !req.auth) {
     return NextResponse.redirect(new URL("/auth/signin", req.url))
   }
 
@@ -31,4 +29,3 @@ export default auth(async (req) => {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 }
-
