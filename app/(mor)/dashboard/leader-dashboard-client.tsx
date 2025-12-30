@@ -12,6 +12,15 @@ import {
     ArrowUpRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+
+const iconMap = {
+    Users,
+    ClipboardCheck,
+    TrendingUp,
+    Award,
+    PlusCircle,
+    FileText,
+}
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -58,7 +67,7 @@ interface LeaderDashboardClientProps {
     stats: Array<{
         name: string
         value: string
-        icon: React.ComponentType<{ className?: string }>
+        iconName: "Users" | "ClipboardCheck" | "TrendingUp" | "Award" | "PlusCircle" | "FileText"
         color: string
         trend: string
     }>
@@ -240,7 +249,10 @@ export function LeaderDashboardClient({
                         <CardContent className="p-4 flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                                 <div className={cn("rounded-lg p-2 bg-muted/50 group-hover:bg-primary/10 transition-colors")}>
-                                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                                    {(() => {
+                                        const Icon = iconMap[stat.iconName as keyof typeof iconMap]
+                                        return <Icon className={`h-5 w-5 ${stat.color}`} />
+                                    })()}
                                 </div>
                                 <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>

@@ -1,4 +1,3 @@
-import { db } from "@/lib/db"
 import {
     Users,
     ClipboardCheck,
@@ -9,49 +8,46 @@ import { AdminDashboardClient } from "./admin-dashboard-client"
 
 export async function AdminDashboard() {
     try {
-        // Fetch admin-specific stats
-        const totalMembers = await db.member.count()
-        const totalLeaders = await db.user.count({ where: { role: "LEADER" } })
-        const totalGroups = await db.ministryGroup.count()
-        const establishedMembers = await db.member.count({ where: { status: "ESTABLISHED" } })
+        // Mock data for Admin Dashboard
+        const totalMembers = 150
+        const totalLeaders = 12
+        const totalGroups = 8
+        const establishedMembers = 120
+        const attendanceRate = 85
 
-        // Calculate average attendance
-        const totalAttendanceRecords = await db.attendance.count()
-        const presentRecords = await db.attendance.count({ where: { isPresent: true } })
-        const attendanceRate = totalAttendanceRecords > 0
-            ? Math.round((presentRecords / totalAttendanceRecords) * 100)
-            : 0
-
-        // Get leaders with their groups
-        const leaders = await db.user.findMany({
-            where: { role: "LEADER" },
-            include: {
-                managedGroups: {
-                    include: {
-                        _count: {
-                            select: { members: true },
-                        },
-                    },
-                },
+        const leaders = [
+            {
+                id: "mock-leader-1",
+                name: "John Leader",
+                email: "john@example.com",
+                managedGroups: [
+                    { id: "g1", name: "Youth Fellowship", _count: { members: 25 } }
+                ]
             },
-            take: 5,
-            orderBy: { createdAt: "desc" },
-        })
+            {
+                id: "mock-leader-2",
+                name: "Sarah Coordinator",
+                email: "sarah@example.com",
+                managedGroups: [
+                    { id: "g2", name: "Men's Ministry", _count: { members: 30 } },
+                    { id: "g3", name: "Prayer Team", _count: { members: 15 } }
+                ]
+            }
+        ]
 
-        // Get all groups for the add member modal
-        const groups = await db.ministryGroup.findMany({
-            select: {
-                id: true,
-                name: true,
-            },
-            orderBy: { name: "asc" },
-        })
+        const groups = [
+            { id: "g1", name: "Youth Fellowship" },
+            { id: "g2", name: "Men's Ministry" },
+            { id: "g3", name: "Prayer Team" },
+            { id: "g4", name: "Women's Fellowship" },
+            { id: "g5", name: "Children's Church" },
+        ]
 
         const stats = [
-            { name: "Total Members", value: totalMembers.toString(), icon: Users, color: "text-blue-500", trend: "Across all groups" },
-            { name: "Leaders", value: totalLeaders.toString(), icon: ShieldCheck, color: "text-purple-500", trend: "Active leaders" },
-            { name: "Groups", value: totalGroups.toString(), icon: Building2, color: "text-green-500", trend: "Ministry groups" },
-            { name: "Attendance Rate", value: `${attendanceRate}%`, icon: ClipboardCheck, color: "text-amber-500", trend: "Overall consistency" },
+            { name: "Total Members", value: totalMembers.toString(), iconName: "Users" as const, color: "text-blue-500", trend: "Across all groups" },
+            { name: "Leaders", value: totalLeaders.toString(), iconName: "ShieldCheck" as const, color: "text-purple-500", trend: "Active leaders" },
+            { name: "Groups", value: totalGroups.toString(), iconName: "Building2" as const, color: "text-green-500", trend: "Ministry groups" },
+            { name: "Attendance Rate", value: `${attendanceRate}%`, iconName: "ClipboardCheck" as const, color: "text-amber-500", trend: "Overall consistency" },
         ]
 
         return (

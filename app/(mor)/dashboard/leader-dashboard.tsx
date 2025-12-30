@@ -68,10 +68,10 @@ export async function LeaderDashboard() {
             : 0
 
         const stats = [
-            { name: "My Members", value: totalMembers.toString(), icon: Users, color: "text-blue-500", trend: "In my groups" },
-            { name: "Attendance Rate", value: `${attendanceRate}%`, icon: ClipboardCheck, color: "text-green-500", trend: "Group consistency" },
-            { name: "New Members", value: newMembers.toString(), icon: TrendingUp, color: "text-amber-500", trend: "Preliminary status" },
-            { name: "Established", value: establishedMembers.toString(), icon: Award, color: "text-purple-500", trend: "Consistent growth" },
+            { name: "My Members", value: totalMembers.toString(), iconName: "Users" as const, color: "text-blue-500", trend: "In my groups" },
+            { name: "Attendance Rate", value: `${attendanceRate}%`, iconName: "ClipboardCheck" as const, color: "text-green-500", trend: "Group consistency" },
+            { name: "New Members", value: newMembers.toString(), iconName: "TrendingUp" as const, color: "text-amber-500", trend: "Preliminary status" },
+            { name: "Established", value: establishedMembers.toString(), iconName: "Award" as const, color: "text-purple-500", trend: "Consistent growth" },
         ]
 
         // Get all members for the attendance modal
