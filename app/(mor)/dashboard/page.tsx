@@ -6,23 +6,23 @@ import { LeaderDashboard } from "./leader-dashboard"
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
+    const session = await auth()
+    console.log("[Dashboard] Session:", session)
+
+    if (!session || !session.user) {
+        console.error("[Dashboard] No session or user found")
+        redirect("/auth/signin")
+    }
+
+    const userRole = session.user?.role
+    console.log("[Dashboard] User role:", userRole)
+
+    if (!userRole) {
+        console.error("[Dashboard] User role is missing")
+        redirect("/auth/signin")
+    }
+
     try {
-        const session = await auth()
-        console.log("[Dashboard] Session:", session)
-
-        if (!session || !session.user) {
-            console.error("[Dashboard] No session or user found")
-            redirect("/auth/signin")
-        }
-
-        const userRole = session.user?.role
-        console.log("[Dashboard] User role:", userRole)
-
-        if (!userRole) {
-            console.error("[Dashboard] User role is missing")
-            redirect("/auth/signin")
-        }
-
         // Render role-based dashboard
         if (userRole === "ADMIN") {
             return <AdminDashboard />
