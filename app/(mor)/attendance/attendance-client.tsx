@@ -163,7 +163,7 @@ export function AttendanceClient({ initialGroups, allMembers, userRole }: Attend
     return (
         <div className="grid gap-6">
             {/* Dashboard Highlights */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                 <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
                     <CardContent className="p-6 flex items-center gap-4">
                         <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">

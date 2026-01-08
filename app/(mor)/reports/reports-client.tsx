@@ -148,7 +148,7 @@ export function ReportsClient({
             </div>
 
             {/* Stat cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 {reportStats.map((stat) => (
                     <Card key={stat.label} className="border-border/50 bg-card/50 backdrop-blur-sm">
                         <CardContent className="p-6">
