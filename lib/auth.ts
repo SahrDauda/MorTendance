@@ -17,23 +17,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const password = credentials?.password?.toString() || ""
 
           if (!email || !password) {
-            console.log("[Auth] Missing credentials")
             return null
           }
 
-          console.log("[Auth] Attempting login with mock data for:", email)
+          console.log("[Auth] Attempting login for:", email)
 
-          // Find user in mock data
           const user = MOCK_USERS.find(u => u.email === email)
 
-          if (!user) {
-            console.log("[Auth] User not found in mock data:", email)
-            return null
-          }
-
-          // For mock data, we check plain text password
-          if (password === user.password) {
-            console.log("[Auth] Login successful for:", email)
+          if (user && password === user.password) {
+            console.log("[Auth] Login successful")
             return {
               id: user.id,
               email: user.email,
@@ -42,7 +34,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
           }
 
-          console.log("[Auth] Invalid password for:", email)
+          console.log("[Auth] Invalid credentials")
           return null
         } catch (error) {
           console.error("[Auth] Authorize error:", error)

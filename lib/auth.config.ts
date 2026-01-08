@@ -1,26 +1,34 @@
 import type { NextAuthConfig } from "next-auth"
 
+// Helper to get and trim environment variables
+const getEnv = (key: string) => process.env[key]?.trim() || ""
+
 export const authConfig = {
     pages: {
         signIn: "/auth/signin",
     },
+    debug: process.env.NODE_ENV === "development",
     callbacks: {
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user
-            const isOnDashboard = nextUrl.pathname.startsWith('/dashboard') ||
-                nextUrl.pathname.startsWith('/attendance') ||
-                nextUrl.pathname.startsWith('/members') ||
-                nextUrl.pathname.startsWith('/reports') ||
-                nextUrl.pathname.startsWith('/admin') ||
-                nextUrl.pathname === '/';
+            const { pathname } = nextUrl
 
-            if (isOnDashboard) {
-                if (isLoggedIn) return true
-                return false // Redirect unauthenticated users to login page
-            } else if (isLoggedIn && nextUrl.pathname.startsWith('/auth')) {
-                return Response.redirect(new URL('/dashboard', nextUrl))
+            // 1. Allow API routes and Public assets
+            if (pathname.startsWith('/api') || pathname.startsWith('/public')) {
+                return true
             }
-            return true
+
+            // 2. Handle Auth Pages (Signin/Signup)
+            const isAuthPage = pathname.startsWith('/auth')
+            if (isAuthPage) {
+                if (isLoggedIn) {
+                    return Response.redirect(new URL('/dashboard', nextUrl))
+                }
+                return true
+            }
+
+            // 3. Protect everything else
+            return isLoggedIn
         },
         async jwt({ token, user }) {
             if (user) {
@@ -41,8 +49,7 @@ export const authConfig = {
     session: {
         strategy: "jwt",
     },
-    // IMPORTANT: On Vercel, ensure AUTH_SECRET is set in the dashboard.
-    // We use a fallback only for local development to prevent crashes.
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "fallback-secret-for-dev-only",
+    // Trim secrets to prevent "Invalid URL" or "Configuration" errors caused by trailing spaces
+    secret: getEnv("AUTH_SECRET") || getEnv("NEXTAUTH_SECRET") || "fallback-secret-for-dev-only",
     trustHost: true,
 } satisfies NextAuthConfig
