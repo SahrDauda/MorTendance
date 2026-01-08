@@ -12,36 +12,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email?.toString().trim().toLowerCase() || ""
-        const password = credentials?.password?.toString() || ""
+        try {
+          const email = credentials?.email?.toString().trim().toLowerCase() || ""
+          const password = credentials?.password?.toString() || ""
 
-        if (!email || !password) {
-          return null
-        }
-
-        console.log("[Auth] Attempting login with mock data for:", email)
-
-        // Find user in mock data
-        const user = MOCK_USERS.find(u => u.email === email)
-
-        if (!user) {
-          console.log("[Auth] User not found in mock data")
-          return null
-        }
-
-        // For mock data, we check plain text password
-        if (password === user.password) {
-          console.log("[Auth] Login successful for:", email)
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
+          if (!email || !password) {
+            console.log("[Auth] Missing credentials")
+            return null
           }
-        }
 
-        console.log("[Auth] Invalid password")
-        return null
+          console.log("[Auth] Attempting login with mock data for:", email)
+
+          // Find user in mock data
+          const user = MOCK_USERS.find(u => u.email === email)
+
+          if (!user) {
+            console.log("[Auth] User not found in mock data:", email)
+            return null
+          }
+
+          // For mock data, we check plain text password
+          if (password === user.password) {
+            console.log("[Auth] Login successful for:", email)
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+            }
+          }
+
+          console.log("[Auth] Invalid password for:", email)
+          return null
+        } catch (error) {
+          console.error("[Auth] Authorize error:", error)
+          return null
+        }
       },
     }),
   ],

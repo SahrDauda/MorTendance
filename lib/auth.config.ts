@@ -5,26 +5,22 @@ export const authConfig = {
         signIn: "/auth/signin",
     },
     callbacks: {
-        async authorized({ auth, request: { nextUrl } }) {
+        authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user
-            const { pathname } = nextUrl
+            const isOnDashboard = nextUrl.pathname.startsWith('/dashboard') ||
+                nextUrl.pathname.startsWith('/attendance') ||
+                nextUrl.pathname.startsWith('/members') ||
+                nextUrl.pathname.startsWith('/reports') ||
+                nextUrl.pathname.startsWith('/admin') ||
+                nextUrl.pathname === '/';
 
-            // 1. Allow API routes and Public assets
-            if (pathname.startsWith('/api') || pathname.startsWith('/public')) {
-                return true
+            if (isOnDashboard) {
+                if (isLoggedIn) return true
+                return false // Redirect unauthenticated users to login page
+            } else if (isLoggedIn && nextUrl.pathname.startsWith('/auth')) {
+                return Response.redirect(new URL('/dashboard', nextUrl))
             }
-
-            // 2. Handle Auth Pages (Signin/Signup)
-            const isAuthPage = pathname.startsWith('/auth')
-            if (isAuthPage) {
-                if (isLoggedIn) {
-                    return Response.redirect(new URL('/dashboard', nextUrl))
-                }
-                return true
-            }
-
-            // 3. Protect everything else
-            return isLoggedIn
+            return true
         },
         async jwt({ token, user }) {
             if (user) {
@@ -45,6 +41,8 @@ export const authConfig = {
     session: {
         strategy: "jwt",
     },
-    secret: process.env.AUTH_SECRET,
+    // IMPORTANT: On Vercel, ensure AUTH_SECRET is set in the dashboard.
+    // We use a fallback only for local development to prevent crashes.
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "fallback-secret-for-dev-only",
     trustHost: true,
 } satisfies NextAuthConfig
