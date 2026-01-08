@@ -7,15 +7,24 @@ export const authConfig = {
     callbacks: {
         async authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user
-            const isOnDashboard = !nextUrl.pathname.startsWith('/auth')
+            const { pathname } = nextUrl
 
-            if (isOnDashboard) {
-                if (isLoggedIn) return true
-                return false // Redirect to login
-            } else if (isLoggedIn) {
-                return Response.redirect(new URL('/', nextUrl))
+            // 1. Allow API routes and Public assets
+            if (pathname.startsWith('/api') || pathname.startsWith('/public')) {
+                return true
             }
-            return true
+
+            // 2. Handle Auth Pages (Signin/Signup)
+            const isAuthPage = pathname.startsWith('/auth')
+            if (isAuthPage) {
+                if (isLoggedIn) {
+                    return Response.redirect(new URL('/dashboard', nextUrl))
+                }
+                return true
+            }
+
+            // 3. Protect everything else
+            return isLoggedIn
         },
         async jwt({ token, user }) {
             if (user) {
@@ -36,6 +45,6 @@ export const authConfig = {
     session: {
         strategy: "jwt",
     },
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    secret: process.env.AUTH_SECRET,
     trustHost: true,
 } satisfies NextAuthConfig
