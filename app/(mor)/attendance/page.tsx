@@ -1,4 +1,3 @@
-import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { AttendanceClient } from "./attendance-client"
@@ -9,34 +8,39 @@ export default async function AttendancePage() {
     const session = await auth()
     if (!session) redirect("/auth/signin")
 
-    // Fetch groups the user can manage
-    const groups = await db.ministryGroup.findMany({
-        where: session.user.role === "LEADER"
-            ? { leaderId: session.user.id }
-            : {},
-        include: {
-            members: {
-                orderBy: { name: "asc" }
-            }
-        }
-    })
+    console.log("[AttendancePage] Using mock data")
 
-    // Fetch all members for the "Add Attendance" modal and dashboard
-    const allMembers = await db.member.findMany({
-        include: {
-            _count: {
-                select: { attendance: true }
-            },
-            group: {
-                select: { name: true }
-            }
-        },
-        orderBy: {
-            attendance: {
-                _count: 'desc'
-            }
+    // Mock groups
+    const groups = [
+        {
+            id: "group-1",
+            name: "Huiothesia",
+            members: [
+                { id: "m1", name: "Mock Member 1", status: "ESTABLISHED" },
+                { id: "m2", name: "Mock Member 2", status: "PRELIMINARY" },
+            ]
         }
-    })
+    ]
+
+    // Mock members
+    const allMembers = [
+        {
+            id: "m1",
+            name: "Mock Member 1",
+            status: "ESTABLISHED",
+            groupId: "group-1",
+            group: { name: "Huiothesia" },
+            _count: { attendance: 10 }
+        },
+        {
+            id: "m2",
+            name: "Mock Member 2",
+            status: "PRELIMINARY",
+            groupId: "group-1",
+            group: { name: "Huiothesia" },
+            _count: { attendance: 2 }
+        }
+    ]
 
     return (
         <div className="space-y-8">

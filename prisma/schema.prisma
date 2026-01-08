@@ -71,13 +71,3 @@ model Attendance {
   @@unique([memberId, date])
   @@map("attendance")
 }
-
-model AIInsight {
-  id        String   @id @default(uuid())
-  type      String   // 'GROUP_PERFORMANCE', 'MEMBER_RETENTION', 'GROWTH_PREDICTION'
-  content   String   @db.Text
-  targetId  String?  // Optional ID of group or member
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("ai_insights")
-}

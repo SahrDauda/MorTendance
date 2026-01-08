@@ -1,7 +1,5 @@
 "use server"
 
-import { db } from "@/lib/db"
-import bcrypt from "bcryptjs"
 import { z } from "zod"
 
 const registerSchema = z.object({
@@ -15,39 +13,18 @@ export async function registerAction(formData: z.infer<typeof registerSchema>) {
         const validatedData = registerSchema.parse(formData)
         const email = validatedData.email.toLowerCase()
 
-        // Check if user already exists
-        const existingUser = await db.user.findUnique({
-            where: { email },
-        })
+        console.log("[Auth Action] Mock registration for:", email)
 
-        if (existingUser) {
-            return { error: "User with this email already exists" }
-        }
-
-        // Hash password
-        const passwordHash = await bcrypt.hash(validatedData.password, 10)
-
-        // Check if this is the first user (make them ADMIN)
-        const userCount = await db.user.count()
-        const role = userCount === 0 ? "ADMIN" : "LEADER"
-
-        // Create user
-        const user = await db.user.create({
-            data: {
+        // Mock success
+        return {
+            success: true,
+            user: {
+                id: "mock-id-" + Date.now(),
                 email,
                 name: validatedData.name,
-                passwordHash,
-                role,
-            },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                role: true,
-            },
-        })
-
-        return { success: true, user }
+                role: "LEADER",
+            }
+        }
     } catch (error) {
         if (error instanceof z.ZodError) {
             return { error: error.errors[0].message }

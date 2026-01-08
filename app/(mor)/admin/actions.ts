@@ -1,9 +1,7 @@
 "use server"
 
-import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
-import bcrypt from "bcryptjs"
 import { z } from "zod"
 
 const addLeaderSchema = z.object({
@@ -23,47 +21,22 @@ export async function addLeaderAction(formData: z.infer<typeof addLeaderSchema>)
         const validatedData = addLeaderSchema.parse(formData)
         const email = validatedData.email.toLowerCase().trim()
 
-        // Check if user already exists
-        const existingUser = await db.user.findUnique({
-            where: { email },
-        })
+        console.log("[Admin Action] Mock add leader:", email)
 
-        if (existingUser) {
-            return { error: "User with this email already exists" }
-        }
-
-        // Hash password
-        const passwordHash = await bcrypt.hash(validatedData.password, 10)
-
-        // Create leader user
-        const leader = await db.user.create({
-            data: {
-                email,
-                name: validatedData.name,
-                passwordHash,
-                role: "LEADER",
-            },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                role: true,
-                createdAt: true,
-            },
-        })
-
-        // Assign group if provided
-        if (validatedData.groupId) {
-            await db.ministryGroup.update({
-                where: { id: validatedData.groupId },
-                data: { leaderId: leader.id },
-            })
-        }
-
+        // Mock success
         revalidatePath("/admin/leaders")
         revalidatePath("/dashboard")
 
-        return { success: true, leader }
+        return {
+            success: true,
+            leader: {
+                id: "mock-leader-" + Date.now(),
+                email,
+                name: validatedData.name,
+                role: "LEADER",
+                createdAt: new Date(),
+            }
+        }
     } catch (error) {
         if (error instanceof z.ZodError) {
             return { error: error.errors[0].message }
@@ -79,30 +52,20 @@ export async function getLeadersAction() {
         throw new Error("Unauthorized: Admin access required")
     }
 
-    const leaders = await db.user.findMany({
-        where: { role: "LEADER" },
-        include: {
-            managedGroups: {
-                include: {
-                    members: {
-                        select: {
-                            id: true,
-                            name: true,
-                            status: true,
-                            phoneNumber: true,
-                            joinedAt: true,
-                        },
-                    },
-                    _count: {
-                        select: { members: true },
-                    },
-                },
-            },
-        },
-        orderBy: { createdAt: "desc" },
-    })
+    console.log("[Admin Action] Mock get leaders")
 
-    return leaders
+    return [
+        {
+            id: "leader-1",
+            name: "John Leader",
+            email: "leader@mor.org",
+            role: "LEADER",
+            managedGroups: [
+                { id: "g1", name: "Huiothesia", _count: { members: 12 } }
+            ],
+            createdAt: new Date()
+        }
+    ]
 }
 
 export async function getLeaderDetailsAction(leaderId: string) {
@@ -111,36 +74,29 @@ export async function getLeaderDetailsAction(leaderId: string) {
         throw new Error("Unauthorized: Admin access required")
     }
 
-    const leader = await db.user.findUnique({
-        where: { id: leaderId, role: "LEADER" },
-        include: {
-            managedGroups: {
-                include: {
-                    members: {
-                        include: {
-                            attendance: {
-                                orderBy: { date: "desc" },
-                                take: 10,
-                            },
-                            _count: {
-                                select: {
-                                    attendance: {
-                                        where: { isPresent: true },
-                                    },
-                                },
-                            },
-                        },
-                        orderBy: { name: "asc" },
-                    },
-                },
-            },
-        },
-    })
+    console.log("[Admin Action] Mock get leader details for:", leaderId)
 
-    if (!leader) {
-        throw new Error("Leader not found")
+    return {
+        id: leaderId,
+        name: "John Leader",
+        email: "leader@mor.org",
+        role: "LEADER",
+        createdAt: new Date(),
+        managedGroups: [
+            {
+                id: "g1",
+                name: "Huiothesia",
+                members: [
+                    {
+                        id: "m1",
+                        name: "Mock Member 1",
+                        phoneNumber: "123-456-7890",
+                        status: "ESTABLISHED",
+                        joinedAt: new Date(),
+                        _count: { attendance: 15 }
+                    }
+                ]
+            }
+        ]
     }
-
-    return leader
 }
-

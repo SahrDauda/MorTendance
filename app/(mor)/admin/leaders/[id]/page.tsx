@@ -1,4 +1,3 @@
-import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { redirect, notFound } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -23,42 +22,35 @@ export default async function LeaderDetailPage({ params }: { params: { id: strin
     if (!session) redirect("/auth/signin")
     if (session.user.role !== "ADMIN") redirect("/dashboard")
 
-    const leader = await db.user.findUnique({
-        where: { id: params.id, role: "LEADER" },
-        include: {
-            managedGroups: {
-                include: {
-                    members: {
-                        include: {
-                            _count: {
-                                select: {
-                                    attendance: {
-                                        where: { isPresent: true },
-                                    },
-                                },
-                            },
-                        },
-                        orderBy: { name: "asc" },
-                    },
-                },
-            },
-        },
-    })
+    console.log("[LeaderDetailPage] Using mock data for ID:", params.id)
 
-    if (!leader) {
-        notFound()
+    // Mock leader
+    const leader = {
+        id: params.id,
+        name: "John Leader",
+        email: "leader@mor.org",
+        role: "LEADER",
+        createdAt: new Date(),
+        managedGroups: [
+            {
+                id: "g1",
+                name: "Huiothesia",
+                members: [
+                    {
+                        id: "m1",
+                        name: "Mock Member 1",
+                        phoneNumber: "123-456-7890",
+                        status: "ESTABLISHED",
+                        joinedAt: new Date(),
+                        _count: { attendance: 15 }
+                    }
+                ]
+            }
+        ]
     }
 
-    const totalMembers = leader.managedGroups.reduce(
-        (sum, group) => sum + group.members.length,
-        0
-    )
-
-    const establishedMembers = leader.managedGroups.reduce(
-        (sum, group) =>
-            sum + group.members.filter((m) => m.status === "ESTABLISHED").length,
-        0
-    )
+    const totalMembers = 1
+    const establishedMembers = 1
 
     return (
         <div className="space-y-8">
@@ -122,94 +114,80 @@ export default async function LeaderDetailPage({ params }: { params: { id: strin
             </Card>
 
             {/* Groups and Members */}
-            {leader.managedGroups.length === 0 ? (
-                <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                    <CardContent className="py-12 text-center">
-                        <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-20" />
-                        <p className="text-muted-foreground">This leader is not assigned to any groups yet.</p>
+            {leader.managedGroups.map((group) => (
+                <Card key={group.id} className="border-border/50 bg-card/50 backdrop-blur-sm">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Building2 className="h-5 w-5 text-primary" />
+                                    {group.name}
+                                </CardTitle>
+                                <CardDescription className="mt-1">
+                                    {group.members.length} member{group.members.length !== 1 ? "s" : ""}
+                                </CardDescription>
+                            </div>
+                            <Badge variant="outline">
+                                {group.members.filter((m) => m.status === "ESTABLISHED").length} Established
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Phone</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Attendance</TableHead>
+                                        <TableHead>Joined</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {group.members.map((member) => (
+                                        <TableRow key={member.id}>
+                                            <TableCell className="font-medium">{member.name}</TableCell>
+                                            <TableCell>
+                                                {member.phoneNumber ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <Phone className="h-4 w-4 text-muted-foreground" />
+                                                        {member.phoneNumber}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant={
+                                                        member.status === "ESTABLISHED"
+                                                            ? "default"
+                                                            : member.status === "SEMI_CONSISTENT"
+                                                                ? "secondary"
+                                                                : "outline"
+                                                    }
+                                                >
+                                                    {member.status.replace("_", " ")}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                                    {member._count.attendance} sessions
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {format(new Date(member.joinedAt), "MMM d, yyyy")}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </CardContent>
                 </Card>
-            ) : (
-                leader.managedGroups.map((group) => (
-                    <Card key={group.id} className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-primary" />
-                                        {group.name}
-                                    </CardTitle>
-                                    <CardDescription className="mt-1">
-                                        {group.members.length} member{group.members.length !== 1 ? "s" : ""}
-                                    </CardDescription>
-                                </div>
-                                <Badge variant="outline">
-                                    {group.members.filter((m) => m.status === "ESTABLISHED").length} Established
-                                </Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            {group.members.length === 0 ? (
-                                <p className="text-center py-8 text-muted-foreground">No members in this group yet.</p>
-                            ) : (
-                                <div className="rounded-md border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Phone</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Attendance</TableHead>
-                                                <TableHead>Joined</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {group.members.map((member) => (
-                                                <TableRow key={member.id}>
-                                                    <TableCell className="font-medium">{member.name}</TableCell>
-                                                    <TableCell>
-                                                        {member.phoneNumber ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                                                {member.phoneNumber}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted-foreground">—</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant={
-                                                                member.status === "ESTABLISHED"
-                                                                    ? "default"
-                                                                    : member.status === "SEMI_CONSISTENT"
-                                                                        ? "secondary"
-                                                                        : "outline"
-                                                            }
-                                                        >
-                                                            {member.status.replace("_", " ")}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <Users className="h-4 w-4 text-muted-foreground" />
-                                                            {member._count.attendance} sessions
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {format(new Date(member.joinedAt), "MMM d, yyyy")}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))
-            )}
+            ))}
         </div>
     )
 }
-

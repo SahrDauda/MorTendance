@@ -1,8 +1,7 @@
-import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { LeadersClient } from "./leaders-client"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { ShieldCheck, Users, Building2 } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
@@ -12,27 +11,31 @@ export default async function LeadersPage() {
     if (!session) redirect("/auth/signin")
     if (session.user.role !== "ADMIN") redirect("/dashboard")
 
-    const leaders = await db.user.findMany({
-        where: { role: "LEADER" },
-        include: {
-            managedGroups: {
-                include: {
-                    _count: {
-                        select: { members: true },
-                    },
-                },
-            },
-        },
-        orderBy: { createdAt: "desc" },
-    })
+    console.log("[LeadersPage] Using mock data")
 
-    const groups = await db.ministryGroup.findMany({
-        orderBy: { name: "asc" },
-    })
+    // Mock leaders
+    const leaders = [
+        {
+            id: "leader-1",
+            name: "John Leader",
+            email: "leader@mor.org",
+            role: "LEADER",
+            managedGroups: [
+                { id: "g1", name: "Huiothesia", _count: { members: 12 } }
+            ],
+            createdAt: new Date()
+        }
+    ]
+
+    // Mock groups
+    const groups = [
+        { id: "g1", name: "Huiothesia" },
+        { id: "g2", name: "Doxasmus" }
+    ]
 
     const totalLeaders = leaders.length
     const totalGroups = groups.length
-    const assignedGroups = leaders.filter((l) => l.managedGroups.length > 0).length
+    const assignedGroups = 1
 
     return (
         <div className="space-y-8">
@@ -93,8 +96,7 @@ export default async function LeadersPage() {
                 </Card>
             </div>
 
-            <LeadersClient initialLeaders={leaders} groups={groups} />
+            <LeadersClient initialLeaders={leaders as any} groups={groups as any} />
         </div>
     )
 }
-

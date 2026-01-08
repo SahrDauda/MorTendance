@@ -1,4 +1,3 @@
-import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { MembersClient } from "./members-client"
@@ -9,46 +8,35 @@ export default async function MembersPage() {
     const session = await auth()
     if (!session) redirect("/auth/signin")
 
-    // Fetch groups based on role
-    let groups = await db.ministryGroup.findMany({
-        orderBy: { name: "asc" },
-    })
+    console.log("[MembersPage] Using mock data")
 
-    // Leaders can only see their own groups
-    if (session.user.role === "LEADER") {
-        groups = await db.ministryGroup.findMany({
-            where: { leaderId: session.user.id },
-            orderBy: { name: "asc" },
-        })
-    }
+    // Mock groups
+    const groups = [
+        { id: "group-1", name: "Huiothesia" },
+        { id: "group-2", name: "Doxasmus" }
+    ]
 
-    // Fetch members based on role
-    let members
-    if (session.user.role === "ADMIN") {
-        // Admin sees all members
-        members = await db.member.findMany({
-            include: {
-                group: true,
-                _count: {
-                    select: { attendance: { where: { isPresent: true } } }
-                }
-            },
-            orderBy: { name: "asc" }
-        })
-    } else {
-        // Leader sees only members in their groups
-        const groupIds = groups.map((g) => g.id)
-        members = await db.member.findMany({
-            where: { groupId: { in: groupIds } },
-            include: {
-                group: true,
-                _count: {
-                    select: { attendance: { where: { isPresent: true } } }
-                }
-            },
-            orderBy: { name: "asc" }
-        })
-    }
+    // Mock members
+    const members = [
+        {
+            id: "m1",
+            name: "Mock Member 1",
+            phoneNumber: "123-456-7890",
+            status: "ESTABLISHED",
+            groupId: "group-1",
+            group: { id: "group-1", name: "Huiothesia" },
+            _count: { attendance: 15 }
+        },
+        {
+            id: "m2",
+            name: "Mock Member 2",
+            phoneNumber: "098-765-4321",
+            status: "PRELIMINARY",
+            groupId: "group-2",
+            group: { id: "group-2", name: "Doxasmus" },
+            _count: { attendance: 3 }
+        }
+    ]
 
     return (
         <div className="space-y-8">
@@ -67,7 +55,7 @@ export default async function MembersPage() {
 
             <MembersClient
                 initialMembers={members as any}
-                groups={groups}
+                groups={groups as any}
                 userRole={session.user.role as "ADMIN" | "LEADER" | "COORDINATOR"}
             />
         </div>

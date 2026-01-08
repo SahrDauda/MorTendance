@@ -1,11 +1,4 @@
-import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import {
-    Users,
-    ClipboardCheck,
-    TrendingUp,
-    Award,
-} from "lucide-react"
 import { LeaderDashboardClient } from "./leader-dashboard-client"
 
 export async function LeaderDashboard() {
@@ -13,91 +6,51 @@ export async function LeaderDashboard() {
         const session = await auth()
         if (!session) return null
 
-        // Get leader's groups
-        const leaderGroups = await db.ministryGroup.findMany({
-            where: { leaderId: session.user.id },
-            include: {
-                members: {
-                    select: {
-                        id: true,
-                        name: true,
-                        status: true,
-                    },
-                },
-                _count: {
-                    select: { members: true },
-                },
-            },
-        })
+        console.log("[LeaderDashboard] Using mock data")
 
-        // Get members in leader's groups
-        const groupMemberIds = leaderGroups.flatMap((group) => group.members.map((m) => m.id))
-
-        const totalMembers = await db.member.count({
-            where: { id: { in: groupMemberIds } },
-        })
-
-        const establishedMembers = await db.member.count({
-            where: {
-                id: { in: groupMemberIds },
-                status: "ESTABLISHED",
-            },
-        })
-
-        const newMembers = await db.member.count({
-            where: {
-                id: { in: groupMemberIds },
-                status: "PRELIMINARY",
-            },
-        })
-
-        // Calculate attendance for leader's groups
-        const attendanceRecords = await db.attendance.count({
-            where: { memberId: { in: groupMemberIds } },
-        })
-
-        const presentRecords = await db.attendance.count({
-            where: {
-                memberId: { in: groupMemberIds },
-                isPresent: true,
-            },
-        })
-
-        const attendanceRate = attendanceRecords > 0
-            ? Math.round((presentRecords / attendanceRecords) * 100)
-            : 0
-
+        // Mock stats
         const stats = [
-            { name: "My Members", value: totalMembers.toString(), iconName: "Users" as const, color: "text-blue-500", trend: "In my groups" },
-            { name: "Attendance Rate", value: `${attendanceRate}%`, iconName: "ClipboardCheck" as const, color: "text-green-500", trend: "Group consistency" },
-            { name: "New Members", value: newMembers.toString(), iconName: "TrendingUp" as const, color: "text-amber-500", trend: "Preliminary status" },
-            { name: "Established", value: establishedMembers.toString(), iconName: "Award" as const, color: "text-purple-500", trend: "Consistent growth" },
+            { name: "My Members", value: "24", iconName: "Users" as const, color: "text-blue-500", trend: "In my groups" },
+            { name: "Attendance Rate", value: "85%", iconName: "ClipboardCheck" as const, color: "text-green-500", trend: "Group consistency" },
+            { name: "New Members", value: "5", iconName: "TrendingUp" as const, color: "text-amber-500", trend: "Preliminary status" },
+            { name: "Established", value: "12", iconName: "Award" as const, color: "text-purple-500", trend: "Consistent growth" },
         ]
 
-        // Get all members for the attendance modal
-        const allMembers = await db.member.findMany({
-            where: { groupId: { in: leaderGroups.map(g => g.id) } },
-            include: {
-                group: {
-                    select: { name: true },
-                },
-                _count: {
-                    select: { attendance: true },
-                },
+        // Mock groups
+        const leaderGroups = [
+            {
+                id: "group-1",
+                name: "Huiothesia",
+                members: [],
+                _count: { members: 12 }
             },
-        }).then(members => members.map(m => ({
-            ...m,
-            phoneNumber: m.phoneNumber ?? undefined,
-        })))
+            {
+                id: "group-2",
+                name: "Doxasmus",
+                members: [],
+                _count: { members: 12 }
+            }
+        ]
+
+        // Mock members
+        const allMembers = Array.from({ length: 10 }).map((_, i) => ({
+            id: `member-${i}`,
+            name: `Mock Member ${i + 1}`,
+            status: i % 3 === 0 ? "ESTABLISHED" : (i % 2 === 0 ? "SEMI_CONSISTENT" : "PRELIMINARY"),
+            groupId: i < 5 ? "group-1" : "group-2",
+            group: { name: i < 5 ? "Huiothesia" : "Doxasmus" },
+            phoneNumber: "123-456-7890",
+            _count: { attendance: 5 }
+        }))
 
         return (
             <LeaderDashboardClient
                 leaderName={session.user.name || "Leader"}
                 stats={stats}
-                leaderGroups={leaderGroups}
-                attendanceRecords={attendanceRecords}
-                presentRecords={presentRecords}
-                allMembers={allMembers}
+                leaderGroups={leaderGroups as any}
+                attendanceRecords={100}
+                presentRecords={85}
+                allMembers={allMembers as any}
             />
         )
     } catch (error) {
@@ -108,11 +61,7 @@ export async function LeaderDashboard() {
                 <p className="text-muted-foreground">
                     There was an error loading the dashboard. Please try again later.
                 </p>
-                {process.env.NODE_ENV === "development" && (
-                    <pre className="text-xs bg-muted p-4 rounded">{String(error)}</pre>
-                )}
             </div>
         )
     }
 }
-
