@@ -1,25 +1,10 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import bcrypt from "bcryptjs"
 import { MOCK_USERS } from "./mock-data"
-
-/**
- * Validates and prepares the authentication secret.
- */
-function getAuthSecret(): string {
-  const rawSecret = (process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET)?.trim()
-
-  if (!rawSecret) {
-    console.warn("[Auth] Missing AUTH_SECRET or NEXTAUTH_SECRET environment variable.")
-    return "development-secret-only-do-not-use-in-production"
-  }
-
-  return rawSecret.replace(/^["']|["']$/g, '')
-}
-
-const authSecret = getAuthSecret()
+import { authConfig } from "./auth.config"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -44,9 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null
         }
 
-        // For mock data, we check plain text password or hashed if we want to be fancy
-        // But since the user asked to skip Prisma/errors, let's keep it simple.
-        // If the mock password matches or if we hash it here for consistency:
+        // For mock data, we check plain text password
         if (password === user.password) {
           console.log("[Auth] Login successful for:", email)
           return {
@@ -62,29 +45,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.role = user.role
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-      }
-      return session
-    },
-  },
-  pages: {
-    signIn: "/auth/signin",
-  },
-  session: {
-    strategy: "jwt",
-  },
-  secret: authSecret,
-  trustHost: true,
-  debug: process.env.NODE_ENV === "development",
 })
