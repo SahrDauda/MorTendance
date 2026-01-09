@@ -35,9 +35,24 @@ export default async function MembersPage() {
             }
         }),
         db.ministryGroup.findMany({
-            select: {
-                id: true,
-                name: true
+            include: {
+                leader: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                branch: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                _count: {
+                    select: {
+                        members: true
+                    }
+                }
             },
             orderBy: {
                 name: 'asc'
