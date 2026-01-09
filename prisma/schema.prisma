@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -17,6 +18,7 @@ model Branch {
   head               User?               @relation("BranchHead", fields: [headId], references: [id])
   cbsLocations       CBSLocation[]
   members            Member[]
+  groups             MinistryGroup[]
 
   @@map("branches")
 }
@@ -38,12 +40,15 @@ model User {
 }
 
 model MinistryGroup {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  leaderId  String?  @map("leader_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  members   Member[]
-  leader    User?    @relation("GroupLeader", fields: [leaderId], references: [id])
+  id                 String              @id @default(uuid())
+  name               String              @unique
+  branchId           String?             @map("branch_id")
+  leaderId           String?             @map("leader_id")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  members            Member[]
+  leader             User?               @relation("GroupLeader", fields: [leaderId], references: [id])
+  branch             Branch?             @relation(fields: [branchId], references: [id])
+  attendanceSessions AttendanceSession[]
 
   @@map("ministry_groups")
 }
@@ -87,11 +92,13 @@ model AttendanceSession {
   type       EventType
   date       DateTime           @db.Date
   branchId   String             @map("branch_id")
+  groupId    String?            @map("group_id")
   recorderId String             @map("recorder_id")
   notes      String?
   createdAt  DateTime           @default(now()) @map("created_at")
   records    AttendanceRecord[]
   branch     Branch             @relation(fields: [branchId], references: [id])
+  group      MinistryGroup?     @relation(fields: [groupId], references: [id])
   recorder   User               @relation("SessionRecorder", fields: [recorderId], references: [id])
 
   @@map("attendance_sessions")

@@ -3,15 +3,19 @@
 import { auth } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { db } from "@/lib/db"
+import bcrypt from "bcryptjs"
+import { UserRole } from "@prisma/client"
 
 const addLeaderSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     groupId: z.string().optional(),
+    role: z.enum(["PROBATION_LEADER", "JUNIOR_LEADER", "SENIOR_LEADER"]).default("PROBATION_LEADER"),
 })
 
-export async function addLeaderAction(formData: z.infer<typeof addLeaderSchema>) {
+export async function addLeaderAction(formData: any) {
     const session = await auth()
     if (!session || session.user.role !== "ADMIN") {
         throw new Error("Unauthorized: Admin access required")
@@ -21,28 +25,41 @@ export async function addLeaderAction(formData: z.infer<typeof addLeaderSchema>)
         const validatedData = addLeaderSchema.parse(formData)
         const email = validatedData.email.toLowerCase().trim()
 
-        console.log("[Admin Action] Mock add leader:", email)
+        const existingUser = await db.user.findUnique({
+            where: { email }
+        })
 
-        // Mock success
+        if (existingUser) {
+            return { error: "A user with this email already exists" }
+        }
+
+        const hashedPassword = await bcrypt.hash(validatedData.password, 10)
+
+        const leader = await db.user.create({
+            data: {
+                name: validatedData.name,
+                email,
+                passwordHash: hashedPassword,
+                role: validatedData.role as UserRole,
+                managedGroups: validatedData.groupId ? {
+                    connect: { id: validatedData.groupId }
+                } : undefined
+            }
+        })
+
         revalidatePath("/admin/leaders")
         revalidatePath("/dashboard")
 
         return {
             success: true,
-            leader: {
-                id: "mock-leader-" + Date.now(),
-                email,
-                name: validatedData.name,
-                role: "LEADER",
-                createdAt: new Date(),
-            }
+            leader
         }
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof z.ZodError) {
             return { error: error.errors[0].message }
         }
         console.error("Add leader error:", error)
-        return { error: "Failed to create leader" }
+        return { error: error.message || "Failed to create leader" }
     }
 }
 
@@ -52,20 +69,25 @@ export async function getLeadersAction() {
         throw new Error("Unauthorized: Admin access required")
     }
 
-    console.log("[Admin Action] Mock get leaders")
-
-    return [
-        {
-            id: "leader-1",
-            name: "John Leader",
-            email: "leader@mor.org",
-            role: "LEADER",
-            managedGroups: [
-                { id: "g1", name: "Huiothesia", _count: { members: 12 } }
-            ],
-            createdAt: new Date()
+    return await db.user.findMany({
+        where: {
+            role: {
+                in: [UserRole.SENIOR_LEADER, UserRole.JUNIOR_LEADER, UserRole.PROBATION_LEADER]
+            }
+        },
+        include: {
+            managedGroups: {
+                include: {
+                    _count: {
+                        select: { members: true }
+                    }
+                }
+            }
+        },
+        orderBy: {
+            name: 'asc'
         }
-    ]
+    })
 }
 
 export async function getLeaderDetailsAction(leaderId: string) {
@@ -74,29 +96,20 @@ export async function getLeaderDetailsAction(leaderId: string) {
         throw new Error("Unauthorized: Admin access required")
     }
 
-    console.log("[Admin Action] Mock get leader details for:", leaderId)
-
-    return {
-        id: leaderId,
-        name: "John Leader",
-        email: "leader@mor.org",
-        role: "LEADER",
-        createdAt: new Date(),
-        managedGroups: [
-            {
-                id: "g1",
-                name: "Huiothesia",
-                members: [
-                    {
-                        id: "m1",
-                        name: "Mock Member 1",
-                        phoneNumber: "123-456-7890",
-                        status: "ESTABLISHED",
-                        joinedAt: new Date(),
-                        _count: { attendance: 15 }
+    return await db.user.findUnique({
+        where: { id: leaderId },
+        include: {
+            managedGroups: {
+                include: {
+                    members: {
+                        include: {
+                            _count: {
+                                select: { attendanceRecords: true }
+                            }
+                        }
                     }
-                ]
+                }
             }
-        ]
-    }
+        }
+    })
 }

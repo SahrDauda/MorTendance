@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { AttendanceClient } from "./attendance-client"
+import { db } from "@/lib/db"
 
 export const dynamic = 'force-dynamic'
 
@@ -8,39 +9,47 @@ export default async function AttendancePage() {
     const session = await auth()
     if (!session) redirect("/auth/signin")
 
-    console.log("[AttendancePage] Using mock data")
+    const [groups, allMembers] = await Promise.all([
+        db.ministryGroup.findMany({
+            include: {
+                members: {
+                    select: {
+                        id: true,
+                        name: true,
+                        status: true
+                    }
+                }
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        }),
+        db.member.findMany({
+            include: {
+                group: {
+                    select: {
+                        name: true
+                    }
+                },
+                _count: {
+                    select: {
+                        attendanceRecords: true
+                    }
+                }
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        })
+    ])
 
-    // Mock groups
-    const groups = [
-        {
-            id: "group-1",
-            name: "Huiothesia",
-            members: [
-                { id: "m1", name: "Mock Member 1", status: "ESTABLISHED" },
-                { id: "m2", name: "Mock Member 2", status: "PRELIMINARY" },
-            ]
+    // Transform members for client component compatibility
+    const transformedMembers = allMembers.map(m => ({
+        ...m,
+        _count: {
+            attendance: m._count.attendanceRecords
         }
-    ]
-
-    // Mock members
-    const allMembers = [
-        {
-            id: "m1",
-            name: "Mock Member 1",
-            status: "ESTABLISHED",
-            groupId: "group-1",
-            group: { name: "Huiothesia" },
-            _count: { attendance: 10 }
-        },
-        {
-            id: "m2",
-            name: "Mock Member 2",
-            status: "PRELIMINARY",
-            groupId: "group-1",
-            group: { name: "Huiothesia" },
-            _count: { attendance: 2 }
-        }
-    ]
+    }))
 
     return (
         <div className="space-y-8">
@@ -51,7 +60,7 @@ export default async function AttendancePage() {
 
             <AttendanceClient
                 initialGroups={groups as any}
-                allMembers={allMembers as any}
+                allMembers={transformedMembers as any}
                 userRole={session.user.role}
             />
         </div>

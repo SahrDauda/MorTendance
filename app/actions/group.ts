@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 interface CreateGroupData {
     name: string
     leaderId?: string
+    branchId?: string
 }
 
 export async function createGroupAction(data: CreateGroupData) {
@@ -24,7 +25,8 @@ export async function createGroupAction(data: CreateGroupData) {
         const group = await db.ministryGroup.create({
             data: {
                 name: data.name,
-                leaderId: data.leaderId || undefined
+                leaderId: data.leaderId || undefined,
+                branchId: data.branchId || undefined
             }
         })
 

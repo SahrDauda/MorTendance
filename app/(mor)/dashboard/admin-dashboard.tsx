@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { db } from "@/lib/db"
 import { AdminDashboardClient } from "./admin-dashboard-client"
+import { UserRole } from "@prisma/client"
 
 export async function AdminDashboard() {
     try {
@@ -20,11 +21,17 @@ export async function AdminDashboard() {
             allBranches
         ] = await Promise.all([
             db.member.count(),
-            db.user.count({ where: { role: "LEADER" } }),
+            db.user.count({
+                where: {
+                    role: { in: [UserRole.SENIOR_LEADER, UserRole.JUNIOR_LEADER, UserRole.PROBATION_LEADER] }
+                }
+            }),
             db.ministryGroup.count(),
             db.branch.count(),
             db.user.findMany({
-                where: { role: "LEADER" },
+                where: {
+                    role: { in: [UserRole.SENIOR_LEADER, UserRole.JUNIOR_LEADER, UserRole.PROBATION_LEADER] }
+                },
                 take: 5,
                 orderBy: { createdAt: "desc" },
                 include: {
@@ -58,7 +65,7 @@ export async function AdminDashboard() {
         return (
             <AdminDashboardClient
                 stats={stats}
-                leaders={recentLeaders}
+                leaders={recentLeaders as any}
                 groups={allGroups}
                 branches={allBranches}
             />

@@ -1,6 +1,8 @@
 "use server"
 
-import { z } from "zod"
+import { db } from "@/lib/db"
+import bcrypt from "bcryptjs"
+import { UserRole } from "@prisma/client"
 
 const registerSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -11,25 +13,44 @@ const registerSchema = z.object({
 export async function registerAction(formData: z.infer<typeof registerSchema>) {
     try {
         const validatedData = registerSchema.parse(formData)
-        const email = validatedData.email.toLowerCase()
+        const email = validatedData.email.toLowerCase().trim()
 
-        console.log("[Auth Action] Mock registration for:", email)
+        // 1. Check if user already exists
+        const existingUser = await db.user.findUnique({
+            where: { email }
+        })
 
-        // Mock success
+        if (existingUser) {
+            return { error: "A user with this email already exists" }
+        }
+
+        // 2. Hash password
+        const hashedPassword = await bcrypt.hash(validatedData.password, 10)
+
+        // 3. Create user
+        const user = await db.user.create({
+            data: {
+                name: validatedData.name,
+                email,
+                passwordHash: hashedPassword,
+                role: UserRole.PROBATION_LEADER, // Default role for self-registration
+            }
+        })
+
         return {
             success: true,
             user: {
-                id: "mock-id-" + Date.now(),
-                email,
-                name: validatedData.name,
-                role: "LEADER",
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
             }
         }
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof z.ZodError) {
             return { error: error.errors[0].message }
         }
         console.error("Registration error:", error)
-        return { error: "Internal server error during registration" }
+        return { error: error.message || "Failed to register account" }
     }
 }

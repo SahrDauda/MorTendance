@@ -86,6 +86,7 @@ export function AdminDashboardClient({
     const [newMemberName, setNewMemberName] = useState("")
     const [newMemberPhone, setNewMemberPhone] = useState("")
     const [newMemberGroupId, setNewMemberGroupId] = useState(groups[0]?.id || "")
+    const [newMemberBranchId, setNewMemberBranchId] = useState<string>("none")
     const [isSubmittingMember, setIsSubmittingMember] = useState(false)
 
     // Branch State
@@ -106,6 +107,7 @@ export function AdminDashboardClient({
     const [isAddGroupOpen, setIsAddGroupOpen] = useState(false)
     const [newGroupName, setNewGroupName] = useState("")
     const [newGroupLeaderId, setNewGroupLeaderId] = useState<string>("none")
+    const [newGroupBranchId, setNewGroupBranchId] = useState<string>("none")
     const [isSubmittingGroup, setIsSubmittingGroup] = useState(false)
 
     const quickActions = [
@@ -126,7 +128,8 @@ export function AdminDashboardClient({
             await addMemberAction({
                 name: newMemberName,
                 phoneNumber: newMemberPhone || undefined,
-                groupId: newMemberGroupId
+                groupId: newMemberGroupId,
+                branchId: newMemberBranchId === "none" ? undefined : newMemberBranchId
             })
             toast.success("Member added successfully", {
                 description: `${newMemberName} has been added to the system.`
@@ -134,7 +137,8 @@ export function AdminDashboardClient({
             setIsAddMemberOpen(false)
             setNewMemberName("")
             setNewMemberPhone("")
-            setNewMemberGroupId("")
+            setNewMemberGroupId(groups[0]?.id || "")
+            setNewMemberBranchId("none")
             setTimeout(() => window.location.reload(), 500)
         } catch (error: any) {
             toast.error(error.message || "Failed to add member")
@@ -211,7 +215,8 @@ export function AdminDashboardClient({
         try {
             await createGroupAction({
                 name: newGroupName,
-                leaderId: newGroupLeaderId === "none" ? undefined : newGroupLeaderId
+                leaderId: newGroupLeaderId === "none" ? undefined : newGroupLeaderId,
+                branchId: newGroupBranchId === "none" ? undefined : newGroupBranchId
             })
             toast.success("Group created successfully", {
                 description: `${newGroupName} has been added.`
@@ -219,6 +224,7 @@ export function AdminDashboardClient({
             setIsAddGroupOpen(false)
             setNewGroupName("")
             setNewGroupLeaderId("none")
+            setNewGroupBranchId("none")
         } catch (error: any) {
             toast.error(error.message || "Failed to create group")
         } finally {
@@ -406,6 +412,20 @@ export function AdminDashboardClient({
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium">Branch (Optional)</label>
+                            <Select value={newMemberBranchId} onValueChange={setNewMemberBranchId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select branch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {branches.map(branch => (
+                                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddMemberOpen(false)}>Cancel</Button>
@@ -554,6 +574,20 @@ export function AdminDashboardClient({
                                     <SelectItem value="none">None</SelectItem>
                                     {leaders.map(leader => (
                                         <SelectItem key={leader.id} value={leader.id}>{leader.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium">Assign to Branch (Optional)</label>
+                            <Select value={newGroupBranchId} onValueChange={setNewGroupBranchId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select branch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {branches.map(branch => (
+                                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

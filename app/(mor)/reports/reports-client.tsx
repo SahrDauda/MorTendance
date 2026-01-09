@@ -25,7 +25,13 @@ interface ReportStat {
     value: string
     trend: string
     trendUp: boolean
-    icon: React.ComponentType<{ className?: string }>
+    iconName: "BarChart3" | "Users" | "Calendar"
+}
+
+const iconMap = {
+    BarChart3,
+    Users,
+    Calendar,
 }
 
 interface Group {
@@ -154,7 +160,10 @@ export function ReportsClient({
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="p-2 rounded-xl bg-primary/10">
-                                    <stat.icon className="h-5 w-5 text-primary" />
+                                    {(() => {
+                                        const Icon = iconMap[stat.iconName]
+                                        return <Icon className="h-5 w-5 text-primary" />
+                                    })()}
                                 </div>
                                 <Badge
                                     variant="outline"

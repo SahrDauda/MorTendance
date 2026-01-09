@@ -14,43 +14,41 @@ import {
 import { ShieldCheck, Users, Building2, Mail, Calendar, Phone, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
+import { db } from "@/lib/db"
 
 export const dynamic = 'force-dynamic'
 
-export default async function LeaderDetailPage({ params }: { params: { id: string } }) {
+export default async function LeaderDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
     if (!session) redirect("/auth/signin")
     if (session.user.role !== "ADMIN") redirect("/dashboard")
 
-    console.log("[LeaderDetailPage] Using mock data for ID:", params.id)
+    const { id } = await params
 
-    // Mock leader
-    const leader = {
-        id: params.id,
-        name: "John Leader",
-        email: "leader@mor.org",
-        role: "LEADER",
-        createdAt: new Date(),
-        managedGroups: [
-            {
-                id: "g1",
-                name: "Huiothesia",
-                members: [
-                    {
-                        id: "m1",
-                        name: "Mock Member 1",
-                        phoneNumber: "123-456-7890",
-                        status: "ESTABLISHED",
-                        joinedAt: new Date(),
-                        _count: { attendance: 15 }
+    const leader = await db.user.findUnique({
+        where: { id },
+        include: {
+            managedGroups: {
+                include: {
+                    members: {
+                        include: {
+                            _count: {
+                                select: { attendanceRecords: true }
+                            }
+                        }
                     }
-                ]
+                }
             }
-        ]
-    }
+        }
+    })
 
-    const totalMembers = 1
-    const establishedMembers = 1
+    if (!leader) notFound()
+
+    const totalMembers = leader.managedGroups.reduce((sum, group) => sum + group.members.length, 0)
+    const establishedMembers = leader.managedGroups.reduce(
+        (sum, group) => sum + group.members.filter(m => m.status === "ESTABLISHED").length,
+        0
+    )
 
     return (
         <div className="space-y-8">
@@ -174,7 +172,7 @@ export default async function LeaderDetailPage({ params }: { params: { id: strin
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Users className="h-4 w-4 text-muted-foreground" />
-                                                    {member._count.attendance} sessions
+                                                    {member._count.attendanceRecords} sessions
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">

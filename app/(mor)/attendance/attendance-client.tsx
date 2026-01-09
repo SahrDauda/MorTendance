@@ -13,6 +13,7 @@ import { saveAttendanceAction } from "./actions"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
+import { EventType } from "@prisma/client"
 import {
     Table,
     TableBody,
@@ -55,6 +56,8 @@ interface AttendanceClientProps {
 export function AttendanceClient({ initialGroups, allMembers, userRole }: AttendanceClientProps) {
     const [selectedGroupId, setSelectedGroupId] = useState<string>(initialGroups[0]?.id || "")
     const [date, setDate] = useState<Date>(new Date())
+    const [eventType, setEventType] = useState<EventType>(EventType.SATURDAY_FELLOWSHIP)
+    const [notes, setNotes] = useState("")
     const [attendance, setAttendance] = useState<Record<string, boolean>>({})
     const [isSaving, setIsSaving] = useState(false)
     const [selectedMember, setSelectedMember] = useState<Member | null>(null)
@@ -84,12 +87,17 @@ export function AttendanceClient({ initialGroups, allMembers, userRole }: Attend
             }))
 
             await saveAttendanceAction({
-                groupId: selectedGroupId, // Still pass this for revalidation context
+                groupId: selectedGroupId,
+                type: eventType,
                 date,
-                records
+                records,
+                notes: notes || undefined
             })
             toast.success("Attendance saved successfully")
+            setAttendance({})
+            setNotes("")
             if (isAddAttendanceOpen) setIsAddAttendanceOpen(false)
+            setTimeout(() => window.location.reload(), 500)
         } catch (error) {
             toast.error("Failed to save attendance")
             console.error(error)
@@ -135,7 +143,7 @@ export function AttendanceClient({ initialGroups, allMembers, userRole }: Attend
 
     const exportToPDF = () => {
         const doc = new jsPDF()
-        doc.text("MOR Attendance Report", 14, 15)
+        doc.text("Attendance Report", 14, 15)
         const tableData = allMembers.map(m => [
             m.name,
             m.group?.name || "N/A",
@@ -317,6 +325,36 @@ export function AttendanceClient({ initialGroups, allMembers, userRole }: Attend
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {date ? format(date, "PPP") : <span>Pick a date</span>}
                         </Button>
+                    </div>
+
+                    <div className="flex-1 min-w-[200px]">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">
+                            Event Type
+                        </label>
+                        <Select value={eventType} onValueChange={(v) => setEventType(v as EventType)}>
+                            <SelectTrigger className="bg-background/50 border-border/50">
+                                <SelectValue placeholder="Select event type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.values(EventType).map(type => (
+                                    <SelectItem key={type} value={type}>
+                                        {type.replace(/_/g, ' ')}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="w-full">
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">
+                            Session Notes (Optional)
+                        </label>
+                        <Input
+                            placeholder="Add any specific notes for this session..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="bg-background/50 border-border/50"
+                        />
                     </div>
                 </CardContent>
             </Card>

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation"
 import { LeadersClient } from "./leaders-client"
 import { Card, CardContent } from "@/components/ui/card"
 import { ShieldCheck, Users, Building2 } from "lucide-react"
+import { db } from "@/lib/db"
+import { UserRole } from "@prisma/client"
 
 export const dynamic = 'force-dynamic'
 
@@ -11,31 +13,36 @@ export default async function LeadersPage() {
     if (!session) redirect("/auth/signin")
     if (session.user.role !== "ADMIN") redirect("/dashboard")
 
-    console.log("[LeadersPage] Using mock data")
-
-    // Mock leaders
-    const leaders = [
-        {
-            id: "leader-1",
-            name: "John Leader",
-            email: "leader@mor.org",
-            role: "LEADER",
-            managedGroups: [
-                { id: "g1", name: "Huiothesia", _count: { members: 12 } }
-            ],
-            createdAt: new Date()
-        }
-    ]
-
-    // Mock groups
-    const groups = [
-        { id: "g1", name: "Huiothesia" },
-        { id: "g2", name: "Doxasmus" }
-    ]
+    const [leaders, groups] = await Promise.all([
+        db.user.findMany({
+            where: {
+                role: {
+                    in: [UserRole.SENIOR_LEADER, UserRole.JUNIOR_LEADER, UserRole.PROBATION_LEADER]
+                }
+            },
+            include: {
+                managedGroups: {
+                    include: {
+                        _count: {
+                            select: { members: true }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        }),
+        db.ministryGroup.findMany({
+            orderBy: {
+                name: 'asc'
+            }
+        })
+    ])
 
     const totalLeaders = leaders.length
     const totalGroups = groups.length
-    const assignedGroups = 1
+    const assignedGroups = leaders.reduce((acc, leader) => acc + leader.managedGroups.length, 0)
 
     return (
         <div className="space-y-8">

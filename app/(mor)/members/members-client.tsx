@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search, MoreHorizontal, UserPlus, Calendar, Users, UserCheck, TrendingUp, Download } from "lucide-react"
+import { Search, MoreHorizontal, UserPlus, Calendar, Users, UserCheck, TrendingUp, Download, LayoutGrid, List } from "lucide-react"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -42,6 +42,10 @@ interface Member {
         id: string
         name: string
     }
+    branch?: {
+        id: string
+        name: string
+    } | null
     _count: {
         attendance: number
     }
@@ -52,28 +56,38 @@ interface Group {
     name: string
 }
 
+interface Branch {
+    id: string
+    name: string
+}
+
 interface MembersClientProps {
     initialMembers: Member[]
     groups: Group[]
-    userRole?: "ADMIN" | "LEADER" | "COORDINATOR"
+    branches: Branch[]
+    userRole?: string
 }
 
-export function MembersClient({ initialMembers, groups, userRole = "LEADER" }: MembersClientProps) {
+export function MembersClient({ initialMembers, groups, branches, userRole = "PROBATION_LEADER" }: MembersClientProps) {
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedGroup, setSelectedGroup] = useState("all")
+    const [selectedBranch, setSelectedBranch] = useState("all")
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
     const [selectedMember, setSelectedMember] = useState<Member | null>(null)
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+    const [viewMode, setViewMode] = useState<"list" | "groups">("list")
 
     const [newMemberName, setNewMemberName] = useState("")
     const [newMemberPhone, setNewMemberPhone] = useState("")
-    const [newMemberGroupId, setNewMemberGroupId] = useState("")
+    const [newMemberGroupId, setNewMemberGroupId] = useState(groups[0]?.id || "")
+    const [newMemberBranchId, setNewMemberBranchId] = useState<string>("none")
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const filteredMembers = initialMembers.filter(member => {
         const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase())
         const matchesGroup = selectedGroup === "all" || member.group.id === selectedGroup
-        return matchesSearch && matchesGroup
+        const matchesBranch = selectedBranch === "all" || member.branch?.id === selectedBranch
+        return matchesSearch && matchesGroup && matchesBranch
     })
 
     const handleAddMember = async () => {
@@ -86,14 +100,17 @@ export function MembersClient({ initialMembers, groups, userRole = "LEADER" }: M
         try {
             await addMemberAction({
                 name: newMemberName,
-                phoneNumber: newMemberPhone,
-                groupId: newMemberGroupId
+                phoneNumber: newMemberPhone || undefined,
+                groupId: newMemberGroupId,
+                branchId: newMemberBranchId === "none" ? undefined : newMemberBranchId
             })
             toast.success("Member added successfully")
             setIsAddDialogOpen(false)
             setNewMemberName("")
             setNewMemberPhone("")
-            setNewMemberGroupId("")
+            setNewMemberGroupId(groups[0]?.id || "")
+            setNewMemberBranchId("none")
+            setTimeout(() => window.location.reload(), 500)
         } catch (error) {
             toast.error("Failed to add member")
         } finally {
@@ -215,6 +232,25 @@ export function MembersClient({ initialMembers, groups, userRole = "LEADER" }: M
                     <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-2">
                         <Download className="h-4 w-4" /> Excel
                     </Button>
+                    <div className="h-8 w-px bg-border mx-2 hidden md:block" />
+                    <div className="flex bg-muted/50 p-1 rounded-lg border border-border/50">
+                        <Button
+                            variant={viewMode === "list" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-7 px-3 gap-2 rounded-md"
+                            onClick={() => setViewMode("list")}
+                        >
+                            <List className="h-3.5 w-3.5" /> List
+                        </Button>
+                        <Button
+                            variant={viewMode === "groups" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-7 px-3 gap-2 rounded-md"
+                            onClick={() => setViewMode("groups")}
+                        >
+                            <LayoutGrid className="h-3.5 w-3.5" /> Groups
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="flex flex-1 items-center gap-2 max-w-sm">
@@ -227,6 +263,17 @@ export function MembersClient({ initialMembers, groups, userRole = "LEADER" }: M
                             className="pl-9 bg-card/50 border-border/50"
                         />
                     </div>
+                    <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                        <SelectTrigger className="w-[180px] bg-card/50 border-border/50">
+                            <SelectValue placeholder="Filter by branch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Branches</SelectItem>
+                            {branches.map(branch => (
+                                <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Select value={selectedGroup} onValueChange={setSelectedGroup}>
                         <SelectTrigger className="w-[180px] bg-card/50 border-border/50">
                             <SelectValue placeholder="Filter by group" />
@@ -284,6 +331,20 @@ export function MembersClient({ initialMembers, groups, userRole = "LEADER" }: M
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium">Branch (Optional)</label>
+                                <Select value={newMemberBranchId} onValueChange={setNewMemberBranchId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select branch" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        {branches.map(branch => (
+                                            <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
@@ -296,111 +357,180 @@ export function MembersClient({ initialMembers, groups, userRole = "LEADER" }: M
             </div>
 
             {/* Desktop Table View */}
-            <Card className="hidden md:block border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader className="bg-muted/20">
-                            <TableRow>
-                                <TableHead className="font-bold uppercase tracking-wider">Member Name</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider">Group</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider">Status</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider">Attendances</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredMembers.map((member) => (
-                                <TableRow
-                                    key={member.id}
-                                    className="hover:bg-primary/5 transition-colors border-border/50 cursor-pointer"
-                                    onClick={() => openMemberDetail(member)}
-                                >
-                                    <TableCell>
-                                        <div className="font-semibold text-foreground">{member.name}</div>
-                                        {member.phoneNumber && <div className="text-[10px] text-muted-foreground">{member.phoneNumber}</div>}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="secondary" className="bg-muted/50 font-medium">
-                                            {member.group.name}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge className={cn(
-                                            "uppercase font-bold text-[10px]",
-                                            member.status === "ESTABLISHED" ? "bg-green-500/10 text-green-500 border-green-500/20" :
-                                                member.status === "SEMI_CONSISTENT" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                                                    "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                                        )}>
-                                            {member.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
-                                                <div
-                                                    className="h-full bg-primary transition-all"
-                                                    style={{ width: `${Math.min((member._count.attendance / 3) * 100, 100)}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-xs font-medium text-muted-foreground">
-                                                {member._count.attendance}/3
-                                            </span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
+            {viewMode === "list" ? (
+                <Card className="hidden md:block border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader className="bg-muted/20">
+                                <TableRow>
+                                    <TableHead className="font-bold uppercase tracking-wider">Member Name</TableHead>
+                                    <TableHead className="font-bold uppercase tracking-wider">Branch</TableHead>
+                                    <TableHead className="font-bold uppercase tracking-wider">Group</TableHead>
+                                    <TableHead className="font-bold uppercase tracking-wider">Status</TableHead>
+                                    <TableHead className="font-bold uppercase tracking-wider">Attendances</TableHead>
+                                    <TableHead className="font-bold uppercase tracking-wider text-right">Actions</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredMembers.map((member) => (
+                                    <TableRow
+                                        key={member.id}
+                                        className="hover:bg-primary/5 transition-colors border-border/50 cursor-pointer"
+                                        onClick={() => openMemberDetail(member)}
+                                    >
+                                        <TableCell>
+                                            <div className="font-semibold text-foreground">{member.name}</div>
+                                            {member.phoneNumber && <div className="text-[10px] text-muted-foreground">{member.phoneNumber}</div>}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className="font-medium">
+                                                {member.branch?.name || "No Branch"}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary" className="bg-muted/50 font-medium">
+                                                {member.group.name}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge className={cn(
+                                                "uppercase font-bold text-[10px]",
+                                                member.status === "ESTABLISHED" ? "bg-green-500/10 text-green-500 border-green-500/20" :
+                                                    member.status === "SEMI_CONSISTENT" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                                                        "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                            )}>
+                                                {member.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-2 w-24 rounded-full bg-muted overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-primary transition-all"
+                                                        style={{ width: `${Math.min((member._count.attendance / 3) * 100, 100)}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs font-medium text-muted-foreground">
+                                                    {member._count.attendance}/3
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groups.map(group => {
+                        const groupMembers = filteredMembers.filter(m => m.group.id === group.id)
+                        if (groupMembers.length === 0 && selectedGroup !== "all") return null
+                        if (groupMembers.length === 0 && selectedGroup === "all") return null // Hide empty groups in group view unless filtered? Actually better to show them if they exist
+
+                        return (
+                            <Card key={group.id} className="border-border/50 bg-card/50 backdrop-blur-sm">
+                                <CardHeader className="pb-3">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                            <Users className="h-5 w-5 text-primary" />
+                                            {group.name}
+                                        </CardTitle>
+                                        <Badge variant="secondary">{groupMembers.length}</Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                        {groupMembers.slice(0, 5).map(member => (
+                                            <div
+                                                key={member.id}
+                                                className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/5 cursor-pointer transition-colors"
+                                                onClick={() => openMemberDetail(member)}
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium">{member.name}</span>
+                                                    <span className="text-[10px] text-muted-foreground">{member.status}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-1.5 w-12 rounded-full bg-muted overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-primary"
+                                                            style={{ width: `${Math.min((member._count.attendance / 3) * 100, 100)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {groupMembers.length > 5 && (
+                                            <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground" onClick={() => {
+                                                setSelectedGroup(group.id)
+                                                setViewMode("list")
+                                            }}>
+                                                View {groupMembers.length - 5} more...
+                                            </Button>
+                                        )}
+                                        {groupMembers.length === 0 && (
+                                            <div className="text-center py-8 text-muted-foreground text-sm italic">
+                                                No members in this group
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
+            )}
 
             {/* Mobile Card View */}
-            <div className="grid gap-4 md:hidden">
-                {filteredMembers.map((member) => (
-                    <Card
-                        key={member.id}
-                        className="border-border/50 bg-card/50 backdrop-blur-sm cursor-pointer active:scale-[0.98] transition-transform"
-                        onClick={() => openMemberDetail(member)}
-                    >
-                        <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-3">
-                                <div className="space-y-1">
-                                    <h3 className="font-bold text-foreground">{member.name}</h3>
-                                    {member.phoneNumber && <p className="text-[10px] text-muted-foreground">{member.phoneNumber}</p>}
-                                    <div className="flex gap-2">
-                                        <Badge variant="secondary" className="text-[10px] h-5">
-                                            {member.group.name}
-                                        </Badge>
-                                        <Badge className={cn(
-                                            "uppercase font-bold text-[9px] h-5",
-                                            member.status === "ESTABLISHED" ? "bg-green-500/10 text-green-500" :
-                                                member.status === "SEMI_CONSISTENT" ? "bg-amber-500/10 text-amber-500" :
-                                                    "bg-blue-500/10 text-blue-500"
-                                        )}>
-                                            {member.status}
-                                        </Badge>
+            {viewMode === "list" && (
+                <div className="grid gap-4 md:hidden">
+                    {filteredMembers.map((member) => (
+                        <Card
+                            key={member.id}
+                            className="border-border/50 bg-card/50 backdrop-blur-sm cursor-pointer active:scale-[0.98] transition-transform"
+                            onClick={() => openMemberDetail(member)}
+                        >
+                            <CardContent className="p-4">
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="space-y-1">
+                                        <h3 className="font-bold text-foreground">{member.name}</h3>
+                                        {member.phoneNumber && <p className="text-[10px] text-muted-foreground">{member.phoneNumber}</p>}
+                                        <div className="flex gap-2">
+                                            <Badge variant="secondary" className="text-[10px] h-5">
+                                                {member.group.name}
+                                            </Badge>
+                                            <Badge className={cn(
+                                                "uppercase font-bold text-[9px] h-5",
+                                                member.status === "ESTABLISHED" ? "bg-green-500/10 text-green-500" :
+                                                    member.status === "SEMI_CONSISTENT" ? "bg-amber-500/10 text-amber-500" :
+                                                        "bg-blue-500/10 text-blue-500"
+                                            )}>
+                                                {member.status}
+                                            </Badge>
+                                        </div>
                                     </div>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between text-[10px] font-medium text-muted-foreground uppercase">
-                                    <span>Attendance Progress</span>
-                                    <span>{member._count.attendance}/3</span>
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between text-[10px] font-medium text-muted-foreground uppercase">
+                                        <span>Attendance Progress</span>
+                                        <span>{member._count.attendance}/3</span>
+                                    </div>
+                                    <Progress value={(member._count.attendance / 3) * 100} className="h-1.5" />
                                 </div>
-                                <Progress value={(member._count.attendance / 3) * 100} className="h-1.5" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
 
             {filteredMembers.length === 0 && (
                 <div className="p-12 text-center text-muted-foreground bg-card/50 rounded-2xl border border-dashed border-border/50">

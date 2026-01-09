@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { MembersClient } from "./members-client"
+import { db } from "@/lib/db"
 
 export const dynamic = 'force-dynamic'
 
@@ -8,35 +9,58 @@ export default async function MembersPage() {
     const session = await auth()
     if (!session) redirect("/auth/signin")
 
-    console.log("[MembersPage] Using mock data")
+    const [members, groups, branches] = await Promise.all([
+        db.member.findMany({
+            include: {
+                group: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                branch: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                _count: {
+                    select: {
+                        attendanceRecords: true
+                    }
+                }
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        }),
+        db.ministryGroup.findMany({
+            select: {
+                id: true,
+                name: true
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        }),
+        db.branch.findMany({
+            select: {
+                id: true,
+                name: true
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        })
+    ])
 
-    // Mock groups
-    const groups = [
-        { id: "group-1", name: "Huiothesia" },
-        { id: "group-2", name: "Doxasmus" }
-    ]
-
-    // Mock members
-    const members = [
-        {
-            id: "m1",
-            name: "Mock Member 1",
-            phoneNumber: "123-456-7890",
-            status: "ESTABLISHED",
-            groupId: "group-1",
-            group: { id: "group-1", name: "Huiothesia" },
-            _count: { attendance: 15 }
-        },
-        {
-            id: "m2",
-            name: "Mock Member 2",
-            phoneNumber: "098-765-4321",
-            status: "PRELIMINARY",
-            groupId: "group-2",
-            group: { id: "group-2", name: "Doxasmus" },
-            _count: { attendance: 3 }
+    // Transform count for client component compatibility
+    const transformedMembers = members.map(m => ({
+        ...m,
+        _count: {
+            attendance: m._count.attendanceRecords
         }
-    ]
+    }))
 
     return (
         <div className="space-y-8">
@@ -54,9 +78,10 @@ export default async function MembersPage() {
             </div>
 
             <MembersClient
-                initialMembers={members as any}
-                groups={groups as any}
-                userRole={session.user.role as "ADMIN" | "LEADER" | "COORDINATOR"}
+                initialMembers={transformedMembers as any}
+                groups={groups}
+                branches={branches}
+                userRole={session.user.role as any}
             />
         </div>
     )

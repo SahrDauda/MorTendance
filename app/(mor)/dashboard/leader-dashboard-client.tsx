@@ -39,10 +39,16 @@ import { saveAttendanceAction } from "../attendance/actions"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { Search as SearchIcon } from "lucide-react"
+import { EventType } from "@prisma/client"
 
 interface Group {
     id: string
     name: string
+    branchId?: string | null
+    branch?: {
+        id: string
+        name: string
+    } | null
     members: Array<{
         id: string
         name: string
@@ -95,6 +101,8 @@ export function LeaderDashboardClient({
     // Attendance modal state
     const [attendanceDate, setAttendanceDate] = useState<Date>(new Date())
     const [attendanceGroupId, setAttendanceGroupId] = useState(leaderGroups[0]?.id || "")
+    const [attendanceType, setAttendanceType] = useState<EventType>(EventType.SATURDAY_FELLOWSHIP)
+    const [attendanceNotes, setAttendanceNotes] = useState("")
     const [attendance, setAttendance] = useState<Record<string, boolean>>({})
     const [memberSearchTerm, setMemberSearchTerm] = useState("")
     const [isSavingAttendance, setIsSavingAttendance] = useState(false)
@@ -112,12 +120,14 @@ export function LeaderDashboardClient({
             return
         }
 
+        const selectedGroup = leaderGroups.find(g => g.id === newMemberGroupId)
         setIsSubmittingMember(true)
         try {
             await addMemberAction({
                 name: newMemberName,
                 phoneNumber: newMemberPhone || undefined,
-                groupId: newMemberGroupId
+                groupId: newMemberGroupId,
+                branchId: selectedGroup?.branchId || undefined
             })
             toast.success("Member added successfully")
             setIsAddMemberOpen(false)
@@ -163,8 +173,10 @@ export function LeaderDashboardClient({
 
             await saveAttendanceAction({
                 groupId: attendanceGroupId,
+                type: attendanceType,
                 date: attendanceDate,
-                records
+                records,
+                notes: attendanceNotes || undefined
             })
             toast.success("Attendance saved successfully")
             setIsTakeAttendanceOpen(false)
@@ -396,6 +408,29 @@ export function LeaderDashboardClient({
                                         )}
                                     </SelectContent>
                                 </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium">Event Type</label>
+                                <Select value={attendanceType} onValueChange={(v) => setAttendanceType(v as EventType)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select event type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.values(EventType).map(type => (
+                                            <SelectItem key={type} value={type}>
+                                                {type.replace(/_/g, ' ')}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium">Notes (Optional)</label>
+                                <Input
+                                    placeholder="Add any specific notes..."
+                                    value={attendanceNotes}
+                                    onChange={(e) => setAttendanceNotes(e.target.value)}
+                                />
                             </div>
                             <div className="relative">
                                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

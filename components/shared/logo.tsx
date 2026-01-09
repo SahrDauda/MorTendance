@@ -40,7 +40,7 @@ export function Logo({ className, size = "md", variant = "full", href = "/" }: L
       </div>
       {variant === "full" && (
         <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-          MOR Attendance
+          MOR
         </span>
       )}
     </div>

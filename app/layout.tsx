@@ -9,25 +9,25 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
-    default: "MOR Attendance",
-    template: "%s | MOR Attendance",
+    default: "MOR",
+    template: "%s | MOR",
   },
   description:
     "Ministry of Reconciliation (MOR) Attendance System - Tracking growth, consistency, and discipleship.",
   keywords: ["ministry", "attendance", "growth", "discipleship", "fellowship", "MOR"],
   authors: [{ name: "MOR Team" }],
   creator: "MOR",
-  generator: "MOR Attendance System",
+  generator: "MOR System",
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "MOR Attendance",
-    title: "MOR Attendance - Tracking Ministry Growth",
+    siteName: "MOR",
+    title: "MOR - Tracking Ministry Growth",
     description: "Ministry of Reconciliation (MOR) Attendance System - Tracking growth, consistency, and discipleship.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "MOR Attendance - Tracking Ministry Growth",
+    title: "MOR - Tracking Ministry Growth",
     description: "Ministry of Reconciliation (MOR) Attendance System - Tracking growth, consistency, and discipleship.",
   },
 }
