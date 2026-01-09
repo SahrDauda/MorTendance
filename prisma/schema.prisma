@@ -7,8 +7,123 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Branch {
+  id                 String              @id @default(uuid())
+  name               String              @unique
+  headId             String?             @unique @map("head_id")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  attendanceSessions AttendanceSession[]
+  head               User?               @relation("BranchHead", fields: [headId], references: [id])
+  cbsLocations       CBSLocation[]
+  members            Member[]
+
+  @@map("branches")
+}
+
+model User {
+  id               String              @id @default(uuid())
+  email            String              @unique
+  name             String
+  passwordHash     String              @map("password_hash")
+  role             UserRole            @default(LEADER)
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  recordedSessions AttendanceSession[] @relation("SessionRecorder")
+  managedBranch    Branch?             @relation("BranchHead")
+  managedCBS       CBSLocation[]       @relation("CBSLeader")
+  managedGroups    MinistryGroup[]     @relation("GroupLeader")
+
+  @@map("users")
+}
+
+model MinistryGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  leaderId  String?  @map("leader_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  members   Member[]
+  leader    User?    @relation("GroupLeader", fields: [leaderId], references: [id])
+
+  @@map("ministry_groups")
+}
+
+model CBSLocation {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  district  String?
+  branchId  String   @map("branch_id")
+  leaderId  String?  @map("leader_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  leader    User?    @relation("CBSLeader", fields: [leaderId], references: [id])
+
+  @@map("cbs_locations")
+}
+
+model Member {
+  id                String             @id @default(uuid())
+  name              String
+  phoneNumber       String?            @map("phone_number")
+  address           String?
+  gender            Gender?
+  schoolName        String?            @map("school_name")
+  groupId           String             @map("group_id")
+  branchId          String?            @map("branch_id")
+  status            MemberStatus       @default(PRELIMINARY)
+  joinedAt          DateTime           @default(now()) @map("joined_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  attendanceRecords AttendanceRecord[]
+  branch            Branch?            @relation(fields: [branchId], references: [id])
+  group             MinistryGroup      @relation(fields: [groupId], references: [id])
+
+  @@map("members")
+}
+
+model AttendanceSession {
+  id         String             @id @default(uuid())
+  type       EventType
+  date       DateTime           @db.Date
+  branchId   String             @map("branch_id")
+  recorderId String             @map("recorder_id")
+  notes      String?
+  createdAt  DateTime           @default(now()) @map("created_at")
+  records    AttendanceRecord[]
+  branch     Branch             @relation(fields: [branchId], references: [id])
+  recorder   User               @relation("SessionRecorder", fields: [recorderId], references: [id])
+
+  @@map("attendance_sessions")
+}
+
+model AttendanceRecord {
+  id        String            @id @default(uuid())
+  sessionId String            @map("session_id")
+  memberId  String            @map("member_id")
+  isPresent Boolean           @default(false) @map("is_present")
+  notes     String?
+  createdAt DateTime          @default(now()) @map("created_at")
+  member    Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, memberId])
+  @@map("attendance_records")
+}
+
+model AIInsight {
+  id        String   @id @default(uuid())
+  type      String
+  content   String
+  targetId  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ai_insights")
+}
+
 enum UserRole {
   ADMIN
+  BRANCH_HEAD
   COORDINATOR
   LEADER
 }
@@ -19,55 +134,15 @@ enum MemberStatus {
   ESTABLISHED
 }
 
-model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  name          String
-  passwordHash  String         @map("password_hash")
-  role          UserRole       @default(LEADER)
-  managedGroups MinistryGroup[] @relation("GroupLeader")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-
-  @@map("users")
+enum EventType {
+  SATURDAY_FELLOWSHIP
+  LEADERSHIP_MEETING
+  CBS
+  EVANGELISM
+  SCHOOL_VISIT
 }
 
-model MinistryGroup {
-  id        String   @id @default(uuid())
-  name      String   @unique // Huiothesia, Doxasmus, Paligenasia
-  leaderId  String?  @map("leader_id")
-  leader    User?    @relation("GroupLeader", fields: [leaderId], references: [id])
-  members   Member[]
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("ministry_groups")
-}
-
-model Member {
-  id          String       @id @default(uuid())
-  name        String
-  phoneNumber String?      @map("phone_number")
-  groupId     String       @map("group_id")
-  group       MinistryGroup @relation(fields: [groupId], references: [id])
-  status      MemberStatus @default(PRELIMINARY)
-  attendance  Attendance[]
-  joinedAt    DateTime     @default(now()) @map("joined_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-
-  @@map("members")
-}
-
-model Attendance {
-  id        String   @id @default(uuid())
-  memberId  String   @map("member_id")
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  date      DateTime @db.Date
-  isPresent Boolean  @default(false) @map("is_present")
-  quarter   Int      // 1, 2, 3, 4
-  year      Int
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@unique([memberId, date])
-  @@map("attendance")
+enum Gender {
+  MALE
+  FEMALE
 }

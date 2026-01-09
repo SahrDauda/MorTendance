@@ -8,13 +8,12 @@ export const dynamic = 'force-dynamic'
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams?: { year?: string; quarter?: string }
+  searchParams: Promise<{ year?: string; quarter?: string }>
 }) {
   const session = await auth()
   if (!session) redirect("/auth/signin")
 
-  const year = searchParams?.year ?? "2024"
-  const quarter = searchParams?.quarter ?? "Q1"
+  const { year = "2024", quarter = "Q1" } = await searchParams
 
   console.log("[ReportsPage] Using mock data")
 

@@ -51,7 +51,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-card/95 backdrop-blur-md shadow-sm">
-      <div className="container mx-auto flex h-16 items-center gap-4 px-4">
+      <div className="w-full max-w-7xl mx-auto flex h-16 items-center gap-4 px-4">
         <Logo variant="full" size="sm" />
 
         <div className="flex flex-1 items-center gap-4 md:gap-8">

@@ -4,57 +4,63 @@ import {
     ShieldCheck,
     Building2,
 } from "lucide-react"
+import { db } from "@/lib/db"
 import { AdminDashboardClient } from "./admin-dashboard-client"
 
 export async function AdminDashboard() {
     try {
-        // Mock data for Admin Dashboard
-        const totalMembers = 150
-        const totalLeaders = 12
-        const totalGroups = 8
-        const establishedMembers = 120
-        const attendanceRate = 85
+        // Real data fetching
+        const [
+            totalMembers,
+            totalLeaders,
+            totalGroups,
+            totalBranches,
+            recentLeaders,
+            allGroups,
+            allBranches
+        ] = await Promise.all([
+            db.member.count(),
+            db.user.count({ where: { role: "LEADER" } }),
+            db.ministryGroup.count(),
+            db.branch.count(),
+            db.user.findMany({
+                where: { role: "LEADER" },
+                take: 5,
+                orderBy: { createdAt: "desc" },
+                include: {
+                    managedGroups: {
+                        select: {
+                            id: true,
+                            name: true,
+                            _count: { select: { members: true } }
+                        }
+                    }
+                }
+            }),
+            db.ministryGroup.findMany({
+                select: { id: true, name: true }
+            }),
+            db.branch.findMany({
+                select: { id: true, name: true }
+            })
+        ])
 
-        const leaders = [
-            {
-                id: "mock-leader-1",
-                name: "John Leader",
-                email: "john@example.com",
-                managedGroups: [
-                    { id: "g1", name: "Youth Fellowship", _count: { members: 25 } }
-                ]
-            },
-            {
-                id: "mock-leader-2",
-                name: "Sarah Coordinator",
-                email: "sarah@example.com",
-                managedGroups: [
-                    { id: "g2", name: "Men's Ministry", _count: { members: 30 } },
-                    { id: "g3", name: "Prayer Team", _count: { members: 15 } }
-                ]
-            }
-        ]
-
-        const groups = [
-            { id: "g1", name: "Youth Fellowship" },
-            { id: "g2", name: "Men's Ministry" },
-            { id: "g3", name: "Prayer Team" },
-            { id: "g4", name: "Women's Fellowship" },
-            { id: "g5", name: "Children's Church" },
-        ]
+        // Calculate attendance rate (placeholder logic for now as we don't have enough data)
+        const attendanceRate = 0
 
         const stats = [
             { name: "Total Members", value: totalMembers.toString(), iconName: "Users" as const, color: "text-blue-500", trend: "Across all groups" },
             { name: "Leaders", value: totalLeaders.toString(), iconName: "ShieldCheck" as const, color: "text-purple-500", trend: "Active leaders" },
             { name: "Groups", value: totalGroups.toString(), iconName: "Building2" as const, color: "text-green-500", trend: "Ministry groups" },
-            { name: "Attendance Rate", value: `${attendanceRate}%`, iconName: "ClipboardCheck" as const, color: "text-amber-500", trend: "Overall consistency" },
+            { name: "Branches", value: totalBranches.toString(), iconName: "Building2" as const, color: "text-amber-500", trend: "Active locations" },
         ]
 
         return (
             <AdminDashboardClient
                 stats={stats}
-                leaders={leaders}
-                groups={groups}
+                leaders={recentLeaders}
+                groups={allGroups}
+                branches={allBranches}
             />
         )
     } catch (error) {
