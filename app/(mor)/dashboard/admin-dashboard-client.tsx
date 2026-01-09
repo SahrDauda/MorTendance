@@ -36,10 +36,27 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createBranchAction } from "@/app/actions/branch"
 import { createLeaderAction } from "@/app/actions/leader"
+import { createGroupAction } from "@/app/actions/group"
 import { addMemberAction } from "../members/actions"
 import { toast } from "sonner"
 
-// ... existing imports
+interface Group {
+    id: string
+    name: string
+}
+
+interface Leader {
+    id: string
+    name: string
+    email: string
+    managedGroups: Array<{
+        id: string
+        name: string
+        _count: {
+            members: number
+        }
+    }>
+}
 
 interface Branch {
     id: string
@@ -56,14 +73,14 @@ interface AdminDashboardClientProps {
     }>
     leaders: Leader[]
     groups: Group[]
-    branches?: Branch[] // Add branches to props
+    branches?: Branch[]
 }
 
 export function AdminDashboardClient({
     stats,
     leaders,
     groups,
-    branches = [], // Default to empty array
+    branches = [],
 }: AdminDashboardClientProps) {
     const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
     const [newMemberName, setNewMemberName] = useState("")
@@ -80,19 +97,25 @@ export function AdminDashboardClient({
     const [isAddLeaderOpen, setIsAddLeaderOpen] = useState(false)
     const [newLeaderName, setNewLeaderName] = useState("")
     const [newLeaderEmail, setNewLeaderEmail] = useState("")
+    const [newLeaderRole, setNewLeaderRole] = useState<"PROBATION_LEADER" | "JUNIOR_LEADER" | "SENIOR_LEADER">("PROBATION_LEADER")
     const [newLeaderBranchId, setNewLeaderBranchId] = useState<string>("none")
     const [newLeaderGroupId, setNewLeaderGroupId] = useState<string>("none")
     const [isSubmittingLeader, setIsSubmittingLeader] = useState(false)
 
+    // Group State
+    const [isAddGroupOpen, setIsAddGroupOpen] = useState(false)
+    const [newGroupName, setNewGroupName] = useState("")
+    const [newGroupLeaderId, setNewGroupLeaderId] = useState<string>("none")
+    const [isSubmittingGroup, setIsSubmittingGroup] = useState(false)
+
     const quickActions = [
         { name: "Add Leader", icon: ShieldCheck, color: "bg-purple-500/10 text-purple-500", action: "leader" },
-        { name: "Add Member", icon: Users, color: "bg-green-500/10 text-green-500", action: "member" },
+        { name: "Create Group", icon: Users, color: "bg-green-500/10 text-green-500", action: "group" },
         { name: "Create Branch", icon: Building2, color: "bg-amber-500/10 text-amber-500", action: "branch" },
         { name: "View Reports", icon: TrendingUp, color: "bg-blue-500/10 text-blue-500", href: "/reports" },
     ]
 
     const handleAddMember = async () => {
-        // ... existing code
         if (!newMemberName || !newMemberGroupId) {
             toast.error("Please fill in all required fields")
             return
@@ -105,7 +128,9 @@ export function AdminDashboardClient({
                 phoneNumber: newMemberPhone || undefined,
                 groupId: newMemberGroupId
             })
-            toast.success("Member added successfully")
+            toast.success("Member added successfully", {
+                description: `${newMemberName} has been added to the system.`
+            })
             setIsAddMemberOpen(false)
             setNewMemberName("")
             setNewMemberPhone("")
@@ -119,7 +144,6 @@ export function AdminDashboardClient({
     }
 
     const handleCreateBranch = async () => {
-        // ... existing code
         if (!newBranchName) {
             toast.error("Branch name is required")
             return
@@ -128,7 +152,9 @@ export function AdminDashboardClient({
         setIsSubmittingBranch(true)
         try {
             await createBranchAction({ name: newBranchName })
-            toast.success("Branch created successfully")
+            toast.success("Branch created successfully", {
+                description: `${newBranchName} is now active.`
+            })
             setIsAddBranchOpen(false)
             setNewBranchName("")
         } catch (error: any) {
@@ -144,24 +170,59 @@ export function AdminDashboardClient({
             return
         }
 
+        // Validation: Only Senior Leaders can have a branch
+        if (newLeaderBranchId !== "none" && newLeaderRole !== "SENIOR_LEADER") {
+            toast.error("Only Senior Leaders can be assigned to a branch")
+            return
+        }
+
         setIsSubmittingLeader(true)
         try {
             await createLeaderAction({
                 name: newLeaderName,
                 email: newLeaderEmail,
+                role: newLeaderRole,
                 branchId: newLeaderBranchId === "none" ? undefined : newLeaderBranchId,
                 groupId: newLeaderGroupId === "none" ? undefined : newLeaderGroupId,
             })
-            toast.success("Leader created successfully")
+            toast.success("Leader created successfully", {
+                description: `Account for ${newLeaderName} has been created.`
+            })
             setIsAddLeaderOpen(false)
             setNewLeaderName("")
             setNewLeaderEmail("")
+            setNewLeaderRole("PROBATION_LEADER")
             setNewLeaderBranchId("none")
             setNewLeaderGroupId("none")
         } catch (error: any) {
             toast.error(error.message || "Failed to create leader")
         } finally {
             setIsSubmittingLeader(false)
+        }
+    }
+
+    const handleCreateGroup = async () => {
+        if (!newGroupName) {
+            toast.error("Group name is required")
+            return
+        }
+
+        setIsSubmittingGroup(true)
+        try {
+            await createGroupAction({
+                name: newGroupName,
+                leaderId: newGroupLeaderId === "none" ? undefined : newGroupLeaderId
+            })
+            toast.success("Group created successfully", {
+                description: `${newGroupName} has been added.`
+            })
+            setIsAddGroupOpen(false)
+            setNewGroupName("")
+            setNewGroupLeaderId("none")
+        } catch (error: any) {
+            toast.error(error.message || "Failed to create group")
+        } finally {
+            setIsSubmittingGroup(false)
         }
     }
 
@@ -209,6 +270,7 @@ export function AdminDashboardClient({
                                 if (action.action === "member") setIsAddMemberOpen(true)
                                 if (action.action === "branch") setIsAddBranchOpen(true)
                                 if (action.action === "leader") setIsAddLeaderOpen(true)
+                                if (action.action === "group") setIsAddGroupOpen(true)
                             }}
                             className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card/50 border border-border/50 transition-all hover:bg-primary/5 hover:border-primary/20 group backdrop-blur-sm h-full cursor-pointer"
                         >
@@ -410,10 +472,27 @@ export function AdminDashboardClient({
                             />
                         </div>
                         <div className="grid gap-2">
-                            <label className="text-sm font-medium">Assign to Branch (Optional)</label>
-                            <Select value={newLeaderBranchId} onValueChange={setNewLeaderBranchId}>
+                            <label className="text-sm font-medium">Role</label>
+                            <Select value={newLeaderRole} onValueChange={(value: any) => setNewLeaderRole(value)}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select branch" />
+                                    <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="PROBATION_LEADER">Probation Leader</SelectItem>
+                                    <SelectItem value="JUNIOR_LEADER">Junior Leader</SelectItem>
+                                    <SelectItem value="SENIOR_LEADER">Senior Leader</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium">Assign to Branch (Optional)</label>
+                            <Select
+                                value={newLeaderBranchId}
+                                onValueChange={setNewLeaderBranchId}
+                                disabled={newLeaderRole !== "SENIOR_LEADER"}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder={newLeaderRole === "SENIOR_LEADER" ? "Select branch" : "Only Senior Leaders can have a branch"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
@@ -442,6 +521,48 @@ export function AdminDashboardClient({
                         <Button variant="outline" onClick={() => setIsAddLeaderOpen(false)}>Cancel</Button>
                         <Button onClick={handleCreateLeader} disabled={isSubmittingLeader}>
                             {isSubmittingLeader ? "Creating..." : "Create Leader"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Create Group Modal */}
+            <Dialog open={isAddGroupOpen} onOpenChange={setIsAddGroupOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Create Ministry Group</DialogTitle>
+                        <DialogDescription>
+                            Create a new ministry group (e.g., "Choir", "Ushers"). You can assign a leader now or later.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium">Group Name</label>
+                            <Input
+                                placeholder="e.g. Choir"
+                                value={newGroupName}
+                                onChange={(e) => setNewGroupName(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium">Assign Leader (Optional)</label>
+                            <Select value={newGroupLeaderId} onValueChange={setNewGroupLeaderId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select leader" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {leaders.map(leader => (
+                                        <SelectItem key={leader.id} value={leader.id}>{leader.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddGroupOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateGroup} disabled={isSubmittingGroup}>
+                            {isSubmittingGroup ? "Creating..." : "Create Group"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

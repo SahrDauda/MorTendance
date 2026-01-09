@@ -9,6 +9,7 @@ import { UserRole } from "@prisma/client"
 interface CreateLeaderData {
     name: string
     email: string
+    role: "PROBATION_LEADER" | "JUNIOR_LEADER" | "SENIOR_LEADER"
     branchId?: string
     groupId?: string
 }
@@ -20,8 +21,13 @@ export async function createLeaderAction(data: CreateLeaderData) {
         throw new Error("Unauthorized")
     }
 
-    if (!data.name || !data.email) {
-        throw new Error("Name and Email are required")
+    if (!data.name || !data.email || !data.role) {
+        throw new Error("Name, Email, and Role are required")
+    }
+
+    // Validation: Only Senior Leaders can be assigned to a branch
+    if (data.branchId && data.role !== "SENIOR_LEADER") {
+        throw new Error("Only Senior Leaders can be assigned to a branch")
     }
 
     try {
@@ -43,8 +49,8 @@ export async function createLeaderAction(data: CreateLeaderData) {
                 name: data.name,
                 email: data.email,
                 passwordHash: hashedPassword,
-                role: UserRole.LEADER,
-                // Assign to Branch if provided
+                role: data.role as UserRole,
+                // Assign to Branch if provided (and valid)
                 managedBranch: data.branchId ? {
                     connect: { id: data.branchId }
                 } : undefined,
