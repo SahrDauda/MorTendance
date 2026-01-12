@@ -10,21 +10,21 @@ export const authConfig = {
             const isLoggedIn = !!auth?.user
             const { pathname } = nextUrl
 
-            // 1. Allow API routes and Public assets
-            if (pathname.startsWith('/api') || pathname.startsWith('/public')) {
-                return true
-            }
+            // 1. Public Routes (Always allow)
+            const isPublicRoute =
+                pathname.startsWith('/auth') ||
+                pathname.startsWith('/api/auth') ||
+                pathname.startsWith('/check-in') || // Allow public check-in
+                pathname === '/'
 
-            // 2. Handle Auth Pages (Signin/Signup)
-            const isAuthPage = pathname.startsWith('/auth')
-            if (isAuthPage) {
-                if (isLoggedIn) {
+            if (isPublicRoute) {
+                if (isLoggedIn && pathname.startsWith('/auth')) {
                     return Response.redirect(new URL('/dashboard', nextUrl))
                 }
                 return true
             }
 
-            // 3. Protect everything else
+            // 2. Protected Routes
             return isLoggedIn
         },
         async jwt({ token, user }) {
@@ -42,10 +42,8 @@ export const authConfig = {
             return session
         },
     },
-    providers: [], // Configured in lib/auth.ts
-    session: {
-        strategy: "jwt",
-    },
-    // NextAuth v5 automatically picks up AUTH_SECRET from environment variables.
+    providers: [],
+    session: { strategy: "jwt" },
+    secret: process.env.AUTH_SECRET,
     trustHost: true,
 } satisfies NextAuthConfig
