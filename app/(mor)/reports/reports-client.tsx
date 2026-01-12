@@ -19,6 +19,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import * as XLSX from "xlsx"
+import jsPDF from "jspdf"
+import "jspdf-autotable"
+import { format } from "date-fns"
 
 interface ReportStat {
     label: string
@@ -87,11 +97,86 @@ export function ReportsClient({
         router.push(`/reports?${params.toString()}`)
     }
 
-    const handleExport = () => {
-        const url = new URL("/api/reports/export", window.location.origin)
-        url.searchParams.set("year", year)
-        url.searchParams.set("quarter", quarter)
-        window.location.href = url.toString()
+    const exportToCSV = () => {
+        const data = groups.map(g => {
+            const groupMembers = g.members.length
+            const establishedInGroup = g.members.filter((m) => m.status === "ESTABLISHED").length
+            const groupMemberIds = g.members.map((m) => m.id)
+            const groupAttendance = attendanceData.filter((a) => groupMemberIds.includes(a.memberId))
+            const groupPresent = groupAttendance.filter((a) => a.isPresent).length
+            const groupRate = groupAttendance.length > 0 ? Math.round((groupPresent / groupAttendance.length) * 100) : 0
+
+            return {
+                "Group Name": g.name,
+                "Total Members": groupMembers,
+                "Avg. Attendance": `${groupRate}%`,
+                "Established Members": establishedInGroup
+            }
+        })
+
+        const headers = ["Group Name", "Total Members", "Avg. Attendance", "Established Members"]
+        const csvContent = [
+            headers.join(","),
+            ...data.map(row => headers.map(h => `"${row[h as keyof typeof row]}"`).join(","))
+        ].join("\n")
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+        const link = document.createElement("a")
+        link.href = URL.createObjectURL(blob)
+        link.setAttribute("download", `mor_report_${year}_${quarter}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
+    const exportToExcel = () => {
+        const data = groups.map(g => {
+            const groupMembers = g.members.length
+            const establishedInGroup = g.members.filter((m) => m.status === "ESTABLISHED").length
+            const groupMemberIds = g.members.map((m) => m.id)
+            const groupAttendance = attendanceData.filter((a) => groupMemberIds.includes(a.memberId))
+            const groupPresent = groupAttendance.filter((a) => a.isPresent).length
+            const groupRate = groupAttendance.length > 0 ? Math.round((groupPresent / groupAttendance.length) * 100) : 0
+
+            return {
+                "Group Name": g.name,
+                "Total Members": groupMembers,
+                "Avg. Attendance": `${groupRate}%`,
+                "Established Members": establishedInGroup
+            }
+        })
+        const worksheet = XLSX.utils.json_to_sheet(data)
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Ministry Report")
+        XLSX.writeFile(workbook, `mor_report_${year}_${quarter}.xlsx`)
+    }
+
+    const exportToPDF = () => {
+        const doc = new jsPDF()
+        doc.text(`MOR Ministry Report - ${year} ${quarter}`, 14, 15)
+
+        const tableData = groups.map(g => {
+            const groupMembers = g.members.length
+            const establishedInGroup = g.members.filter((m) => m.status === "ESTABLISHED").length
+            const groupMemberIds = g.members.map((m) => m.id)
+            const groupAttendance = attendanceData.filter((a) => groupMemberIds.includes(a.memberId))
+            const groupPresent = groupAttendance.filter((a) => a.isPresent).length
+            const groupRate = groupAttendance.length > 0 ? Math.round((groupPresent / groupAttendance.length) * 100) : 0
+
+            return [
+                g.name,
+                groupMembers.toString(),
+                `${groupRate}%`,
+                establishedInGroup.toString()
+            ]
+        })
+
+            ; (doc as any).autoTable({
+                head: [["Group Name", "Total Members", "Avg. Attendance", "Established"]],
+                body: tableData,
+                startY: 25,
+            })
+        doc.save(`mor_report_${year}_${quarter}.pdf`)
     }
 
     // Safety check
@@ -147,9 +232,18 @@ export function ReportsClient({
                     <Button variant="outline" className="gap-2">
                         <Filter className="h-4 w-4" /> Filter
                     </Button>
-                    <Button className="gap-2 shadow-lg shadow-primary/20" onClick={handleExport}>
-                        <Download className="h-4 w-4" /> Export Report
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button className="gap-2 shadow-lg shadow-primary/20">
+                                <Download className="h-4 w-4" /> Export Report
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={exportToPDF}>Export as PDF</DropdownMenuItem>
+                            <DropdownMenuItem onClick={exportToCSV}>Export as CSV</DropdownMenuItem>
+                            <DropdownMenuItem onClick={exportToExcel}>Export as Excel</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 

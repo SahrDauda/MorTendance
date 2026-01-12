@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 
-export async function createBranchAction(data: { name: string }) {
+export async function createBranchAction(data: { name: string, headId?: string }) {
     const session = await auth()
 
     if (!session || session.user.role !== "ADMIN") {
@@ -19,6 +19,7 @@ export async function createBranchAction(data: { name: string }) {
         const branch = await db.branch.create({
             data: {
                 name: data.name,
+                headId: data.headId === "none" ? undefined : data.headId
             }
         })
 

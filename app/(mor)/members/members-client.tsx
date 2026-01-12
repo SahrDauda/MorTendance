@@ -29,6 +29,12 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { addMemberAction } from "./actions"
 import { toast } from "sonner"
@@ -88,6 +94,8 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
     const [selectedMember, setSelectedMember] = useState<Member | null>(null)
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
     const [viewMode, setViewMode] = useState<"list" | "groups">("list")
+    const [groupSearchTerm, setGroupSearchTerm] = useState("")
+    const [groupSelectedBranch, setGroupSelectedBranch] = useState("all")
 
     const [newMemberName, setNewMemberName] = useState("")
     const [newMemberPhone, setNewMemberPhone] = useState("")
@@ -100,6 +108,12 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
         const matchesGroup = selectedGroup === "all" || member.group.id === selectedGroup
         const matchesBranch = selectedBranch === "all" || member.branch?.id === selectedBranch
         return matchesSearch && matchesGroup && matchesBranch
+    })
+
+    const filteredGroups = groups.filter(group => {
+        const matchesSearch = group.name.toLowerCase().includes(groupSearchTerm.toLowerCase())
+        const matchesBranch = groupSelectedBranch === "all" || group.branch?.id === groupSelectedBranch
+        return matchesSearch && matchesBranch
     })
 
     const handleAddMember = async () => {
@@ -194,6 +208,63 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
     const establishedMembers = initialMembers.filter(m => m.status === "ESTABLISHED").length
     const newMembers = initialMembers.filter(m => m.status === "PRELIMINARY").length
 
+    // Group Exports
+    const exportGroupsToCSV = () => {
+        const data = groups.map(g => ({
+            Name: g.name,
+            Leader: g.leader?.name || "N/A",
+            Branch: g.branch?.name || "N/A",
+            Members: g._count?.members || 0
+        }))
+        const headers = ["Name", "Leader", "Branch", "Members"]
+        const csvContent = [
+            headers.join(","),
+            ...data.map(row => headers.map(h => `"${row[h as keyof typeof row]}"`).join(","))
+        ].join("\n")
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+        const link = document.createElement("a")
+        link.href = URL.createObjectURL(blob)
+        link.setAttribute("download", `groups_${format(new Date(), "yyyy-MM-dd")}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
+    const exportGroupsToExcel = () => {
+        const data = groups.map(g => ({
+            Name: g.name,
+            Leader: g.leader?.name || "N/A",
+            Branch: g.branch?.name || "N/A",
+            Members: g._count?.members || 0
+        }))
+        const worksheet = XLSX.utils.json_to_sheet(data)
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Groups")
+        XLSX.writeFile(workbook, `groups_${format(new Date(), "yyyy-MM-dd")}.xlsx`)
+    }
+
+    const exportGroupsToPDF = () => {
+        const doc = new jsPDF()
+        doc.text("MOR Ministry Groups Report", 14, 15)
+        const tableData = groups.map(g => [
+            g.name,
+            g.leader?.name || "N/A",
+            g.branch?.name || "N/A",
+            (g._count?.members || 0).toString()
+        ])
+            ; (doc as any).autoTable({
+                head: [["Name", "Leader", "Branch", "Members"]],
+                body: tableData,
+                startY: 20,
+            })
+        doc.save(`groups_${format(new Date(), "yyyy-MM-dd")}.pdf`)
+    }
+
+    const totalGroups = groups.length
+    const groupsWithLeaders = groups.filter(g => g.leader).length
+    const totalGroupMembers = groups.reduce((acc, g) => acc + (g._count?.members || 0), 0)
+
     return (
         <>
             <Tabs defaultValue="members" className="space-y-6">
@@ -245,15 +316,18 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
 
                         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                             <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" size="sm" onClick={exportToPDF} className="gap-2">
-                                    <Download className="h-4 w-4" /> PDF
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={exportToCSV} className="gap-2">
-                                    <Download className="h-4 w-4" /> CSV
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-2">
-                                    <Download className="h-4 w-4" /> Excel
-                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="gap-2">
+                                            <Download className="h-4 w-4" /> Export Members
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                        <DropdownMenuItem onClick={exportToPDF}>Export as PDF</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={exportToCSV}>Export as CSV</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={exportToExcel}>Export as Excel</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                                 <div className="h-8 w-px bg-border mx-2 hidden md:block" />
                                 <div className="flex bg-muted/50 p-1 rounded-lg border border-border/50">
                                     <Button
@@ -563,54 +637,141 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                 </TabsContent>
 
                 <TabsContent value="groups" className="space-y-6 mt-0">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold tracking-tight">Ministry Groups</h2>
-                            <p className="text-muted-foreground">Manage fellowship groups, assign leaders and branches.</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {groups.map(group => (
-                            <Card key={group.id} className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden group">
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-lg font-bold flex items-center gap-2">
-                                            <div className="p-2 rounded-lg bg-primary/10">
-                                                <Users className="h-4 w-4 text-primary" />
-                                            </div>
-                                            {group.name}
-                                        </CardTitle>
-                                        <Badge variant="secondary" className="font-bold">
-                                            {group._count?.members || 0} Members
-                                        </Badge>
+                    <div className="flex flex-col gap-6">
+                        {/* Group Dashboard Highlights */}
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                                <CardContent className="p-6 flex items-center gap-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+                                        <Users className="h-6 w-6 text-primary" />
                                     </div>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3 text-sm">
-                                            <Shield className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-muted-foreground">Leader:</span>
-                                            <span className="font-medium">{group.leader?.name || "No Leader Assigned"}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-sm">
-                                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-muted-foreground">Branch:</span>
-                                            <span className="font-medium">{group.branch?.name || "No Branch Assigned"}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-4 flex items-center gap-2 border-t border-border/50">
-                                        <Button variant="outline" size="sm" className="flex-1 h-9 rounded-xl border-border/50 hover:bg-primary/5">
-                                            Edit Group
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-destructive hover:bg-destructive/5">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Total Groups</p>
+                                        <h3 className="text-2xl font-bold">{totalGroups}</h3>
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
+                            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                                <CardContent className="p-6 flex items-center gap-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center">
+                                        <Shield className="h-6 w-6 text-green-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Active Leaders</p>
+                                        <h3 className="text-2xl font-bold">{groupsWithLeaders}</h3>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                                <CardContent className="p-6 flex items-center gap-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
+                                        <UserCheck className="h-6 w-6 text-blue-500" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Total Group Members</p>
+                                        <h3 className="text-2xl font-bold">{totalGroupMembers}</h3>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-wrap gap-2">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="gap-2">
+                                            <Download className="h-4 w-4" /> Export Groups
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                        <DropdownMenuItem onClick={exportGroupsToPDF}>Export as PDF</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={exportGroupsToCSV}>Export as CSV</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={exportGroupsToExcel}>Export as Excel</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-1 md:justify-end">
+                                <div className="flex flex-col gap-4 md:flex-row md:items-center flex-1 max-w-2xl justify-end">
+                                    <div className="relative flex-1 max-w-sm">
+                                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search groups..."
+                                            value={groupSearchTerm}
+                                            onChange={(e) => setGroupSearchTerm(e.target.value)}
+                                            className="pl-9 bg-card/50 border-border/50"
+                                        />
+                                    </div>
+                                    <Select value={groupSelectedBranch} onValueChange={setGroupSelectedBranch}>
+                                        <SelectTrigger className="w-[180px] bg-card/50 border-border/50">
+                                            <SelectValue placeholder="Filter by branch" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Branches</SelectItem>
+                                            {branches.map(branch => (
+                                                <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {userRole === "ADMIN" && (
+                                    <Button className="gap-2 shadow-lg shadow-primary/20">
+                                        <Users className="h-4 w-4" />
+                                        Create New Group
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredGroups.map(group => (
+                                <Card key={group.id} className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden group hover:border-primary/30 transition-all duration-300">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                                <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                                    <Users className="h-4 w-4 text-primary" />
+                                                </div>
+                                                {group.name}
+                                            </CardTitle>
+                                            <Badge variant="secondary" className="font-bold">
+                                                {group._count?.members || 0} Members
+                                            </Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3 text-sm">
+                                                <Shield className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-muted-foreground">Leader:</span>
+                                                <span className="font-medium">{group.leader?.name || "No Leader Assigned"}</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-sm">
+                                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-muted-foreground">Branch:</span>
+                                                <span className="font-medium">{group.branch?.name || "No Branch Assigned"}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 flex items-center gap-2 border-t border-border/50">
+                                            <Button variant="outline" size="sm" className="flex-1 h-9 rounded-xl border-border/50 hover:bg-primary/5">
+                                                Edit Group
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-destructive hover:bg-destructive/5">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+
+                        {filteredGroups.length === 0 && (
+                            <div className="p-12 text-center text-muted-foreground bg-card/50 rounded-2xl border border-dashed border-border/50">
+                                No groups found matching your search.
+                            </div>
+                        )}
                     </div>
                 </TabsContent>
             </Tabs>

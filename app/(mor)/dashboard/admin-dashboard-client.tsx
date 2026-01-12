@@ -92,6 +92,7 @@ export function AdminDashboardClient({
     // Branch State
     const [isAddBranchOpen, setIsAddBranchOpen] = useState(false)
     const [newBranchName, setNewBranchName] = useState("")
+    const [newBranchHeadId, setNewBranchHeadId] = useState<string>("none")
     const [isSubmittingBranch, setIsSubmittingBranch] = useState(false)
 
     // Leader State
@@ -155,12 +156,17 @@ export function AdminDashboardClient({
 
         setIsSubmittingBranch(true)
         try {
-            await createBranchAction({ name: newBranchName })
+            await createBranchAction({
+                name: newBranchName,
+                headId: newBranchHeadId === "none" ? undefined : newBranchHeadId
+            })
             toast.success("Branch created successfully", {
                 description: `${newBranchName} is now active.`
             })
             setIsAddBranchOpen(false)
             setNewBranchName("")
+            setNewBranchHeadId("none")
+            setTimeout(() => window.location.reload(), 500)
         } catch (error: any) {
             toast.error(error.message || "Failed to create branch")
         } finally {
@@ -186,7 +192,6 @@ export function AdminDashboardClient({
                 name: newLeaderName,
                 email: newLeaderEmail,
                 role: newLeaderRole,
-                branchId: newLeaderBranchId === "none" ? undefined : newLeaderBranchId,
                 groupId: newLeaderGroupId === "none" ? undefined : newLeaderGroupId,
             })
             toast.success("Leader created successfully", {
@@ -454,6 +459,20 @@ export function AdminDashboardClient({
                                 onChange={(e) => setNewBranchName(e.target.value)}
                             />
                         </div>
+                        <div className="grid gap-2">
+                            <label className="text-sm font-medium">Head Leader (Optional)</label>
+                            <Select value={newBranchHeadId} onValueChange={setNewBranchHeadId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a senior leader" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {leaders.map(leader => (
+                                        <SelectItem key={leader.id} value={leader.id}>{leader.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddBranchOpen(false)}>Cancel</Button>
@@ -501,24 +520,6 @@ export function AdminDashboardClient({
                                     <SelectItem value="PROBATION_LEADER">Probation Leader</SelectItem>
                                     <SelectItem value="JUNIOR_LEADER">Junior Leader</SelectItem>
                                     <SelectItem value="SENIOR_LEADER">Senior Leader</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <label className="text-sm font-medium">Assign to Branch (Optional)</label>
-                            <Select
-                                value={newLeaderBranchId}
-                                onValueChange={setNewLeaderBranchId}
-                                disabled={newLeaderRole !== "SENIOR_LEADER"}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder={newLeaderRole === "SENIOR_LEADER" ? "Select branch" : "Only Senior Leaders can have a branch"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {branches.map(branch => (
-                                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
-                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

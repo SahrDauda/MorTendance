@@ -3,13 +3,18 @@ const prisma = new PrismaClient()
 
 async function main() {
     try {
-        const url = process.env.DATABASE_URL || 'NOT SET'
-        console.log('DATABASE_URL (masked):', url.replace(/:[^:@]+@/, ':****@'))
-        console.log('Attempting to connect to database...')
-        const count = await prisma.user.count()
-        console.log('Connection successful! User count:', count)
+        console.log('Attempting to query MinistryGroup...')
+        const groups = await prisma.ministryGroup.findMany({
+            take: 1,
+            select: {
+                id: true,
+                name: true,
+                branchId: true
+            }
+        })
+        console.log('Query successful! Sample group:', groups[0])
     } catch (e) {
-        console.error('Connection failed:', e)
+        console.error('Query failed:', e.message)
     } finally {
         await prisma.$disconnect()
     }

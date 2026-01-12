@@ -30,6 +30,12 @@ import {
     DialogTrigger,
     DialogFooter,
 } from "@/components/ui/dialog"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 
 interface Member {
@@ -209,15 +215,18 @@ export function AttendanceClient({ initialGroups, allMembers, userRole }: Attend
 
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                 <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={exportToPDF} className="gap-2">
-                        <Download className="h-4 w-4" /> PDF
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={exportToCSV} className="gap-2">
-                        <Download className="h-4 w-4" /> CSV
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={exportToExcel} className="gap-2">
-                        <Download className="h-4 w-4" /> Excel
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                                <Download className="h-4 w-4" /> Export Attendance
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={exportToPDF}>Export as PDF</DropdownMenuItem>
+                            <DropdownMenuItem onClick={exportToCSV}>Export as CSV</DropdownMenuItem>
+                            <DropdownMenuItem onClick={exportToExcel}>Export as Excel</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
 
                 <Dialog open={isAddAttendanceOpen} onOpenChange={setIsAddAttendanceOpen}>

@@ -20,28 +20,41 @@ export function Logo({ className, size = "md", variant = "full", href = "/" }: L
   }, [])
 
   const imageSizes = {
-    sm: { width: 70, height: 22 },
-    md: { width: 100, height: 32 },
-    lg: { width: 130, height: 42 },
+    sm: { width: 80, height: 28 },
+    md: { width: 120, height: 42 },
+    lg: { width: 160, height: 56 },
   }
 
   const iconSizes = {
-    sm: { width: 24, height: 24 },
-    md: { width: 32, height: 32 },
-    lg: { width: 40, height: 40 },
+    sm: { width: 32, height: 32 },
+    md: { width: 48, height: 48 },
+    lg: { width: 64, height: 64 },
   }
 
   const dimensions = variant === "icon" ? iconSizes[size] : imageSizes[size]
 
   const content = (
     <div className={cn("flex items-center gap-2", className)}>
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-xl shadow-lg">
-        M
+      <div className="relative flex items-center justify-center rounded-xl bg-slate-900 p-1.5 shadow-xl border border-white/10 overflow-hidden group transition-all hover:scale-105">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-50" />
+        <Image
+          src="/mor_logo.png"
+          alt="MOR Logo"
+          width={dimensions.width}
+          height={dimensions.height}
+          className="relative z-10 object-contain"
+          priority
+        />
       </div>
       {variant === "full" && (
-        <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-          MOR
-        </span>
+        <div className="flex flex-col -space-y-1">
+          <span className="font-black text-xl tracking-tighter bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            MOR
+          </span>
+          <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+            Attendance System
+          </span>
+        </div>
       )}
     </div>
   )
