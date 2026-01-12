@@ -49,7 +49,8 @@ export const authConfig = {
     session: {
         strategy: "jwt",
     },
-    // Trim secrets to prevent "Invalid URL" or "Configuration" errors caused by trailing spaces
-    secret: getEnv("AUTH_SECRET") || getEnv("NEXTAUTH_SECRET") || "fallback-secret-for-dev-only",
+    // NextAuth v5 automatically picks up AUTH_SECRET from environment variables.
+    // We only provide a fallback for local development if not set.
+    secret: process.env.AUTH_SECRET || "fallback-secret-for-dev-only",
     trustHost: true,
 } satisfies NextAuthConfig
