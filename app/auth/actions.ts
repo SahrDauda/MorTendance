@@ -3,6 +3,7 @@
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { UserRole } from "@prisma/client"
+import { z } from "zod"
 
 const registerSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),

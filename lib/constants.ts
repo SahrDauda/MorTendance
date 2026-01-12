@@ -41,6 +41,7 @@ export const ROUTES = {
   MEMBERS: "/members",
   REPORTS: "/reports",
   SETTINGS: "/settings",
+  QR_GENERATOR: "/attendance/qr",
 } as const
 
 // ============================================================================

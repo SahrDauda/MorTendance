@@ -37,26 +37,27 @@
       ~ Every member/leader marks attendance for Evangelism every Friday(After the evangelism).
   ### School Attendance
       ~ It should be recorded every time a group visits a school. Individuals should mark attendance.
-      ~ Attendance of how many school students attended fellowship should be traced also, so when someone marks attendance, he shold tell if he was invited in his/her school, and the name of the school.
+      ~ Attendance of how many school students attended fellowship should be traced also, so when someone marks attendance, he should tell if he was invited in his/her school, and the name of the school.
       
 ### Architectural Roadmap (Senior Engineer Plan)
 
 #### Sprint A: The Foundation (Database & Architecture)
-- [ ] **Schema Refactor:**
-    - [ ] Introduce `Branch` entity (HQ, Eastern, Bo).
-    - [ ] Update `User` roles to include `BRANCH_HEAD`.
-    - [ ] Upgrade `Member` profile to CRM-style (Gender, Address, Phone, Branch Link).
-    - [ ] Implement `AttendanceSession` & `AttendanceRecord` for multi-event tracking (Fellowship, CBS, Evangelism).
-- [ ] **Data Migration:** Ensure existing data maps to the new structure.
+- [x] **Schema Refactor:**
+    - [x] Introduce `Branch` entity (HQ, Eastern, Bo).
+    - [x] Update `User` roles to include `BRANCH_HEAD`.
+    - [x] Upgrade `Member` profile to CRM-style (Gender, Address, Phone, Branch Link).
+    - [x] Implement `AttendanceSession` & `AttendanceRecord` for multi-event tracking (Fellowship, CBS, Evangelism).
+- [x] **Data Migration:** Ensure existing data maps to the new structure.
 
 #### Sprint B: The Input Engine (QR & Onboarding)
-- [ ] **Newcomer Flow:** Create a dedicated form for adding new members with full details.
-- [ ] **QR Check-in System:**
-    - [ ] Generate static QR codes for Branches/Events.
-    - [ ] Build the "Self-Check-in" page for members.
+- [x] **Newcomer Flow:** Create a dedicated form for adding new members with full details.
+- [x] **QR Check-in System:**
+    - [x] Generate static QR codes for Branches/Events.
+    - [x] Build the "Self-Check-in" page for members.
     - [ ] Build the "Manual Check-in" list for Leaders.
 
 #### Sprint C: The Dashboards (Intelligence)
 - [ ] **Branch Head Portal:** A view scoped to a specific branch's performance.
-- [ ] **Master Admin Reports:** The "God View" for Min Marcos (All branches, all metrics).
-- [ ] **Export Engine:** One-click PDF/CSV generation for any data view.
+- [x] **Master Admin Reports:** The "God View" for Min Marcos (All branches, all metrics).
+- [x] **Export Engine:** One-click PDF/CSV generation for any data view.
+- [x] **Group Management:** Integrated group management within the members portal.

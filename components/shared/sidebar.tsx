@@ -10,6 +10,7 @@ import {
   Settings,
   UserCircle,
   ShieldCheck,
+  QrCode,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ROUTES } from "@/lib/constants"
@@ -26,6 +27,7 @@ const baseNavigation = [
 
 const adminNavigation = [
   { name: "Leaders", href: "/admin/leaders", icon: ShieldCheck },
+  { name: "QR Generator", href: ROUTES.QR_GENERATOR, icon: QrCode },
 ]
 
 export function Sidebar() {
