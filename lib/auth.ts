@@ -40,4 +40,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  debug: true, // Temporary: set to true to see detailed errors in Vercel logs
 })

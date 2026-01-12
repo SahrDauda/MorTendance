@@ -1,8 +1,5 @@
 import type { NextAuthConfig } from "next-auth"
 
-// Helper to get and trim environment variables
-const getEnv = (key: string) => process.env[key]?.trim() || ""
-
 export const authConfig = {
     pages: {
         signIn: "/auth/signin",
@@ -50,7 +47,5 @@ export const authConfig = {
         strategy: "jwt",
     },
     // NextAuth v5 automatically picks up AUTH_SECRET from environment variables.
-    // We only provide a fallback for local development if not set.
-    secret: process.env.AUTH_SECRET || "fallback-secret-for-dev-only",
     trustHost: true,
 } satisfies NextAuthConfig
