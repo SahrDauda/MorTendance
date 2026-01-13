@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search, MoreHorizontal, UserPlus, Calendar, Users, UserCheck, TrendingUp, Download, LayoutGrid, List, Building2, Shield } from "lucide-react"
+import { Search, MoreHorizontal, UserPlus, Calendar, Users, UserCheck, TrendingUp, Download, LayoutGrid, List, Building2, Shield, Upload } from "lucide-react"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -36,9 +36,10 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
-import { addMemberAction } from "./actions"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BulkImportDialog } from "@/components/shared/bulk-import-dialog"
+import { addMemberAction, bulkAddMembersAction } from "./actions"
 
 interface Member {
     id: string
@@ -102,6 +103,27 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
     const [newMemberGroupId, setNewMemberGroupId] = useState(groups[0]?.id || "")
     const [newMemberBranchId, setNewMemberBranchId] = useState<string>("none")
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+
+    const handleBulkImportMembers = async (data: any[]) => {
+        const membersToImport = data.map(row => {
+            const group = groups.find(g => g.name.toLowerCase() === row.GroupName?.toString().toLowerCase())
+            const branch = branches.find(b => b.name.toLowerCase() === row.BranchName?.toString().toLowerCase())
+
+            if (!group) {
+                throw new Error(`Group "${row.GroupName}" not found for member "${row.Name}"`)
+            }
+
+            return {
+                name: row.Name?.toString(),
+                phoneNumber: row.Phone?.toString() || undefined,
+                groupId: group.id,
+                branchId: branch?.id
+            }
+        })
+
+        return await bulkAddMembersAction(membersToImport)
+    }
 
     const filteredMembers = initialMembers.filter(member => {
         const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -383,73 +405,84 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                 </Select>
                             </div>
 
-                            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button className="gap-2 shadow-lg shadow-primary/20">
-                                        <UserPlus className="h-4 w-4" />
-                                        Add New Member
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-[425px]">
-                                    <DialogHeader>
-                                        <DialogTitle>Add New Member</DialogTitle>
-                                        <DialogDescription>
-                                            Enter the details of the new member to add them to a fellowship group.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="grid gap-4 py-4">
-                                        <div className="grid gap-2">
-                                            <label className="text-sm font-medium">Full Name</label>
-                                            <Input
-                                                placeholder="John Doe"
-                                                value={newMemberName}
-                                                onChange={(e) => setNewMemberName(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <label className="text-sm font-medium">Phone Number (Optional)</label>
-                                            <Input
-                                                placeholder="+234..."
-                                                value={newMemberPhone}
-                                                onChange={(e) => setNewMemberPhone(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <label className="text-sm font-medium">Ministry Group</label>
-                                            <Select value={newMemberGroupId} onValueChange={setNewMemberGroupId}>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select group" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {groups.map(group => (
-                                                        <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <label className="text-sm font-medium">Branch (Optional)</label>
-                                            <Select value={newMemberBranchId} onValueChange={setNewMemberBranchId}>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select branch" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">None</SelectItem>
-                                                    {branches.map(branch => (
-                                                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                                        <Button onClick={handleAddMember} disabled={isSubmitting}>
-                                            {isSubmitting ? "Adding..." : "Add Member"}
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="gap-2"
+                                    onClick={() => setIsImportDialogOpen(true)}
+                                >
+                                    <Upload className="h-4 w-4" />
+                                    Bulk Import
+                                </Button>
+
+                                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button className="gap-2 shadow-lg shadow-primary/20">
+                                            <UserPlus className="h-4 w-4" />
+                                            Add New Member
                                         </Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[425px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Add New Member</DialogTitle>
+                                            <DialogDescription>
+                                                Enter the details of the new member to add them to a fellowship group.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="grid gap-4 py-4">
+                                            <div className="grid gap-2">
+                                                <label className="text-sm font-medium">Full Name</label>
+                                                <Input
+                                                    placeholder="John Doe"
+                                                    value={newMemberName}
+                                                    onChange={(e) => setNewMemberName(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <label className="text-sm font-medium">Phone Number (Optional)</label>
+                                                <Input
+                                                    placeholder="+234..."
+                                                    value={newMemberPhone}
+                                                    onChange={(e) => setNewMemberPhone(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <label className="text-sm font-medium">Ministry Group</label>
+                                                <Select value={newMemberGroupId} onValueChange={setNewMemberGroupId}>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select group" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {groups.map(group => (
+                                                            <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <label className="text-sm font-medium">Branch (Optional)</label>
+                                                <Select value={newMemberBranchId} onValueChange={setNewMemberBranchId}>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select branch" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        {branches.map(branch => (
+                                                            <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                                            <Button onClick={handleAddMember} disabled={isSubmitting}>
+                                                {isSubmitting ? "Adding..." : "Add Member"}
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         </div>
 
                         {/* Desktop Table View */}
@@ -838,6 +871,18 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                     )}
                 </DialogContent>
             </Dialog>
+
+            <BulkImportDialog
+                isOpen={isImportDialogOpen}
+                onOpenChange={setIsImportDialogOpen}
+                title="Import Members"
+                description="Upload a CSV or Excel file with member details. GroupName must match an existing ministry group."
+                templateHeaders={["Name", "Phone", "GroupName", "BranchName"]}
+                sampleData={[
+                    { Name: "John Doe", Phone: "08012345678", GroupName: groups[0]?.name || "Group A", BranchName: branches[0]?.name || "Branch 1" }
+                ]}
+                onImport={handleBulkImportMembers}
+            />
         </>
     )
 }

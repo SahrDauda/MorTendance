@@ -42,6 +42,12 @@ export function Header() {
     }
   }
 
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const initials = user?.name
     ?.split(" ")
     .map((n) => n[0])
@@ -52,7 +58,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-card/95 backdrop-blur-md shadow-sm">
       <div className="w-full max-w-7xl mx-auto flex h-16 items-center gap-4 px-4">
-        <Logo variant="full" size="sm" />
+        <Logo variant="icon" size="sm" />
 
         <div className="flex flex-1 items-center gap-4 md:gap-8">
           <div className="hidden flex-1 md:block md:max-w-md">
@@ -72,34 +78,38 @@ export function Header() {
               <span className="sr-only">Notifications</span>
             </Button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full hover:ring-2 hover:ring-primary/20 transition-all">
-                  <Avatar className="h-9 w-9 ring-2 ring-border hover:ring-primary/40 transition-all">
-                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-semibold">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="sr-only">User menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.name || "User"}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user?.email || "user@example.com"}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href={ROUTES.SETTINGS}>Settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {mounted ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full hover:ring-2 hover:ring-primary/20 transition-all">
+                    <Avatar className="h-9 w-9 ring-2 ring-border hover:ring-primary/40 transition-all">
+                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-semibold">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="sr-only">User menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user?.name || "User"}</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user?.email || "user@example.com"}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href={ROUTES.SETTINGS}>Settings</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+            )}
           </nav>
         </div>
       </div>

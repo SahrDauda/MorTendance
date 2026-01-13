@@ -20,15 +20,15 @@ export function Logo({ className, size = "md", variant = "full", href = "/" }: L
   }, [])
 
   const imageSizes = {
-    sm: { width: 80, height: 28 },
-    md: { width: 120, height: 42 },
-    lg: { width: 160, height: 56 },
+    sm: { width: 30, height: 10 },
+    md: { width: 45, height: 16 },
+    lg: { width: 60, height: 21 },
   }
 
   const iconSizes = {
-    sm: { width: 32, height: 32 },
-    md: { width: 48, height: 48 },
-    lg: { width: 64, height: 64 },
+    sm: { width: 16, height: 16 },
+    md: { width: 24, height: 24 },
+    lg: { width: 32, height: 32 },
   }
 
   const dimensions = variant === "icon" ? iconSizes[size] : imageSizes[size]
@@ -52,7 +52,7 @@ export function Logo({ className, size = "md", variant = "full", href = "/" }: L
             MOR
           </span>
           <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-            Attendance System
+            Admin Dashboard
           </span>
         </div>
       )}

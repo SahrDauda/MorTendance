@@ -53,16 +53,17 @@ model MinistryGroup {
 }
 
 model CBSLocation {
-  id        String   @id @default(uuid())
-  name      String
-  address   String?
-  district  String?
-  branchId  String   @map("branch_id")
-  leaderId  String?  @map("leader_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  branch    Branch   @relation(fields: [branchId], references: [id])
-  leader    User?    @relation("CBSLeader", fields: [leaderId], references: [id])
+  id                 String              @id @default(uuid())
+  name               String
+  address            String?
+  district           String?
+  branchId           String              @map("branch_id")
+  leaderId           String?             @map("leader_id")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  branch             Branch              @relation(fields: [branchId], references: [id])
+  leader             User?               @relation("CBSLeader", fields: [leaderId], references: [id])
+  attendanceSessions AttendanceSession[]
 
   @@map("cbs_locations")
 }
@@ -87,18 +88,20 @@ model Member {
 }
 
 model AttendanceSession {
-  id         String             @id @default(uuid())
-  type       EventType
-  date       DateTime           @db.Date
-  branchId   String             @map("branch_id")
-  recorderId String             @map("recorder_id")
-  notes      String?
-  createdAt  DateTime           @default(now()) @map("created_at")
-  groupId    String?            @map("group_id")
-  records    AttendanceRecord[]
-  branch     Branch             @relation(fields: [branchId], references: [id])
-  group      MinistryGroup?     @relation(fields: [groupId], references: [id])
-  recorder   User               @relation("SessionRecorder", fields: [recorderId], references: [id])
+  id            String             @id @default(uuid())
+  type          EventType
+  date          DateTime           @db.Date
+  branchId      String             @map("branch_id")
+  recorderId    String             @map("recorder_id")
+  notes         String?
+  createdAt     DateTime           @default(now()) @map("created_at")
+  groupId       String?            @map("group_id")
+  cbsLocationId String?            @map("cbs_location_id")
+  records       AttendanceRecord[]
+  branch        Branch             @relation(fields: [branchId], references: [id])
+  group         MinistryGroup?     @relation(fields: [groupId], references: [id])
+  cbsLocation   CBSLocation?       @relation(fields: [cbsLocationId], references: [id])
+  recorder      User               @relation("SessionRecorder", fields: [recorderId], references: [id])
 
   @@map("attendance_sessions")
 }

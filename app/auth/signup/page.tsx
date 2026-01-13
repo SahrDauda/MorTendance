@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Logo } from "@/components/shared/logo"
 import { registerAction } from "../actions"
 import { Mail, Lock, User, ArrowRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -94,7 +95,7 @@ export default function SignUpPage() {
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-border/50 backdrop-blur-sm bg-card/95 dark:bg-card/90">
         <CardHeader className="space-y-3 text-center pb-6">
           <div className="flex justify-center mb-2">
-            <Logo variant="full" size="lg" />
+            <Logo variant="icon" size="lg" />
           </div>
           <div className="space-y-1.5">
             <CardTitle className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">

@@ -101,7 +101,7 @@ export default function SignInPage() {
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-border/50 backdrop-blur-sm bg-card/95 dark:bg-card/90">
         <CardHeader className="space-y-3 text-center pb-6">
           <div className="flex justify-center mb-2">
-            <Logo variant="full" size="lg" />
+            <Logo variant="icon" size="lg" />
           </div>
           <div className="space-y-1.5">
             <CardTitle className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
@@ -135,7 +135,7 @@ export default function SignInPage() {
                   value={formData.email}
                   onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value })
-                    setError(null) // Clear error when user types
+                    setError(null)
                   }}
                   required
                   disabled={loading}
@@ -147,9 +147,17 @@ export default function SignInPage() {
               </div>
             </div>
             <div className="space-y-2.5">
-              <Label htmlFor="password" className="text-sm font-medium">
-                Password
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </Label>
+                <Link 
+                  href="/auth/forgot-password" 
+                  className="text-sm font-medium text-primary hover:text-primary/80 transition-colors hover:underline underline-offset-4"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -159,7 +167,7 @@ export default function SignInPage() {
                   value={formData.password}
                   onChange={(e) => {
                     setFormData({ ...formData, password: e.target.value })
-                    setError(null) // Clear error when user types
+                    setError(null)
                   }}
                   required
                   disabled={loading}
@@ -186,15 +194,6 @@ export default function SignInPage() {
                 </>
               )}
             </Button>
-            <p className="text-sm text-center text-muted-foreground">
-              Don't have an account?{" "}
-              <Link
-                href="/auth/signup"
-                className="text-primary font-semibold hover:text-primary/80 transition-colors hover:underline underline-offset-4"
-              >
-                Sign up
-              </Link>
-            </p>
           </CardFooter>
         </form>
       </Card>
