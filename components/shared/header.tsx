@@ -101,6 +101,9 @@ export function Header() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
+                    <Link href={ROUTES.PROFILE}>Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href={ROUTES.SETTINGS}>Settings</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

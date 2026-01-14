@@ -3,6 +3,8 @@ const prisma = new PrismaClient()
 
 async function main() {
     try {
+        console.log('DATABASE_URL:', process.env.DATABASE_URL)
+        console.log('DIRECT_URL:', process.env.DIRECT_URL)
         console.log('Attempting to query MinistryGroup...')
         const groups = await prisma.ministryGroup.findMany({
             take: 1,

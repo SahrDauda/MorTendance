@@ -40,8 +40,16 @@ export const ROUTES = {
   ATTENDANCE: "/attendance",
   MEMBERS: "/members",
   REPORTS: "/reports",
+  ADVANCED_REPORTS: "/reports/advanced",
   SETTINGS: "/settings",
   QR_GENERATOR: "/attendance/qr",
+  CBS: "/admin/cbs",
+  BRANCHES: "/admin/branches",
+  GROUPS: "/admin/groups",
+  USERS: "/admin/users",
+  LOGS: "/admin/logs",
+  MINISTRY_SETTINGS: "/admin/settings",
+  PROFILE: "/profile",
 } as const
 
 // ============================================================================

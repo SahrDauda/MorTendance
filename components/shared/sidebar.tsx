@@ -7,10 +7,15 @@ import {
   ClipboardCheck,
   Users,
   BarChart3,
+  TrendingUp,
   Settings,
   UserCircle,
   ShieldCheck,
   QrCode,
+  MapPin,
+  Building2,
+  UserCog,
+  History,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ROUTES } from "@/lib/constants"
@@ -23,10 +28,17 @@ const baseNavigation = [
   { name: "Attendance", href: ROUTES.ATTENDANCE, icon: ClipboardCheck },
   { name: "Members", href: ROUTES.MEMBERS, icon: Users },
   { name: "Reports", href: ROUTES.REPORTS, icon: BarChart3 },
+  { name: "Analytics", href: ROUTES.ADVANCED_REPORTS, icon: TrendingUp },
 ]
 
 const adminNavigation = [
   { name: "Leaders", href: "/admin/leaders", icon: ShieldCheck },
+  { name: "Branches", href: ROUTES.BRANCHES, icon: Building2 },
+  { name: "Groups", href: ROUTES.GROUPS, icon: Users },
+  { name: "CBS Locations", href: ROUTES.CBS, icon: MapPin },
+  { name: "User Management", href: ROUTES.USERS, icon: UserCog },
+  { name: "Audit Logs", href: ROUTES.LOGS, icon: History },
+  { name: "Ministry Settings", href: ROUTES.MINISTRY_SETTINGS, icon: Settings },
   { name: "QR Generator", href: ROUTES.QR_GENERATOR, icon: QrCode },
 ]
 
@@ -72,7 +84,19 @@ export function Sidebar() {
         </nav>
       </ScrollArea>
 
-      <div className="border-t border-border p-3 bg-muted/30">
+      <div className="border-t border-border p-3 bg-muted/30 space-y-1">
+        <Link href={ROUTES.PROFILE}>
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full justify-start gap-3",
+              pathname === ROUTES.PROFILE && "bg-primary/10 text-primary font-semibold"
+            )}
+          >
+            <UserCircle className="h-5 w-5" />
+            My Profile
+          </Button>
+        </Link>
         <Link href={ROUTES.SETTINGS}>
           <Button
             variant="ghost"

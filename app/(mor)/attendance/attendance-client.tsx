@@ -1,13 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, getDay } from "date-fns"
 import { Calendar as CalendarIcon, Check, X, Save, Loader2, Users, TrendingUp, UserCheck, Download, Plus, Search as SearchIcon, MoreHorizontal, Upload, QrCode } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -80,13 +78,12 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, user
     const [memberSearchTerm, setMemberSearchTerm] = useState("")
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
     const [isSessionActive, setIsSessionActive] = useState(false)
+    const [mounted, setMounted] = useState(false)
 
-    const handleDateChange = (newDate: Date | undefined) => {
-        if (!newDate) return
-        setDate(newDate)
-
-        const day = getDay(newDate)
-        // 0: Sunday, 1: Monday, 2: Tuesday, 3: Wednesday, 4: Thursday, 5: Friday, 6: Saturday
+    useEffect(() => {
+        setMounted(true)
+        const today = new Date()
+        const day = getDay(today)
         if (day === 2) {
             setEventType(EventType.CBS)
         } else if (day === 6) {
@@ -94,7 +91,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, user
         } else if (day === 0 || day === 4) {
             setEventType(EventType.LEADERSHIP_MEETING)
         }
-    }
+    }, [])
 
     const handleBulkImportAttendance = async (data: any[]) => {
         // Group data by Date, EventType, and GroupName
@@ -259,6 +256,42 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, user
     return (
         <>
             <div className="grid gap-6">
+                {/* Mobile Quick Links */}
+                <div className="flex md:hidden overflow-x-auto pb-2 gap-3 no-scrollbar">
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-shrink-0 gap-2 rounded-xl"
+                        onClick={() => setIsAddAttendanceOpen(true)}
+                    >
+                        <Plus className="h-4 w-4" /> Add
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-shrink-0 gap-2 rounded-xl"
+                        onClick={() => router.push("/attendance/qr")}
+                    >
+                        <QrCode className="h-4 w-4" /> QR
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-shrink-0 gap-2 rounded-xl"
+                        onClick={() => setIsImportDialogOpen(true)}
+                    >
+                        <Upload className="h-4 w-4" /> Import
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-shrink-0 gap-2 rounded-xl"
+                        onClick={exportToPDF}
+                    >
+                        <Download className="h-4 w-4" /> PDF
+                    </Button>
+                </div>
+
                 {/* Dashboard Highlights */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                     <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -511,28 +544,10 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, user
                             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">
                                 Fellowship Date
                             </label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal bg-background/50 border-border/50",
-                                            !date && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {date ? format(date, "PPP") : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={date}
-                                        onSelect={handleDateChange}
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
+                            <div className="flex items-center h-10 px-3 py-2 rounded-md border border-border/50 bg-muted/30 text-muted-foreground cursor-not-allowed">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                <span className="text-sm">{mounted ? format(date, "PPP") : "Loading..."}</span>
+                            </div>
                         </div>
 
                         <div className="flex-1 min-w-[200px]">

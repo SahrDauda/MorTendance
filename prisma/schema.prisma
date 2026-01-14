@@ -34,6 +34,7 @@ model User {
   managedBranch    Branch?             @relation("BranchHead")
   managedCBS       CBSLocation[]       @relation("CBSLeader")
   managedGroups    MinistryGroup[]     @relation("GroupLeader")
+  auditLogs        AuditLog[]
 
   @@map("users")
 }
@@ -128,6 +129,28 @@ model AIInsight {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("ai_insights")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }
 
 enum UserRole {

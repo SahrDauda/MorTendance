@@ -6,6 +6,7 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
 import { UserRole } from "@prisma/client"
+import { logAction } from "@/lib/audit"
 
 const addLeaderSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -13,6 +14,31 @@ const addLeaderSchema = z.object({
     password: z.string().min(8, "Password must be at least 8 characters"),
     groupId: z.string().optional(),
     role: z.enum(["PROBATION_LEADER", "JUNIOR_LEADER", "SENIOR_LEADER"]).default("PROBATION_LEADER"),
+})
+
+const addCBSSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    address: z.string().optional(),
+    district: z.string().optional(),
+    branchId: z.string().min(1, "Branch is required"),
+    leaderId: z.string().optional(),
+})
+
+const addBranchSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    headId: z.string().optional(),
+})
+
+const addGroupSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    branchId: z.string().min(1, "Branch is required"),
+    leaderId: z.string().optional(),
+})
+
+const updateUserSchema = z.object({
+    userId: z.string().min(1),
+    role: z.nativeEnum(UserRole),
+    branchId: z.string().optional(),
 })
 
 export async function addLeaderAction(formData: any) {
@@ -46,6 +72,8 @@ export async function addLeaderAction(formData: any) {
                 } : undefined
             }
         })
+
+        await logAction("CREATE", "USER", leader.id, `Created leader: ${leader.name} (${leader.role})`)
 
         revalidatePath("/admin/leaders")
         revalidatePath("/dashboard")
@@ -112,4 +140,169 @@ export async function getLeaderDetailsAction(leaderId: string) {
             }
         }
     })
+}
+
+export async function addCBSAction(formData: any) {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    try {
+        const validatedData = addCBSSchema.parse(formData)
+        const cbs = await db.cBSLocation.create({
+            data: {
+                name: validatedData.name,
+                address: validatedData.address,
+                district: validatedData.district,
+                branchId: validatedData.branchId,
+                leaderId: validatedData.leaderId || undefined
+            }
+        })
+
+        await logAction("CREATE", "CBS_LOCATION", cbs.id, `Created CBS location: ${cbs.name}`)
+
+        revalidatePath("/admin/cbs")
+        return { success: true, cbs }
+    } catch (error: any) {
+        return { error: error.message || "Failed to create CBS location" }
+    }
+}
+
+export async function addBranchAction(formData: any) {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    try {
+        const validatedData = addBranchSchema.parse(formData)
+        const branch = await db.branch.create({
+            data: {
+                name: validatedData.name,
+                headId: validatedData.headId || undefined
+            }
+        })
+
+        await logAction("CREATE", "BRANCH", branch.id, `Created branch: ${branch.name}`)
+
+        revalidatePath("/admin/branches")
+        return { success: true, branch }
+    } catch (error: any) {
+        return { error: error.message || "Failed to create branch" }
+    }
+}
+
+export async function addGroupAction(formData: any) {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    try {
+        const validatedData = addGroupSchema.parse(formData)
+        const group = await db.ministryGroup.create({
+            data: {
+                name: validatedData.name,
+                branchId: validatedData.branchId,
+                leaderId: validatedData.leaderId || undefined
+            }
+        })
+
+        await logAction("CREATE", "MINISTRY_GROUP", group.id, `Created group: ${group.name}`)
+
+        revalidatePath("/admin/groups")
+        return { success: true, group }
+    } catch (error: any) {
+        return { error: error.message || "Failed to create group" }
+    }
+}
+
+export async function getUsersAction() {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    return await db.user.findMany({
+        include: {
+            managedBranch: true,
+            managedGroups: true,
+            managedCBS: true
+        },
+        orderBy: { name: 'asc' }
+    })
+}
+
+export async function updateUserAction(formData: any) {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    try {
+        const validatedData = updateUserSchema.parse(formData)
+
+        await db.user.update({
+            where: { id: validatedData.userId },
+            data: {
+                role: validatedData.role,
+            }
+        })
+
+        await logAction("UPDATE", "USER", validatedData.userId, `Updated user role to: ${validatedData.role}`)
+
+        revalidatePath("/admin/users")
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message || "Failed to update user" }
+    }
+}
+
+export async function getAuditLogsAction() {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    return await db.auditLog.findMany({
+        include: {
+            user: {
+                select: {
+                    name: true,
+                    email: true,
+                    role: true
+                }
+            }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100
+    })
+}
+
+export async function getSettingsAction() {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    return await db.systemSetting.findMany()
+}
+
+export async function updateSettingAction(key: string, value: string) {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    const setting = await db.systemSetting.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value }
+    })
+
+    await logAction("UPDATE", "SYSTEM_SETTING", setting.id, `Updated setting ${key} to ${value}`)
+
+    revalidatePath("/admin/settings")
+    return { success: true }
 }
