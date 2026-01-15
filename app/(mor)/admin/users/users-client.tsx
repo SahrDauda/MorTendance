@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Search, Shield, User, MoreHorizontal, Mail, Calendar } from "lucide-react"
+import { Search, Shield, User, Mail, Calendar } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -109,12 +109,18 @@ export function UsersClient({ initialUsers }: UsersClientProps) {
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px]">Role</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px]">Assignments</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px]">Joined</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredUsers.map((user) => (
-                                <TableRow key={user.id} className="border-border/50 hover:bg-primary/5 transition-colors">
+                                <TableRow 
+                                    key={user.id} 
+                                    className="border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setSelectedUser(user)
+                                        setIsEditDialogOpen(true)
+                                    }}
+                                >
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -155,19 +161,6 @@ export function UsersClient({ initialUsers }: UsersClientProps) {
                                             {format(new Date(user.createdAt), "MMM d, yyyy")}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 rounded-full"
-                                            onClick={() => {
-                                                setSelectedUser(user)
-                                                setIsEditDialogOpen(true)
-                                            }}
-                                        >
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -176,43 +169,88 @@ export function UsersClient({ initialUsers }: UsersClientProps) {
             </Card>
 
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="sm:max-w-[400px]">
+                <DialogContent className="sm:max-w-[500px]">
                     {selectedUser && (
-                        <form onSubmit={handleUpdateUser}>
+                        <>
                             <DialogHeader>
-                                <DialogTitle>Edit User Role</DialogTitle>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Shield className="h-5 w-5 text-primary" />
+                                    User Details
+                                </DialogTitle>
                             </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="space-y-2 text-center pb-2">
-                                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
-                                        <User className="h-8 w-8 text-primary" />
+                            <form onSubmit={handleUpdateUser}>
+                                <div className="space-y-6 py-4">
+                                    <div className="space-y-2 text-center pb-4 border-b border-border/50">
+                                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                                            <User className="h-8 w-8 text-primary" />
+                                        </div>
+                                        <h3 className="font-bold text-lg">{selectedUser.name}</h3>
+                                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                                            <Mail className="h-3 w-3" /> {selectedUser.email}
+                                        </p>
                                     </div>
-                                    <h3 className="font-bold">{selectedUser.name}</h3>
-                                    <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Role</p>
+                                            <Badge variant={selectedUser.role === "ADMIN" ? "default" : "secondary"} className="uppercase font-bold text-xs">
+                                                {selectedUser.role.replace("_", " ")}
+                                            </Badge>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Joined</p>
+                                            <p className="text-sm flex items-center gap-1">
+                                                <Calendar className="h-3 w-3" />
+                                                {format(new Date(selectedUser.createdAt), "MMM d, yyyy")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Assignments</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedUser.managedBranch && (
+                                                <Badge variant="outline" className="text-xs bg-primary/5">
+                                                    Branch Head: {selectedUser.managedBranch.name}
+                                                </Badge>
+                                            )}
+                                            {selectedUser.managedGroups.length > 0 && (
+                                                <Badge variant="outline" className="text-xs bg-green-500/5">
+                                                    {selectedUser.managedGroups.length} Group{selectedUser.managedGroups.length > 1 ? 's' : ''}
+                                                </Badge>
+                                            )}
+                                            {selectedUser.managedCBS.length > 0 && (
+                                                <Badge variant="outline" className="text-xs bg-amber-500/5">
+                                                    {selectedUser.managedCBS.length} CBS Location{selectedUser.managedCBS.length > 1 ? 's' : ''}
+                                                </Badge>
+                                            )}
+                                            {!selectedUser.managedBranch && selectedUser.managedGroups.length === 0 && selectedUser.managedCBS.length === 0 && (
+                                                <span className="text-xs text-muted-foreground italic">No assignments</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 pt-2 border-t border-border/50">
+                                        <label className="text-sm font-medium">Update System Role</label>
+                                        <Select name="role" defaultValue={selectedUser.role}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select role" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {Object.values(UserRole).map(role => (
+                                                    <SelectItem key={role} value={role}>
+                                                        {role.replace("_", " ")}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">System Role</label>
-                                    <Select name="role" defaultValue={selectedUser.role}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select role" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Object.values(UserRole).map(role => (
-                                                <SelectItem key={role} value={role}>
-                                                    {role.replace("_", " ")}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-                                <Button type="submit" disabled={isSaving}>
-                                    {isSaving ? "Updating..." : "Update User"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
+                                <DialogFooter>
+                                    <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>Close</Button>
+                                    <Button type="submit" disabled={isSaving}>
+                                        {isSaving ? "Updating..." : "Update Role"}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </>
                     )}
                 </DialogContent>
             </Dialog>

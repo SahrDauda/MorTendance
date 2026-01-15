@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Building2, User, MoreHorizontal, Users } from "lucide-react"
+import { Plus, Search, Building2, User, Users } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -52,6 +52,8 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
     const [searchTerm, setSearchTerm] = useState("")
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
+    const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
 
     const filteredGroups = initialGroups.filter(group =>
         group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -156,12 +158,18 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px]">Branch</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px]">Leader</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Members</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredGroups.map((group) => (
-                                <TableRow key={group.id} className="border-border/50 hover:bg-primary/5 transition-colors">
+                                <TableRow 
+                                    key={group.id} 
+                                    className="border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setSelectedGroup(group)
+                                        setIsDetailDialogOpen(true)
+                                    }}
+                                >
                                     <TableCell className="font-semibold">
                                         <div className="flex items-center gap-2">
                                             <Users className="h-4 w-4 text-primary" />
@@ -190,11 +198,6 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
                                     <TableCell className="text-center font-bold text-primary">
                                         {group._count.members}
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -206,6 +209,57 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    {selectedGroup && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Users className="h-5 w-5 text-primary" />
+                                    {selectedGroup.name}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-6 py-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Branch</p>
+                                        <p className="text-sm font-semibold">
+                                            {selectedGroup.branch ? (
+                                                <Badge variant="secondary" className="bg-muted/50 font-medium text-xs gap-1">
+                                                    <Building2 className="h-3 w-3" /> {selectedGroup.branch.name}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">No Branch</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Leader</p>
+                                        <p className="text-sm font-semibold">
+                                            {selectedGroup.leader ? (
+                                                <div className="flex items-center gap-2">
+                                                    <User className="h-4 w-4 text-muted-foreground" />
+                                                    {selectedGroup.leader.name}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">Unassigned</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Total Members</p>
+                                        <p className="text-sm font-semibold text-primary">{selectedGroup._count.members}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>Close</Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

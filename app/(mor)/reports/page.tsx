@@ -23,45 +23,46 @@ export default async function ReportsPage({
   const startDate = new Date(parseInt(year), month, 1)
   const endDate = endOfQuarter(startDate)
 
-  const [members, groups, attendanceRecords] = await Promise.all([
-    db.member.findMany({
-      include: {
-        _count: {
-          select: { attendanceRecords: true }
-        }
-      }
-    }),
-    db.ministryGroup.findMany({
-      include: {
-        members: {
-          select: {
-            id: true,
-            status: true
-          }
-        }
-      }
-    }),
-    db.attendanceRecord.findMany({
-      where: {
-        session: {
-          date: {
-            gte: startDate,
-            lte: endDate
-          }
-        }
+  // Run these sequentially instead of in parallel to reduce DB connection pressure
+  const members = await db.member.findMany({
+    include: {
+      _count: {
+        select: { attendanceRecords: true },
       },
-      select: {
-        memberId: true,
-        isPresent: true
-      }
-    })
-  ])
+    },
+  })
+
+  const groups = await db.ministryGroup.findMany({
+    include: {
+      members: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
+  })
+
+  const attendanceRecords = await db.attendanceRecord.findMany({
+    where: {
+      session: {
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    },
+    select: {
+      memberId: true,
+      isPresent: true,
+    },
+  })
 
   // Calculate stats
   const totalMembers = members.length
   const establishedMembers = members.filter(m => m.status === "ESTABLISHED").length
   const newMembersThisQuarter = members.filter(m =>
-    m.createdAt >= startDate && m.createdAt <= endDate && m.status === "PRELIMINARY"
+    m.joinedAt.getTime() >= startDate.getTime() && m.joinedAt.getTime() <= endDate.getTime() && m.status === "PRELIMINARY"
   ).length
 
   const totalAttendanceCount = attendanceRecords.length

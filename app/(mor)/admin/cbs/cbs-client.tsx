@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, MapPin, Building2, User, MoreHorizontal } from "lucide-react"
+import { Plus, Search, MapPin, Building2, User } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -54,6 +54,8 @@ export function CBSClient({ initialLocations, branches, leaders }: CBSClientProp
     const [searchTerm, setSearchTerm] = useState("")
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [selectedLocation, setSelectedLocation] = useState<CBSLocation | null>(null)
+    const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
 
     const filteredLocations = initialLocations.filter(loc =>
         loc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -168,12 +170,18 @@ export function CBSClient({ initialLocations, branches, leaders }: CBSClientProp
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px]">Branch</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px]">Leader</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Sessions</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredLocations.map((loc) => (
-                                <TableRow key={loc.id} className="border-border/50 hover:bg-primary/5 transition-colors">
+                                <TableRow 
+                                    key={loc.id} 
+                                    className="border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setSelectedLocation(loc)
+                                        setIsDetailDialogOpen(true)
+                                    }}
+                                >
                                     <TableCell>
                                         <div className="font-semibold">{loc.name}</div>
                                         {loc.address && <div className="text-[10px] text-muted-foreground">{loc.address}</div>}
@@ -196,11 +204,6 @@ export function CBSClient({ initialLocations, branches, leaders }: CBSClientProp
                                     <TableCell className="text-center font-bold text-primary">
                                         {loc._count.attendanceSessions}
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -212,6 +215,65 @@ export function CBSClient({ initialLocations, branches, leaders }: CBSClientProp
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    {selectedLocation && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <MapPin className="h-5 w-5 text-primary" />
+                                    {selectedLocation.name}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-6 py-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Branch</p>
+                                        <p className="text-sm font-semibold">
+                                            <Badge variant="secondary" className="bg-muted/50 font-medium text-xs gap-1">
+                                                <Building2 className="h-3 w-3" /> {selectedLocation.branch.name}
+                                            </Badge>
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Leader</p>
+                                        <p className="text-sm font-semibold">
+                                            {selectedLocation.leader ? (
+                                                <div className="flex items-center gap-2">
+                                                    <User className="h-4 w-4 text-primary" />
+                                                    {selectedLocation.leader.name}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">Unassigned</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    {selectedLocation.address && (
+                                        <div className="space-y-1 col-span-2">
+                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Address</p>
+                                            <p className="text-sm">{selectedLocation.address}</p>
+                                        </div>
+                                    )}
+                                    {selectedLocation.district && (
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">District</p>
+                                            <p className="text-sm">{selectedLocation.district}</p>
+                                        </div>
+                                    )}
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Attendance Sessions</p>
+                                        <p className="text-sm font-semibold text-primary">{selectedLocation._count.attendanceSessions}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>Close</Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -259,25 +259,31 @@ export async function updateUserAction(formData: any) {
     }
 }
 
+
 export async function getAuditLogsAction() {
     const session = await auth()
     if (!session || session.user.role !== "ADMIN") {
         throw new Error("Unauthorized")
     }
 
-    return await db.auditLog.findMany({
-        include: {
-            user: {
-                select: {
-                    name: true,
-                    email: true,
-                    role: true
+    try {
+        return await db.auditLog.findMany({
+            include: {
+                user: {
+                    select: {
+                        name: true,
+                        email: true,
+                        role: true
+                    }
                 }
-            }
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100
-    })
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100
+        })
+    } catch (error) {
+        console.error("Failed to fetch audit logs:", error)
+        return []
+    }
 }
 
 export async function getSettingsAction() {
@@ -295,14 +301,19 @@ export async function updateSettingAction(key: string, value: string) {
         throw new Error("Unauthorized")
     }
 
-    const setting = await db.systemSetting.upsert({
-        where: { key },
-        update: { value },
-        create: { key, value }
-    })
+    try {
+        const setting = await db.systemSetting.upsert({
+            where: { key },
+            update: { value },
+            create: { key, value }
+        })
 
-    await logAction("UPDATE", "SYSTEM_SETTING", setting.id, `Updated setting ${key} to ${value}`)
+        await logAction("UPDATE", "SYSTEM_SETTING", setting.id, `Updated setting ${key} to ${value}`)
 
-    revalidatePath("/admin/settings")
-    return { success: true }
+        revalidatePath("/admin/settings")
+        return { success: true }
+    } catch (error: any) {
+        console.error("Failed to update setting:", error)
+        return { error: error.message || "Failed to update setting" }
+    }
 }

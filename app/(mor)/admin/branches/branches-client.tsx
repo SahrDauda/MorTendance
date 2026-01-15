@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Building2, User, MoreHorizontal, Users, MapPin } from "lucide-react"
+import { Plus, Search, Building2, User, Users, MapPin } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -53,6 +53,8 @@ export function BranchesClient({ initialBranches, leaders }: BranchesClientProps
     const [searchTerm, setSearchTerm] = useState("")
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null)
+    const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
 
     const filteredBranches = initialBranches.filter(branch =>
         branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -144,12 +146,18 @@ export function BranchesClient({ initialBranches, leaders }: BranchesClientProps
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Groups</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">CBS</TableHead>
                                 <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Members</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {filteredBranches.map((branch) => (
-                                <TableRow key={branch.id} className="border-border/50 hover:bg-primary/5 transition-colors">
+                                <TableRow
+                                    key={branch.id}
+                                    className="border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setSelectedBranch(branch)
+                                        setIsDetailDialogOpen(true)
+                                    }}
+                                >
                                     <TableCell className="font-semibold">
                                         <div className="flex items-center gap-2">
                                             <Building2 className="h-4 w-4 text-primary" />
@@ -179,11 +187,6 @@ export function BranchesClient({ initialBranches, leaders }: BranchesClientProps
                                     <TableCell className="text-center font-bold text-primary">
                                         {branch._count.members}
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -195,6 +198,53 @@ export function BranchesClient({ initialBranches, leaders }: BranchesClientProps
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    {selectedBranch && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Building2 className="h-5 w-5 text-primary" />
+                                    {selectedBranch.name}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-6 py-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Branch Head</p>
+                                        <p className="text-sm font-semibold">
+                                            {selectedBranch.head ? (
+                                                <div className="flex items-center gap-2">
+                                                    <User className="h-4 w-4 text-muted-foreground" />
+                                                    {selectedBranch.head.name}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">No Head Assigned</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Total Groups</p>
+                                        <p className="text-sm font-semibold text-primary">{selectedBranch._count.groups}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">CBS Locations</p>
+                                        <p className="text-sm font-semibold text-amber-500">{selectedBranch._count.cbsLocations}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Total Members</p>
+                                        <p className="text-sm font-semibold text-primary">{selectedBranch._count.members}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>Close</Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -98,6 +98,8 @@ model AttendanceSession {
   createdAt     DateTime           @default(now()) @map("created_at")
   groupId       String?            @map("group_id")
   cbsLocationId String?            @map("cbs_location_id")
+  cutoffTime    String?            @map("cutoff_time") // Time in HH:mm format (e.g., "09:00")
+  isActive      Boolean            @default(true) @map("is_active")
   records       AttendanceRecord[]
   branch        Branch             @relation(fields: [branchId], references: [id])
   group         MinistryGroup?     @relation(fields: [groupId], references: [id])
@@ -112,6 +114,7 @@ model AttendanceRecord {
   sessionId String            @map("session_id")
   memberId  String            @map("member_id")
   isPresent Boolean           @default(false) @map("is_present")
+  isLate    Boolean           @default(false) @map("is_late")
   notes     String?
   createdAt DateTime          @default(now()) @map("created_at")
   member    Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
