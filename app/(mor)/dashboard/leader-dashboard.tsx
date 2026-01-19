@@ -54,7 +54,7 @@ export async function LeaderDashboard() {
         })
 
         // 3. Fetch CBS Locations managed by this leader (if any)
-        const managedCBS = await db.cbsLocation.findMany({
+        const managedCBS = await db.cBSLocation.findMany({
             where: {
                 leaderId: leaderId
             },
