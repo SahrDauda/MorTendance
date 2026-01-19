@@ -19,7 +19,9 @@ export const authConfig = {
 
             if (isPublicRoute) {
                 if (isLoggedIn && pathname.startsWith('/auth')) {
-                    return Response.redirect(new URL('/dashboard', nextUrl))
+                    const dashboardUrl = nextUrl.clone()
+                    dashboardUrl.pathname = '/dashboard'
+                    return Response.redirect(dashboardUrl)
                 }
                 return true
             }
@@ -45,5 +47,5 @@ export const authConfig = {
     providers: [],
     // session: { strategy: "jwt" },
     // secret: process.env.AUTH_SECRET,
-    // trustHost: true,
+    trustHost: true,
 } satisfies NextAuthConfig
