@@ -37,12 +37,61 @@ export async function LeaderDashboard() {
             }
         })
 
+        // 2. Fetch Branch managed by this leader (if any)
+        const managedBranch = await db.branch.findUnique({
+            where: {
+                headId: leaderId
+            },
+            include: {
+                _count: {
+                    select: {
+                        groups: true,
+                        members: true,
+                        cbsLocations: true
+                    }
+                }
+            }
+        })
+
+        // 3. Fetch CBS Locations managed by this leader (if any)
+        const managedCBS = await db.cbsLocation.findMany({
+            where: {
+                leaderId: leaderId
+            },
+            include: {
+                branch: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                _count: {
+                    select: {
+                        attendanceSessions: true
+                    }
+                }
+            }
+        })
+
         const groupIds = leaderGroups.map(g => g.id)
 
-        // 2. Fetch all members in these groups for the list
+        // Collect relevant branch IDs (from managed branch or CBS locations)
+        const branchIds = new Set<string>()
+        if (managedBranch) branchIds.add(managedBranch.id)
+        managedCBS.forEach(cbs => {
+            if (cbs.branch?.id) branchIds.add(cbs.branch.id)
+        })
+
+        // 4. Fetch members:
+        // - Members of groups I lead
+        // - OR Members of branches I manage
+        // - OR Members of branches where I manage a CBS location
         const allMembers = await db.member.findMany({
             where: {
-                groupId: { in: groupIds }
+                OR: [
+                    { groupId: { in: groupIds } },
+                    { branchId: { in: Array.from(branchIds) } }
+                ]
             },
             include: {
                 group: {
@@ -51,10 +100,13 @@ export async function LeaderDashboard() {
                 _count: {
                     select: { attendanceRecords: true }
                 }
+            },
+            orderBy: {
+                name: 'asc'
             }
         })
 
-        // 3. Calculate Stats
+        // 5. Calculate Stats
         const totalMembers = allMembers.length
         const establishedMembers = allMembers.filter(m => m.status === "ESTABLISHED").length
         const newMembers = allMembers.filter(m => m.status === "PRELIMINARY").length
@@ -100,6 +152,8 @@ export async function LeaderDashboard() {
                 leaderName={session.user.name || "Leader"}
                 stats={stats}
                 leaderGroups={leaderGroups as any}
+                managedBranch={managedBranch as any}
+                managedCBS={managedCBS as any}
                 attendanceRecords={totalAttendanceRecords}
                 presentRecords={presentRecords}
                 allMembers={transformedMembers as any}
