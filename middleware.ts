@@ -4,14 +4,6 @@ import { authConfig } from "@/lib/auth.config"
 export default NextAuth(authConfig).auth
 
 export const config = {
-  // Protects specific routes
-  matcher: [
-    "/dashboard/:path*",
-    "/admin/:path*",
-    "/members/:path*",
-    "/attendance/:path*",
-    "/reports/:path*",
-    "/auth/:path*",
-    "/cbs/:path*"
-  ],
+  // Protects all routes except static files, images, and API routes
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 }
