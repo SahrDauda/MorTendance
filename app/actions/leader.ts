@@ -9,7 +9,7 @@ import { UserRole } from "@prisma/client"
 interface CreateLeaderData {
     name: string
     email: string
-    role: "PROBATION_LEADER" | "JUNIOR_LEADER" | "SENIOR_LEADER"
+    role: "PROBATION_LEADER" | "JUNIOR_LEADER" | "SENIOR_LEADER" | "ADMIN"
     branchId?: string
     groupId?: string
 }
@@ -17,12 +17,17 @@ interface CreateLeaderData {
 export async function createLeaderAction(data: CreateLeaderData) {
     const session = await auth()
 
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN")) {
         throw new Error("Unauthorized")
     }
 
     if (!data.name || !data.email || !data.role) {
         throw new Error("Name, Email, and Role are required")
+    }
+
+    // Validation: Only SUPER_ADMIN can create ADMINs
+    if (data.role === "ADMIN" && session.user.role !== "SUPER_ADMIN") {
+        throw new Error("Only Super Admins can create Admins")
     }
 
     // Validation: Only Senior Leaders can be assigned to a branch

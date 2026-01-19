@@ -8,7 +8,7 @@ import { db } from "@/lib/db"
 import { AdminDashboardClient } from "./admin-dashboard-client"
 import { UserRole } from "@prisma/client"
 
-export async function AdminDashboard() {
+export async function AdminDashboard({ currentUserRole }: { currentUserRole: string }) {
     try {
         // Real data fetching
         const [
@@ -68,6 +68,7 @@ export async function AdminDashboard() {
                 leaders={recentLeaders as any}
                 groups={allGroups}
                 branches={allBranches}
+                currentUserRole={currentUserRole}
             />
         )
     } catch (error) {

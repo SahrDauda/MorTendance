@@ -74,6 +74,7 @@ interface AdminDashboardClientProps {
     leaders: Leader[]
     groups: Group[]
     branches?: Branch[]
+    currentUserRole: string
 }
 
 export function AdminDashboardClient({
@@ -81,6 +82,7 @@ export function AdminDashboardClient({
     leaders,
     groups,
     branches = [],
+    currentUserRole,
 }: AdminDashboardClientProps) {
     const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
     const [newMemberName, setNewMemberName] = useState("")
@@ -99,7 +101,7 @@ export function AdminDashboardClient({
     const [isAddLeaderOpen, setIsAddLeaderOpen] = useState(false)
     const [newLeaderName, setNewLeaderName] = useState("")
     const [newLeaderEmail, setNewLeaderEmail] = useState("")
-    const [newLeaderRole, setNewLeaderRole] = useState<"PROBATION_LEADER" | "JUNIOR_LEADER" | "SENIOR_LEADER">("PROBATION_LEADER")
+    const [newLeaderRole, setNewLeaderRole] = useState<"PROBATION_LEADER" | "JUNIOR_LEADER" | "SENIOR_LEADER" | "ADMIN">("PROBATION_LEADER")
     const [newLeaderBranchId, setNewLeaderBranchId] = useState<string>("none")
     const [newLeaderGroupId, setNewLeaderGroupId] = useState<string>("none")
     const [isSubmittingLeader, setIsSubmittingLeader] = useState(false)
@@ -520,6 +522,9 @@ export function AdminDashboardClient({
                                     <SelectItem value="PROBATION_LEADER">Probation Leader</SelectItem>
                                     <SelectItem value="JUNIOR_LEADER">Junior Leader</SelectItem>
                                     <SelectItem value="SENIOR_LEADER">Senior Leader</SelectItem>
+                                    {currentUserRole === "SUPER_ADMIN" && (
+                                        <SelectItem value="ADMIN">Admin</SelectItem>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>

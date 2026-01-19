@@ -157,6 +157,7 @@ model SystemSetting {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   BRANCH_HEAD
   COORDINATOR

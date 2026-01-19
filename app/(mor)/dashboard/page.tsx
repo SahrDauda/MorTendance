@@ -24,8 +24,9 @@ export default async function DashboardPage() {
 
     try {
         // Render role-based dashboard
-        if (userRole === "ADMIN") {
-            return <AdminDashboard />
+        // Render role-based dashboard
+        if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
+            return <AdminDashboard currentUserRole={userRole} />
         }
 
         return <LeaderDashboard />
