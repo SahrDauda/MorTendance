@@ -4,7 +4,7 @@ export const authConfig = {
     pages: {
         signIn: "/auth/signin",
     },
-    debug: process.env.NODE_ENV === "development",
+    // debug: process.env.NODE_ENV === "development",
     callbacks: {
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user
@@ -43,7 +43,7 @@ export const authConfig = {
         },
     },
     providers: [],
-    session: { strategy: "jwt" },
-    secret: process.env.AUTH_SECRET,
-    trustHost: true,
+    // session: { strategy: "jwt" },
+    // secret: process.env.AUTH_SECRET,
+    // trustHost: true,
 } satisfies NextAuthConfig
