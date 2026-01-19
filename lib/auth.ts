@@ -14,29 +14,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const parsedCredentials = z
-          .object({ email: z.string().email(), password: z.string().min(6) })
-          .safeParse(credentials)
+        try {
+          const parsedCredentials = z
+            .object({ email: z.string().email(), password: z.string().min(6) })
+            .safeParse(credentials)
 
-        if (parsedCredentials.success) {
-          const { email, password } = parsedCredentials.data
+          if (parsedCredentials.success) {
+            const { email, password } = parsedCredentials.data
 
-          const user = await db.user.findUnique({ where: { email } })
-          if (!user) return null
-
-          const passwordsMatch = await bcrypt.compare(password, user.passwordHash)
-          if (passwordsMatch) {
-            return {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
+            console.log("Attempting login for:", email)
+            const user = await db.user.findUnique({ where: { email } })
+            if (!user) {
+              console.log("User not found:", email)
+              return null
             }
-          }
-        }
 
-        console.log("Invalid credentials")
-        return null
+            const passwordsMatch = await bcrypt.compare(password, user.passwordHash)
+            if (passwordsMatch) {
+              console.log("Login successful for:", email)
+              return {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+              }
+            }
+            console.log("Invalid password for:", email)
+          } else {
+            console.log("Invalid credentials format")
+          }
+
+          return null
+        } catch (error) {
+          console.error("Auth error:", error)
+          return null
+        }
       },
     }),
   ],
