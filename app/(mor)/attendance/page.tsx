@@ -105,7 +105,11 @@ export default async function AttendancePage() {
             },
             include: {
                 records: {
-                    include: {
+                    select: {
+                        id: true,
+                        memberId: true,
+                        isPresent: true,
+                        isLate: true,
                         member: {
                             select: {
                                 id: true,

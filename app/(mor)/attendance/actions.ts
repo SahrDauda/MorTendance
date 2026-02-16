@@ -137,33 +137,99 @@ export async function saveAttendanceAction({ groupId, cbsLocationId, branchId, t
             }))
         }
 
-        // 3. Create session and records in a transaction
+        // 3. Find or create session and upsert records in a transaction
         const result = await db.$transaction(async (tx) => {
-            const sessionData: any = {
+            // Normalize date to start of day for comparison (Prisma Date type stores only date, no time)
+            const sessionDate = new Date(date)
+            sessionDate.setHours(0, 0, 0, 0)
+
+            // Build where clause for finding existing session
+            const whereClause: any = {
                 type,
-                date,
+                date: sessionDate,
                 branchId: effectiveBranchId!,
-                groupId: type === EventType.LEADERSHIP_MEETING ? undefined : groupId,
-                cbsLocationId,
-                recorderId: session.user.id,
-                notes,
-                records: {
-                    create: processedRecords.map(r => ({
-                        memberId: r.memberId,
-                        isPresent: r.isPresent,
-                        isLate: r.isLate || false
-                    }))
+            }
+
+            // Add group/location filters based on event type
+            if (type === EventType.LEADERSHIP_MEETING) {
+                // Leadership meetings don't have groups
+                whereClause.groupId = null
+            } else if (type === EventType.CBS) {
+                whereClause.cbsLocationId = cbsLocationId || null
+            } else {
+                whereClause.groupId = groupId || null
+            }
+
+            // Check if a session already exists for this group/date/type combination
+            const existingSession = await tx.attendanceSession.findFirst({
+                where: whereClause,
+                include: {
+                    records: true
                 }
-            }
-
-            // Add cutoffTime if provided (will work after schema migration)
-            if (cutoffTime) {
-                sessionData.cutoffTime = cutoffTime
-            }
-
-            const attendanceSession = await tx.attendanceSession.create({
-                data: sessionData
             })
+
+            let attendanceSession
+
+            if (existingSession) {
+                // Update existing session
+                attendanceSession = await tx.attendanceSession.update({
+                    where: { id: existingSession.id },
+                    data: {
+                        notes: notes || existingSession.notes,
+                        cutoffTime: cutoffTime || existingSession.cutoffTime,
+                        recorderId: session.user.id, // Update recorder to current user
+                    }
+                })
+
+                // Upsert records: update existing or create new
+                for (const record of processedRecords) {
+                    await tx.attendanceRecord.upsert({
+                        where: {
+                            sessionId_memberId: {
+                                sessionId: existingSession.id,
+                                memberId: record.memberId
+                            }
+                        },
+                        update: {
+                            isPresent: record.isPresent,
+                            isLate: record.isLate || false
+                        },
+                        create: {
+                            sessionId: existingSession.id,
+                            memberId: record.memberId,
+                            isPresent: record.isPresent,
+                            isLate: record.isLate || false
+                        }
+                    })
+                }
+            } else {
+                // Create new session
+                const sessionData: any = {
+                    type,
+                    date: sessionDate,
+                    branchId: effectiveBranchId!,
+                    groupId: type === EventType.LEADERSHIP_MEETING ? undefined : groupId,
+                    cbsLocationId,
+                    recorderId: session.user.id,
+                    notes,
+                    records: {
+                        create: processedRecords.map(r => ({
+                            memberId: r.memberId,
+                            isPresent: r.isPresent,
+                            isLate: r.isLate || false
+                        }))
+                    }
+                }
+
+                // Add cutoffTime if provided
+                if (cutoffTime) {
+                    sessionData.cutoffTime = cutoffTime
+                }
+
+                attendanceSession = await tx.attendanceSession.create({
+                    data: sessionData
+                })
+            }
 
             return attendanceSession
         })
@@ -174,6 +240,118 @@ export async function saveAttendanceAction({ groupId, cbsLocationId, branchId, t
     } catch (error: any) {
         console.error("Failed to save attendance:", error)
         throw new Error(error.message || "Failed to save attendance")
+    }
+}
+
+// Action to clean up duplicate attendance records
+export async function cleanupDuplicateAttendanceAction() {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized: Admin access required")
+    }
+
+    try {
+        let deletedRecords = 0
+        let mergedSessions = 0
+
+        // Find all sessions grouped by group/date/type
+        const allSessions = await db.attendanceSession.findMany({
+            include: {
+                records: true
+            },
+            orderBy: {
+                createdAt: 'asc'
+            }
+        })
+
+        // Group sessions by unique key (group/date/type)
+        const sessionGroups = new Map<string, typeof allSessions>()
+        
+        for (const sess of allSessions) {
+            const key = `${sess.groupId || 'null'}_${sess.cbsLocationId || 'null'}_${sess.date.toISOString().split('T')[0]}_${sess.type}`
+            if (!sessionGroups.has(key)) {
+                sessionGroups.set(key, [])
+            }
+            sessionGroups.get(key)!.push(sess)
+        }
+
+        // Process each group
+        for (const [key, sessions] of sessionGroups) {
+            if (sessions.length > 1) {
+                // Keep the first session, merge others into it
+                const keepSession = sessions[0]
+                const deleteSessions = sessions.slice(1)
+
+                for (const deleteSession of deleteSessions) {
+                    // Move records from duplicate session to the kept session
+                    for (const record of deleteSession.records) {
+                        // Check if record already exists in kept session
+                        const existingRecord = keepSession.records.find(
+                            r => r.memberId === record.memberId
+                        )
+
+                        if (existingRecord) {
+                            // Update existing record, then delete duplicate
+                            await db.attendanceRecord.delete({
+                                where: { id: record.id }
+                            })
+                            deletedRecords++
+                        } else {
+                            // Move record to kept session
+                            await db.attendanceRecord.update({
+                                where: { id: record.id },
+                                data: { sessionId: keepSession.id }
+                            })
+                        }
+                    }
+
+                    // Delete the duplicate session
+                    await db.attendanceSession.delete({
+                        where: { id: deleteSession.id }
+                    })
+                    mergedSessions++
+                }
+            }
+        }
+
+        // Also check for duplicate records within the same session (shouldn't happen due to unique constraint, but just in case)
+        const allRecords = await db.attendanceRecord.findMany({
+            orderBy: {
+                createdAt: 'asc'
+            }
+        })
+
+        const recordMap = new Map<string, typeof allRecords>()
+        for (const record of allRecords) {
+            const key = `${record.sessionId}_${record.memberId}`
+            if (!recordMap.has(key)) {
+                recordMap.set(key, [])
+            }
+            recordMap.get(key)!.push(record)
+        }
+
+        for (const [key, records] of recordMap) {
+            if (records.length > 1) {
+                // Keep first, delete rest
+                const toDelete = records.slice(1)
+                await db.attendanceRecord.deleteMany({
+                    where: {
+                        id: { in: toDelete.map(r => r.id) }
+                    }
+                })
+                deletedRecords += toDelete.length
+            }
+        }
+
+        revalidatePath("/attendance")
+        return { 
+            success: true, 
+            deletedRecords,
+            mergedSessions
+        }
+    } catch (error: any) {
+        console.error("Failed to cleanup duplicates:", error)
+        throw new Error(error.message || "Failed to cleanup duplicates")
     }
 }
 
@@ -232,5 +410,122 @@ export async function bulkSaveAttendanceAction(sessions: SaveAttendanceParams[])
     } catch (error: any) {
         console.error("Failed to bulk save attendance:", error)
         throw new Error("Failed to bulk save attendance")
+    }
+}
+
+// Delete a single attendance record (admin only)
+export async function deleteAttendanceRecordAction(recordId: string) {
+    const session = await auth()
+    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN")) {
+        throw new Error("Unauthorized: Admin access required")
+    }
+
+    try {
+        const record = await db.attendanceRecord.findUnique({
+            where: { id: recordId },
+            include: {
+                member: {
+                    select: { name: true }
+                },
+                session: {
+                    select: {
+                        id: true,
+                        date: true,
+                        type: true,
+                        group: {
+                            select: { name: true }
+                        }
+                    }
+                }
+            }
+        })
+
+        if (!record) {
+            throw new Error("Attendance record not found")
+        }
+
+        await db.attendanceRecord.delete({
+            where: { id: recordId }
+        })
+
+        // Log the deletion
+        await db.auditLog.create({
+            data: {
+                userId: session.user.id,
+                action: "DELETE",
+                entity: "ATTENDANCE_RECORD",
+                entityId: recordId,
+                details: `Deleted attendance for ${record.member.name} from ${record.session.group?.name || 'session'} on ${record.session.date.toISOString().split('T')[0]}`
+            }
+        })
+
+        revalidatePath("/attendance")
+        revalidatePath("/dashboard")
+        return { 
+            success: true, 
+            message: `Attendance for ${record.member.name} has been deleted` 
+        }
+    } catch (error: any) {
+        console.error("Failed to delete attendance record:", error)
+        throw new Error(error.message || "Failed to delete attendance record")
+    }
+}
+
+// Delete an entire attendance session (admin only)
+export async function deleteAttendanceSessionAction(sessionId: string) {
+    const session = await auth()
+    if (!session || (session.user.role !== "ADMIN" && session.user.role !== "SUPER_ADMIN")) {
+        throw new Error("Unauthorized: Admin access required")
+    }
+
+    try {
+        const attendanceSession = await db.attendanceSession.findUnique({
+            where: { id: sessionId },
+            include: {
+                group: {
+                    select: { name: true }
+                },
+                records: {
+                    include: {
+                        member: {
+                            select: { name: true }
+                        }
+                    }
+                },
+                _count: {
+                    select: { records: true }
+                }
+            }
+        })
+
+        if (!attendanceSession) {
+            throw new Error("Attendance session not found")
+        }
+
+        // Delete the session (cascade will delete all records)
+        await db.attendanceSession.delete({
+            where: { id: sessionId }
+        })
+
+        // Log the deletion
+        await db.auditLog.create({
+            data: {
+                userId: session.user.id,
+                action: "DELETE",
+                entity: "ATTENDANCE_SESSION",
+                entityId: sessionId,
+                details: `Deleted attendance session for ${attendanceSession.group?.name || 'session'} on ${attendanceSession.date.toISOString().split('T')[0]} (${attendanceSession._count.records} records)`
+            }
+        })
+
+        revalidatePath("/attendance")
+        revalidatePath("/dashboard")
+        return { 
+            success: true, 
+            message: `Attendance session with ${attendanceSession._count.records} records has been deleted` 
+        }
+    } catch (error: any) {
+        console.error("Failed to delete attendance session:", error)
+        throw new Error(error.message || "Failed to delete attendance session")
     }
 }

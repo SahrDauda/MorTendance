@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, getDay } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, Save, Loader2, Users, TrendingUp, UserCheck, Download, Plus, Search as SearchIcon, MoreHorizontal, Upload, QrCode, Copy, Printer, CheckCircle2 } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, Save, Loader2, Users, TrendingUp, UserCheck, Download, Plus, Search as SearchIcon, MoreHorizontal, Upload, QrCode, Copy, Printer, CheckCircle2, Trash2 } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { BulkImportDialog } from "@/components/shared/bulk-import-dialog"
-import { saveAttendanceAction, bulkSaveAttendanceAction } from "./actions"
+import { saveAttendanceAction, bulkSaveAttendanceAction, cleanupDuplicateAttendanceAction, deleteAttendanceRecordAction, deleteAttendanceSessionAction } from "./actions"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 
 interface Member {
@@ -130,19 +130,63 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const [qrCopied, setQrCopied] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
+    const [deleteRecordDialog, setDeleteRecordDialog] = useState<{ open: boolean; recordId: string | null; memberName: string }>({ open: false, recordId: null, memberName: "" })
+    const [deleteSessionDialog, setDeleteSessionDialog] = useState<{ open: boolean; sessionId: string | null; sessionName: string }>({ open: false, sessionId: null, sessionName: "" })
+    const [isDeleting, setIsDeleting] = useState(false)
 
     // Use localStorage to persist session state
     const [sessionState, setSessionState] = useLocalStorage<SessionState | null>("attendance_session", null)
     const [isSessionActive, setIsSessionActive] = useState(false)
 
+    // Track explicitly completed groups (groups where user clicked "Complete Attendance")
+    // Key: date string, Value: Set of completed group IDs for that date
+    const [completedGroupsByDate, setCompletedGroupsByDate] = useLocalStorage<Record<string, string[]>>("completed_groups_by_date", {})
+    
+    // Get today's date key
+    const todayKey = date.toISOString().split('T')[0]
+    const todaysCompletedGroupIds = completedGroupsByDate[todayKey] || []
+    const todaysCompletedSet = new Set(todaysCompletedGroupIds)
+
     // Pre-compute today's Saturday Fellowship completion across groups (for overview strip)
-    const todaysSaturdaySet = new Set(todaysSaturdayGroupIds)
     const totalGroups = initialGroups.length
-    const completedGroups = initialGroups.filter(g => todaysSaturdaySet.has(g.id))
-    const pendingGroups = initialGroups.filter(g => !todaysSaturdaySet.has(g.id))
+    const completedGroups = initialGroups.filter(g => todaysCompletedSet.has(g.id))
+    const pendingGroups = initialGroups.filter(g => !todaysCompletedSet.has(g.id))
 
     useEffect(() => {
         setMounted(true)
+        
+        // Restore session state from localStorage FIRST (before setting defaults)
+        if (sessionState) {
+            const sessionDate = new Date(sessionState.date)
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            sessionDate.setHours(0, 0, 0, 0)
+
+            // Only restore if it's the same day and was active
+            if (sessionDate.getTime() === today.getTime() && sessionState.isActive) {
+                setIsSessionActive(true)
+                setDate(sessionDate)
+                setEventType(sessionState.eventType)
+                if (sessionState.groupId) setSelectedGroupId(sessionState.groupId)
+                if (sessionState.locationId) setSelectedLocationId(sessionState.locationId)
+                if (sessionState.cutoffTime) setCutoffTime(sessionState.cutoffTime)
+                if (sessionState.notes) setNotes(sessionState.notes)
+                // Restore all marked attendance
+                if (sessionState.attendance && Object.keys(sessionState.attendance).length > 0) {
+                    setAttendance(sessionState.attendance)
+                    const markedCount = Object.keys(sessionState.attendance).filter(id => sessionState.attendance[id]?.isPresent).length
+                    toast.info(`Session restored: ${markedCount} member(s) already marked present`)
+                } else {
+                    toast.info("Session restored - you can continue marking attendance")
+                }
+                return // Don't override with day-based defaults if we restored a session
+            } else {
+                // Clear expired session
+                setSessionState(null)
+            }
+        }
+
+        // Only set day-based defaults if no session was restored
         const today = new Date()
         const day = getDay(today)
         if (day === 2) {
@@ -152,47 +196,39 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
         } else if (day === 0 || day === 4) {
             setEventType(EventType.LEADERSHIP_MEETING)
         }
-
-        // Restore session state from localStorage if it exists and is still valid
-        if (sessionState) {
-            const sessionDate = new Date(sessionState.date)
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            sessionDate.setHours(0, 0, 0, 0)
-
-            // Only restore if it's the same day
-            if (sessionDate.getTime() === today.getTime() && sessionState.isActive) {
-                setIsSessionActive(true)
-                setDate(sessionDate)
-                setEventType(sessionState.eventType)
-                if (sessionState.groupId) setSelectedGroupId(sessionState.groupId)
-                if (sessionState.locationId) setSelectedLocationId(sessionState.locationId)
-                if (sessionState.cutoffTime) setCutoffTime(sessionState.cutoffTime)
-                if (sessionState.notes) setNotes(sessionState.notes)
-                setAttendance(sessionState.attendance)
-            } else {
-                // Clear expired session
-                setSessionState(null)
-            }
-        }
     }, [])
 
-    // Check if day has passed and auto-close session
+    // Check if day has passed and auto-close session + clean up old completed groups
     useEffect(() => {
-        if (!mounted || !isSessionActive) return
+        if (!mounted) return
 
         const checkDayChange = () => {
             const today = new Date()
             today.setHours(0, 0, 0, 0)
-            const sessionDate = new Date(date)
-            sessionDate.setHours(0, 0, 0, 0)
+            const todayKey = today.toISOString().split('T')[0]
+            
+            // Clean up completed groups from previous days (keep only today and future dates)
+            const cleanedCompletedGroups: Record<string, string[]> = {}
+            Object.keys(completedGroupsByDate).forEach(dateKey => {
+                if (dateKey >= todayKey) {
+                    cleanedCompletedGroups[dateKey] = completedGroupsByDate[dateKey]
+                }
+            })
+            if (Object.keys(cleanedCompletedGroups).length !== Object.keys(completedGroupsByDate).length) {
+                setCompletedGroupsByDate(cleanedCompletedGroups)
+            }
 
-            if (sessionDate.getTime() !== today.getTime()) {
-                setIsSessionActive(false)
-                setAttendance({})
-                setNotes("")
-                setSessionState(null)
-                toast.info("Session closed automatically - new day started")
+            if (isSessionActive) {
+                const sessionDate = new Date(date)
+                sessionDate.setHours(0, 0, 0, 0)
+
+                if (sessionDate.getTime() !== today.getTime()) {
+                    setIsSessionActive(false)
+                    setAttendance({})
+                    setNotes("")
+                    setSessionState(null)
+                    toast.info("Session closed automatically - new day started")
+                }
             }
         }
 
@@ -201,11 +237,14 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
         const interval = setInterval(checkDayChange, 60000) // Check every minute
 
         return () => clearInterval(interval)
-    }, [isSessionActive, date, mounted])
+    }, [isSessionActive, date, mounted, completedGroupsByDate])
 
     // Save session state to localStorage whenever it changes
+    // This ensures the session persists even if user navigates away
     useEffect(() => {
-        if (isSessionActive && mounted) {
+        if (!mounted) return
+        
+        if (isSessionActive) {
             setSessionState({
                 isActive: true,
                 date: date.toISOString(),
@@ -216,8 +255,12 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                 notes,
                 attendance
             })
-        } else if (!isSessionActive && mounted) {
-            setSessionState(null)
+        } else {
+            // Only clear if explicitly closed (not just on mount)
+            // This prevents clearing on initial load before we check for existing session
+            if (mounted) {
+                setSessionState(null)
+            }
         }
     }, [isSessionActive, date, eventType, selectedGroupId, selectedLocationId, cutoffTime, notes, attendance, mounted])
 
@@ -296,11 +339,12 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                 notes: notes || undefined,
                 cutoffTime: cutoffTime
             })
-            toast.success("Attendance saved successfully")
-            // Clear attendance but keep session active if it's still the same day
-            setAttendance({})
+            toast.success("Attendance saved successfully. You can continue adding members who arrived later.")
+            // Keep session active - don't clear attendance so user can continue marking
+            // Session persists until explicitly closed or day changes
+            // Only clear notes after save
+            // DO NOT mark group as complete - user must click "Complete Attendance" button
             setNotes("")
-            // Don't close session - it stays active until manually closed or day changes
             if (isAddAttendanceOpen) setIsAddAttendanceOpen(false)
             router.refresh()
         } catch (error: any) {
@@ -518,7 +562,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                     Today&apos;s Saturday Fellowship
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                    {completedGroups.length} of {totalGroups} groups have submitted attendance today.
+                                    {completedGroups.length} of {totalGroups} groups marked as complete today.
                                 </p>
                             </div>
                             <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
@@ -669,6 +713,25 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {isAdminLikeRole && (
+                            <Button
+                                variant="outline"
+                                className="gap-2 text-xs"
+                                size="sm"
+                                onClick={async () => {
+                                    try {
+                                        const result = await cleanupDuplicateAttendanceAction()
+                                        toast.success(`Cleanup complete: ${result.deletedRecords} duplicate records removed, ${result.mergedSessions} sessions merged`)
+                                        router.refresh()
+                                    } catch (error: any) {
+                                        toast.error(error.message || "Failed to cleanup duplicates")
+                                    }
+                                }}
+                            >
+                                <X className="h-3 w-3" />
+                                Clean Duplicates
+                            </Button>
+                        )}
                         <Button
                             variant="outline"
                             className="gap-2"
@@ -855,11 +918,35 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                 <Check className="h-4 w-4" /> Confirm & Start Marking
                             </Button>
                         ) : (
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 items-center flex-wrap">
                                 <Badge className="bg-green-500 text-white gap-2 px-3 py-1">
                                     <div className="h-2 w-2 rounded-full bg-white animate-pulse"></div>
                                     Session Active
                                 </Badge>
+                                {Object.keys(attendance).length > 0 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {Object.keys(attendance).filter(id => attendance[id]?.isPresent).length} marked present
+                                    </Badge>
+                                )}
+                                {eventType === EventType.SATURDAY_FELLOWSHIP && selectedGroupId && !todaysCompletedSet.has(selectedGroupId) && (
+                                    <Button
+                                        size="sm"
+                                        className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                                        onClick={() => {
+                                            const todayKey = date.toISOString().split('T')[0]
+                                            const currentCompleted = completedGroupsByDate[todayKey] || []
+                                            if (!currentCompleted.includes(selectedGroupId)) {
+                                                setCompletedGroupsByDate({
+                                                    ...completedGroupsByDate,
+                                                    [todayKey]: [...currentCompleted, selectedGroupId]
+                                                })
+                                                toast.success(`Attendance for ${selectedGroup?.name || 'this group'} marked as complete!`)
+                                            }
+                                        }}
+                                    >
+                                        <Check className="h-4 w-4" /> Complete Attendance
+                                    </Button>
+                                )}
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -868,6 +955,8 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                         setIsSessionActive(false)
                                         setAttendance({})
                                         setNotes("")
+                                        setSessionState(null) // Clear from localStorage
+                                        toast.info("Session closed. All marked attendance has been cleared.")
                                     }}
                                 >
                                     <X className="h-4 w-4" /> Close Session
@@ -997,6 +1086,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                             <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Present</TableHead>
                                             <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Absent</TableHead>
                                             <TableHead className="font-bold uppercase tracking-wider text-[10px]">Recorded By</TableHead>
+                                            {isAdminLikeRole && (
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center w-16">Actions</TableHead>
+                                            )}
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1005,9 +1097,8 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                             const absentCount = session.records.filter(r => !r.isPresent).length
                                             const isExpanded = expandedSessionId === session.id
                                             return (
-                                                <>
+                                                <React.Fragment key={session.id}>
                                                     <TableRow
-                                                        key={session.id}
                                                         className="border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
                                                         onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
                                                     >
@@ -1040,25 +1131,64 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                         <TableCell className="text-xs text-muted-foreground">
                                                             {session.recorder.name}
                                                         </TableCell>
+                                                        {isAdminLikeRole && (
+                                                            <TableCell className="text-center">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        setDeleteSessionDialog({
+                                                                            open: true,
+                                                                            sessionId: session.id,
+                                                                            sessionName: `${session.group?.name || 'Session'} - ${format(new Date(session.date), "MMM d, yyyy")}`
+                                                                        })
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </Button>
+                                                            </TableCell>
+                                                        )}
                                                     </TableRow>
                                                     {isExpanded && (
                                                         <TableRow key={`${session.id}-details`} className="bg-muted/20">
-                                                            <TableCell colSpan={7} className="p-0">
+                                                            <TableCell colSpan={isAdminLikeRole ? 9 : 8} className="p-0">
                                                                 <div className="p-4">
                                                                     <div className="mb-3 flex items-center justify-between">
                                                                         <h4 className="font-semibold text-sm">Member Attendance Details</h4>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="gap-2"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation()
-                                                                                exportSessionToExcel(session)
-                                                                            }}
-                                                                        >
-                                                                            <Download className="h-3 w-3" />
-                                                                            Export This Session
-                                                                        </Button>
+                                                                        <div className="flex gap-2">
+                                                                            {isAdminLikeRole && (
+                                                                                <Button
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation()
+                                                                                        setDeleteSessionDialog({
+                                                                                            open: true,
+                                                                                            sessionId: session.id,
+                                                                                            sessionName: `${session.group?.name || 'Session'} - ${format(new Date(session.date), "MMM d, yyyy")}`
+                                                                                        })
+                                                                                    }}
+                                                                                >
+                                                                                    <Trash2 className="h-3 w-3" />
+                                                                                    Delete Session
+                                                                                </Button>
+                                                                            )}
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="gap-2"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation()
+                                                                                    exportSessionToExcel(session)
+                                                                                }}
+                                                                            >
+                                                                                <Download className="h-3 w-3" />
+                                                                                Export This Session
+                                                                            </Button>
+                                                                        </div>
                                                                     </div>
                                                                     <div className="overflow-x-auto">
                                                                         <Table>
@@ -1069,11 +1199,14 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                                                     <TableHead className="text-[10px] font-bold">Group</TableHead>
                                                                                     <TableHead className="text-[10px] font-bold">Status</TableHead>
                                                                                     <TableHead className="text-[10px] font-bold text-center">Attendance</TableHead>
+                                                                                    {isAdminLikeRole && (
+                                                                                        <TableHead className="text-[10px] font-bold text-center">Actions</TableHead>
+                                                                                    )}
                                                                                 </TableRow>
                                                                             </TableHeader>
                                                                             <TableBody>
                                                                                 {session.records.map((record) => (
-                                                                                    <TableRow key={record.member.id}>
+                                                                                    <TableRow key={record.id || record.member.id}>
                                                                                         <TableCell className="text-sm font-medium">
                                                                                             {record.member.name}
                                                                                         </TableCell>
@@ -1109,6 +1242,25 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                                                                 </Badge>
                                                                                             )}
                                                                                         </TableCell>
+                                                                                        {isAdminLikeRole && (
+                                                                                            <TableCell className="text-center">
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="sm"
+                                                                                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation()
+                                                                                                        setDeleteRecordDialog({
+                                                                                                            open: true,
+                                                                                                            recordId: record.id,
+                                                                                                            memberName: record.member.name
+                                                                                                        })
+                                                                                                    }}
+                                                                                                >
+                                                                                                    <Trash2 className="h-3 w-3" />
+                                                                                                </Button>
+                                                                                            </TableCell>
+                                                                                        )}
                                                                                     </TableRow>
                                                                                 ))}
                                                                             </TableBody>
@@ -1118,7 +1270,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                             </TableCell>
                                                         </TableRow>
                                                     )}
-                                                </>
+                                                </React.Fragment>
                                             )
                                         })}
                                     </TableBody>
@@ -1290,17 +1442,15 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                             </Select>
                         </div>
 
-                        {selectedBranchForQR && (
+                        {selectedBranchForQR && mounted && (
                             <div className="flex flex-col items-center gap-4 p-6 bg-muted/30 rounded-xl">
                                 <div className="bg-white p-4 rounded-2xl shadow-lg">
-                                    {typeof window !== 'undefined' && (
-                                        <QRCodeSVG
-                                            value={`${window.location.origin}/check-in?branchId=${selectedBranchForQR}&type=SATURDAY_FELLOWSHIP`}
-                                            size={200}
-                                            level="H"
-                                            includeMargin={true}
-                                        />
-                                    )}
+                                    <QRCodeSVG
+                                        value={`${window.location.origin}/check-in?branchId=${selectedBranchForQR}&type=SATURDAY_FELLOWSHIP`}
+                                        size={200}
+                                        level="H"
+                                        includeMargin={true}
+                                    />
                                 </div>
                                 <div className="text-center space-y-1">
                                     <p className="font-semibold text-lg">
@@ -1346,6 +1496,114 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                             </div>
                         )}
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Record Confirmation Dialog */}
+            <Dialog open={deleteRecordDialog.open} onOpenChange={(open) => setDeleteRecordDialog({ ...deleteRecordDialog, open })}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Attendance Record?</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Are you sure you want to delete the attendance record for <strong>{deleteRecordDialog.memberName}</strong>? 
+                            This action cannot be undone and will be logged in the audit trail.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteRecordDialog({ open: false, recordId: null, memberName: "" })}
+                            disabled={isDeleting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={async () => {
+                                if (!deleteRecordDialog.recordId) return
+                                setIsDeleting(true)
+                                try {
+                                    const result = await deleteAttendanceRecordAction(deleteRecordDialog.recordId)
+                                    toast.success(result.message)
+                                    setDeleteRecordDialog({ open: false, recordId: null, memberName: "" })
+                                    router.refresh()
+                                } catch (error: any) {
+                                    toast.error(error.message || "Failed to delete attendance record")
+                                } finally {
+                                    setIsDeleting(false)
+                                }
+                            }}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Session Confirmation Dialog */}
+            <Dialog open={deleteSessionDialog.open} onOpenChange={(open) => setDeleteSessionDialog({ ...deleteSessionDialog, open })}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Entire Session?</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Are you sure you want to delete the entire attendance session for <strong>{deleteSessionDialog.sessionName}</strong>? 
+                            This will delete all attendance records in this session. This action cannot be undone and will be logged in the audit trail.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteSessionDialog({ open: false, sessionId: null, sessionName: "" })}
+                            disabled={isDeleting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={async () => {
+                                if (!deleteSessionDialog.sessionId) return
+                                setIsDeleting(true)
+                                try {
+                                    const result = await deleteAttendanceSessionAction(deleteSessionDialog.sessionId)
+                                    toast.success(result.message)
+                                    setDeleteSessionDialog({ open: false, sessionId: null, sessionName: "" })
+                                    router.refresh()
+                                } catch (error: any) {
+                                    toast.error(error.message || "Failed to delete attendance session")
+                                } finally {
+                                    setIsDeleting(false)
+                                }
+                            }}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Session
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
