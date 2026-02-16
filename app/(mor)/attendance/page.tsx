@@ -9,7 +9,7 @@ export default async function AttendancePage() {
     const session = await auth()
     if (!session) redirect("/auth/signin")
 
-    const [groups, allMembers, cbsLocations, leaders] = await Promise.all([
+    const [groups, allMembers, cbsLocations, leaders, branches] = await Promise.all([
         db.ministryGroup.findMany({
             include: {
                 members: {
@@ -63,6 +63,15 @@ export default async function AttendancePage() {
                 name: true,
                 email: true,
                 role: true
+            },
+            orderBy: {
+                name: 'asc'
+            }
+        }),
+        db.branch.findMany({
+            select: {
+                id: true,
+                name: true
             },
             orderBy: {
                 name: 'asc'
@@ -166,6 +175,7 @@ export default async function AttendancePage() {
                 recentSessions={recentSessions as any}
                 userRole={session.user.role}
                 todaysSaturdayGroupIds={todaysSaturdayGroupIds}
+                branches={branches as any}
             />
         </div>
     )

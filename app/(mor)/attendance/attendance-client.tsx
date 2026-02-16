@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, getDay } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, Save, Loader2, Users, TrendingUp, UserCheck, Download, Plus, Search as SearchIcon, MoreHorizontal, Upload, QrCode } from "lucide-react"
+import { Calendar as CalendarIcon, Check, X, Save, Loader2, Users, TrendingUp, UserCheck, Download, Plus, Search as SearchIcon, MoreHorizontal, Upload, QrCode, Copy, Printer, CheckCircle2 } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -95,6 +96,7 @@ interface AttendanceClientProps {
     recentSessions?: AttendanceSession[]
     userRole: string
     todaysSaturdayGroupIds?: string[]
+    branches?: { id: string, name: string }[]
 }
 
 interface SessionState {
@@ -108,7 +110,7 @@ interface SessionState {
     attendance: Record<string, { isPresent: boolean; isLate?: boolean }>
 }
 
-export function AttendanceClient({ initialGroups, allMembers, cbsLocations, leaders, recentSessions = [], userRole, todaysSaturdayGroupIds = [] }: AttendanceClientProps) {
+export function AttendanceClient({ initialGroups, allMembers, cbsLocations, leaders, recentSessions = [], userRole, todaysSaturdayGroupIds = [], branches = [] }: AttendanceClientProps) {
     const router = useRouter()
     const [selectedGroupId, setSelectedGroupId] = useState<string>(initialGroups[0]?.id || "")
     const [selectedLocationId, setSelectedLocationId] = useState<string>(cbsLocations[0]?.id || "")
@@ -123,6 +125,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const [isAddAttendanceOpen, setIsAddAttendanceOpen] = useState(false)
     const [memberSearchTerm, setMemberSearchTerm] = useState("")
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+    const [isQRModalOpen, setIsQRModalOpen] = useState(false)
+    const [selectedBranchForQR, setSelectedBranchForQR] = useState<string>(branches[0]?.id || "")
+    const [qrCopied, setQrCopied] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
 
@@ -588,7 +593,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                         variant="outline"
                         size="sm"
                         className="flex-shrink-0 gap-2 rounded-xl"
-                        onClick={() => router.push("/attendance/qr")}
+                        onClick={() => setIsQRModalOpen(true)}
                     >
                         <QrCode className="h-4 w-4" /> QR
                     </Button>
@@ -667,7 +672,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                         <Button
                             variant="outline"
                             className="gap-2"
-                            onClick={() => router.push("/attendance/qr")}
+                            onClick={() => setIsQRModalOpen(true)}
                         >
                             <QrCode className="h-4 w-4" />
                             QR Check-in
@@ -1261,6 +1266,88 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                     </DialogContent>
                 </Dialog>
             </div>
+
+            {/* QR Generator Modal */}
+            <Dialog open={isQRModalOpen} onOpenChange={setIsQRModalOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle>Saturday Fellowship QR Code</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Select Branch</label>
+                            <Select value={selectedBranchForQR} onValueChange={setSelectedBranchForQR}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select branch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {branches.map(branch => (
+                                        <SelectItem key={branch.id} value={branch.id}>
+                                            {branch.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {selectedBranchForQR && (
+                            <div className="flex flex-col items-center gap-4 p-6 bg-muted/30 rounded-xl">
+                                <div className="bg-white p-4 rounded-2xl shadow-lg">
+                                    {typeof window !== 'undefined' && (
+                                        <QRCodeSVG
+                                            value={`${window.location.origin}/check-in?branchId=${selectedBranchForQR}&type=SATURDAY_FELLOWSHIP`}
+                                            size={200}
+                                            level="H"
+                                            includeMargin={true}
+                                        />
+                                    )}
+                                </div>
+                                <div className="text-center space-y-1">
+                                    <p className="font-semibold text-lg">
+                                        {branches.find(b => b.id === selectedBranchForQR)?.name || "Branch"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                                        Saturday Fellowship
+                                    </p>
+                                </div>
+                                <div className="flex gap-2 w-full">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 gap-2"
+                                        onClick={() => {
+                                            const checkInUrl = `${window.location.origin}/check-in?branchId=${selectedBranchForQR}&type=SATURDAY_FELLOWSHIP`
+                                            navigator.clipboard.writeText(checkInUrl)
+                                            setQrCopied(true)
+                                            toast.success("Check-in link copied!")
+                                            setTimeout(() => setQrCopied(false), 2000)
+                                        }}
+                                    >
+                                        {qrCopied ? (
+                                            <>
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                Copied!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="h-4 w-4" />
+                                                Copy Link
+                                            </>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1 gap-2"
+                                        onClick={() => window.print()}
+                                    >
+                                        <Printer className="h-4 w-4" />
+                                        Print
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <BulkImportDialog
                 isOpen={isImportDialogOpen}

@@ -11,7 +11,6 @@ import {
   Settings,
   UserCircle,
   ShieldCheck,
-  QrCode,
   MapPin,
   Building2,
   UserCog,
@@ -39,7 +38,6 @@ const adminNavigation = [
   { name: "User Management", href: ROUTES.USERS, icon: UserCog },
   { name: "Audit Logs", href: ROUTES.LOGS, icon: History },
   { name: "Ministry Settings", href: ROUTES.MINISTRY_SETTINGS, icon: Settings },
-  { name: "QR Generator", href: ROUTES.QR_GENERATOR, icon: QrCode },
 ]
 
 export function Sidebar() {
