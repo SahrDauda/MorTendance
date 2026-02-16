@@ -94,6 +94,7 @@ interface AttendanceClientProps {
     leaders: Leader[]
     recentSessions?: AttendanceSession[]
     userRole: string
+    todaysSaturdayGroupIds?: string[]
 }
 
 interface SessionState {
@@ -107,7 +108,7 @@ interface SessionState {
     attendance: Record<string, { isPresent: boolean; isLate?: boolean }>
 }
 
-export function AttendanceClient({ initialGroups, allMembers, cbsLocations, leaders, recentSessions = [], userRole }: AttendanceClientProps) {
+export function AttendanceClient({ initialGroups, allMembers, cbsLocations, leaders, recentSessions = [], userRole, todaysSaturdayGroupIds = [] }: AttendanceClientProps) {
     const router = useRouter()
     const [selectedGroupId, setSelectedGroupId] = useState<string>(initialGroups[0]?.id || "")
     const [selectedLocationId, setSelectedLocationId] = useState<string>(cbsLocations[0]?.id || "")
@@ -128,6 +129,12 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     // Use localStorage to persist session state
     const [sessionState, setSessionState] = useLocalStorage<SessionState | null>("attendance_session", null)
     const [isSessionActive, setIsSessionActive] = useState(false)
+
+    // Pre-compute today's Saturday Fellowship completion across groups (for overview strip)
+    const todaysSaturdaySet = new Set(todaysSaturdayGroupIds)
+    const totalGroups = initialGroups.length
+    const completedGroups = initialGroups.filter(g => todaysSaturdaySet.has(g.id))
+    const pendingGroups = initialGroups.filter(g => !todaysSaturdaySet.has(g.id))
 
     useEffect(() => {
         setMounted(true)
@@ -260,12 +267,6 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const handleSave = async () => {
         setIsSaving(true)
         try {
-            if (!isSessionActive) {
-                toast.error("Please confirm session details first")
-                setIsSaving(false)
-                return
-            }
-
             // Only save records that have been marked in the attendance state
             const memberIdsToSave = Object.keys(attendance).filter(id => attendance[id] !== undefined)
 
@@ -498,9 +499,80 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
         ? (allMembers.reduce((acc, m) => acc + (m._count?.attendance || 0), 0) / allMembers.length).toFixed(1)
         : 0
 
+    const showSaturdayOverview = eventType === EventType.SATURDAY_FELLOWSHIP && totalGroups > 0
+
     return (
         <>
             <div className="grid gap-6">
+                {showSaturdayOverview && (
+                    <Card className="border-border/60 bg-primary/5 backdrop-blur-sm">
+                        <CardContent className="p-4 md:p-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">
+                                    Today&apos;s Saturday Fellowship
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    {completedGroups.length} of {totalGroups} groups have submitted attendance today.
+                                </p>
+                            </div>
+                            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                                {pendingGroups.length > 0 && (
+                                    <div className="flex-1">
+                                        <p className="text-[11px] font-medium text-muted-foreground mb-1">
+                                            Groups still to mark
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {pendingGroups.slice(0, 4).map(group => (
+                                                <Button
+                                                    key={group.id}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-7 text-[11px] px-2 rounded-full"
+                                                    onClick={() => {
+                                                        setSelectedGroupId(group.id)
+                                                        setEventType(EventType.SATURDAY_FELLOWSHIP)
+                                                        setIsAddAttendanceOpen(true)
+                                                    }}
+                                                >
+                                                    {group.name}
+                                                </Button>
+                                            ))}
+                                            {pendingGroups.length > 4 && (
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    +{pendingGroups.length - 4} more
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                                {completedGroups.length > 0 && (
+                                    <div className="flex-1 md:w-auto">
+                                        <p className="text-[11px] font-medium text-muted-foreground mb-1">
+                                            Completed today
+                                        </p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {completedGroups.slice(0, 3).map(group => (
+                                                <Badge
+                                                    key={group.id}
+                                                    variant="secondary"
+                                                    className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 border-primary/20"
+                                                >
+                                                    {group.name}
+                                                </Badge>
+                                            ))}
+                                            {completedGroups.length > 3 && (
+                                                <span className="text-[11px] text-muted-foreground">
+                                                    +{completedGroups.length - 3} more
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Mobile Quick Links */}
                 <div className="flex md:hidden overflow-x-auto pb-2 gap-3 no-scrollbar">
                     <Button
@@ -634,6 +706,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                 size="sm"
                                                 className="flex-1 text-xs h-8 bg-green-500/5 hover:bg-green-500/10 text-green-600 border-green-500/20"
                                                 onClick={() => {
+                                                    if (!isSessionActive) {
+                                                        setIsSessionActive(true)
+                                                    }
                                                     const now = new Date()
                                                     const [hours, minutes] = cutoffTime.split(':').map(Number)
                                                     const cutoffDateTime = new Date(date)
@@ -654,6 +729,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                 size="sm"
                                                 className="flex-1 text-xs h-8 bg-red-500/5 hover:bg-red-500/10 text-red-600 border-red-500/20"
                                                 onClick={() => {
+                                                    if (!isSessionActive) {
+                                                        setIsSessionActive(true)
+                                                    }
                                                     const newAttendance = { ...attendance }
                                                     filteredAllMembers.forEach(m => {
                                                         newAttendance[m.id] = { isPresent: false, isLate: false }
@@ -667,27 +745,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                     </div>
                                 </DialogHeader>
                                 <div className="flex-1 overflow-y-auto p-6 relative">
-                                    {!isSessionActive && (
-                                        <div className="absolute inset-0 z-20 bg-background/60 backdrop-blur-[2px] flex items-center justify-center p-6 text-center">
-                                            <div className="bg-card border border-border/50 p-6 rounded-2xl shadow-xl max-w-xs">
-                                                <CalendarIcon className="h-12 w-12 text-primary mx-auto mb-4 opacity-50" />
-                                                <h3 className="font-bold text-lg mb-2">Session Not Started</h3>
-                                                <p className="text-sm text-muted-foreground mb-4">Please confirm the session details (Group, Date, Type) first.</p>
-                                                <Button
-                                                    onClick={() => {
-                                                        const scrollTarget = document.getElementById('session-details-card')
-                                                        if (scrollTarget) scrollTarget.scrollIntoView({ behavior: 'smooth' })
-                                                        setIsAddAttendanceOpen(false)
-                                                    }}
-                                                    variant="secondary"
-                                                    className="w-full"
-                                                >
-                                                    Set Details
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className={cn("space-y-4", !isSessionActive && "opacity-20 pointer-events-none")}>
+                                    <div className="space-y-4">
                                         {filteredAllMembers.map(member => (
                                             <div key={member.id} className="flex items-center justify-between p-3 rounded-xl border border-border/50 hover:bg-muted/30 transition-colors">
                                                 <div>
@@ -707,6 +765,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                     <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-full border border-border/50">
                                                         <button
                                                             onClick={() => {
+                                                                if (!isSessionActive) {
+                                                                    setIsSessionActive(true)
+                                                                }
                                                                 const now = new Date()
                                                                 const [hours, minutes] = cutoffTime.split(':').map(Number)
                                                                 const cutoffDateTime = new Date(date)
@@ -726,10 +787,15 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                             {attendance[member.id]?.isPresent && attendance[member.id]?.isLate ? "LATE" : "PR"}
                                                         </button>
                                                         <button
-                                                            onClick={() => setAttendance(prev => ({
-                                                                ...prev,
-                                                                [member.id]: { isPresent: false, isLate: false }
-                                                            }))}
+                                                            onClick={() => {
+                                                                if (!isSessionActive) {
+                                                                    setIsSessionActive(true)
+                                                                }
+                                                                setAttendance(prev => ({
+                                                                    ...prev,
+                                                                    [member.id]: { isPresent: false, isLate: false }
+                                                                }))
+                                                            }}
                                                             className={cn(
                                                                 "px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all",
                                                                 attendance[member.id]?.isPresent === false ? "bg-red-500 text-white" : "text-muted-foreground"

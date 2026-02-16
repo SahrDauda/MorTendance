@@ -78,56 +78,84 @@ export default async function AttendancePage() {
         }
     }))
 
-    // Fetch recent attendance sessions for the selected group (if any)
-    const recentSessions = await db.attendanceSession.findMany({
-        where: {
-            type: "SATURDAY_FELLOWSHIP",
-            date: {
-                gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) // Last month
-            }
-        },
-        include: {
-            records: {
-                include: {
-                    member: {
-                        select: {
-                            id: true,
-                            name: true,
-                            phoneNumber: true,
-                            status: true,
-                            group: {
-                                select: {
-                                    id: true,
-                                    name: true
+    // Compute today's date range (server time) for Saturday Fellowship overview
+    const today = new Date()
+    const startOfToday = new Date(today)
+    startOfToday.setHours(0, 0, 0, 0)
+    const startOfTomorrow = new Date(startOfToday)
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1)
+
+    // Fetch recent Saturday Fellowship attendance sessions (last month)
+    const [recentSessions, todaysSaturdaySessions] = await Promise.all([
+        db.attendanceSession.findMany({
+            where: {
+                type: "SATURDAY_FELLOWSHIP",
+                date: {
+                    gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) // Last month
+                }
+            },
+            include: {
+                records: {
+                    include: {
+                        member: {
+                            select: {
+                                id: true,
+                                name: true,
+                                phoneNumber: true,
+                                status: true,
+                                group: {
+                                    select: {
+                                        id: true,
+                                        name: true
+                                    }
                                 }
                             }
                         }
                     }
+                },
+                group: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                recorder: {
+                    select: {
+                        name: true
+                    }
                 }
             },
-            group: {
-                select: {
-                    id: true,
-                    name: true
+            orderBy: {
+                date: 'desc'
+            },
+            take: 10
+        }),
+        db.attendanceSession.findMany({
+            where: {
+                type: "SATURDAY_FELLOWSHIP",
+                date: {
+                    gte: startOfToday,
+                    lt: startOfTomorrow
                 }
             },
-            recorder: {
-                select: {
-                    name: true
-                }
+            select: {
+                id: true,
+                groupId: true,
             }
-        },
-        orderBy: {
-            date: 'desc'
-        },
-        take: 10
-    })
+        })
+    ])
+
+    const todaysSaturdayGroupIds = todaysSaturdaySessions
+        .map((s) => s.groupId)
+        .filter((id): id is string => !!id)
 
     return (
         <div className="space-y-8">
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-bold tracking-tight">Attendance Management</h1>
-                <p className="text-muted-foreground">Track consistency and growth across all fellowship groups.</p>
+                <p className="text-muted-foreground">
+                    Focus on today&apos;s Saturday Fellowship attendance first, then other gatherings.
+                </p>
             </div>
 
             <AttendanceClient
@@ -137,6 +165,7 @@ export default async function AttendancePage() {
                 leaders={leaders as any}
                 recentSessions={recentSessions as any}
                 userRole={session.user.role}
+                todaysSaturdayGroupIds={todaysSaturdayGroupIds}
             />
         </div>
     )
