@@ -133,6 +133,15 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const [deleteRecordDialog, setDeleteRecordDialog] = useState<{ open: boolean; recordId: string | null; memberName: string }>({ open: false, recordId: null, memberName: "" })
     const [deleteSessionDialog, setDeleteSessionDialog] = useState<{ open: boolean; sessionId: string | null; sessionName: string }>({ open: false, sessionId: null, sessionName: "" })
     const [isDeleting, setIsDeleting] = useState(false)
+    
+    // Filter state for Member Attendance Details
+    const [memberDetailFilter, setMemberDetailFilter] = useState<{
+        attendanceStatus: "ALL" | "PRESENT" | "ABSENT" | "LATE"
+        memberStatus: "ALL" | "PRELIMINARY" | "SEMI_CONSISTENT" | "ESTABLISHED"
+    }>({
+        attendanceStatus: "ALL",
+        memberStatus: "ALL"
+    })
 
     // Use localStorage to persist session state
     const [sessionState, setSessionState] = useLocalStorage<SessionState | null>("attendance_session", null)
