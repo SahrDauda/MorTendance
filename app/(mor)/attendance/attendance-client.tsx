@@ -1057,42 +1057,61 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                 </Card>
 
                 {/* Recent Attendance Sessions */}
-                {recentSessions.length > 0 && (
-                    <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
-                        <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 bg-muted/20 px-4 md:px-6 py-4">
-                            <div>
-                                <CardTitle className="text-base md:text-lg font-medium">Recent Attendance Sessions</CardTitle>
-                                <p className="text-xs text-muted-foreground">Click on a session to view member details</p>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-2"
-                                onClick={() => exportAttendanceToExcel(recentSessions)}
-                            >
-                                <Download className="h-4 w-4" />
-                                Export All Sessions
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <Table>
-                                    <TableHeader className="bg-muted/10">
-                                        <TableRow className="border-border/50">
-                                            <TableHead className="font-bold uppercase tracking-wider text-[10px] w-8"></TableHead>
-                                            <TableHead className="font-bold uppercase tracking-wider text-[10px]">Date</TableHead>
-                                            <TableHead className="font-bold uppercase tracking-wider text-[10px]">Group</TableHead>
-                                            <TableHead className="font-bold uppercase tracking-wider text-[10px]">Type</TableHead>
-                                            <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Present</TableHead>
-                                            <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Absent</TableHead>
-                                            <TableHead className="font-bold uppercase tracking-wider text-[10px]">Recorded By</TableHead>
-                                            {isAdminLikeRole && (
-                                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center w-16">Actions</TableHead>
-                                            )}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {recentSessions.map((session) => {
+                {(() => {
+                    // Filter sessions: only show today's sessions if they're marked as complete
+                    // Older sessions (from previous days) are always shown
+                    const todayKey = date.toISOString().split('T')[0]
+                    const todaysCompletedSet = new Set(completedGroupsByDate[todayKey] || [])
+                    
+                    const filteredRecentSessions = recentSessions.filter(session => {
+                        const sessionDateKey = new Date(session.date).toISOString().split('T')[0]
+                        const isToday = sessionDateKey === todayKey
+                        
+                        if (isToday && session.groupId) {
+                            // For today's sessions, only show if group is marked as complete
+                            return todaysCompletedSet.has(session.groupId)
+                        }
+                        
+                        // For older sessions, always show them
+                        return true
+                    })
+                    
+                    return filteredRecentSessions.length > 0 && (
+                        <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+                            <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 bg-muted/20 px-4 md:px-6 py-4">
+                                <div>
+                                    <CardTitle className="text-base md:text-lg font-medium">Recent Attendance Sessions</CardTitle>
+                                    <p className="text-xs text-muted-foreground">Click on a session to view member details</p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2"
+                                    onClick={() => exportAttendanceToExcel(filteredRecentSessions)}
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Export All Sessions
+                                </Button>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader className="bg-muted/10">
+                                            <TableRow className="border-border/50">
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px] w-8"></TableHead>
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px]">Date</TableHead>
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px]">Group</TableHead>
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px]">Type</TableHead>
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Present</TableHead>
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Absent</TableHead>
+                                                <TableHead className="font-bold uppercase tracking-wider text-[10px]">Recorded By</TableHead>
+                                                {isAdminLikeRole && (
+                                                    <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center w-16">Actions</TableHead>
+                                                )}
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredRecentSessions.map((session) => {
                                             const presentCount = session.records.filter(r => r.isPresent).length
                                             const absentCount = session.records.filter(r => !r.isPresent).length
                                             const isExpanded = expandedSessionId === session.id
@@ -1278,7 +1297,8 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                             </div>
                         </CardContent>
                     </Card>
-                )}
+                    )
+                })()}
 
                 <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 bg-muted/20 px-4 md:px-6 py-4 sticky top-0 z-10 backdrop-blur-md">

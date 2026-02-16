@@ -100,10 +100,15 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
 
     const [newMemberName, setNewMemberName] = useState("")
     const [newMemberPhone, setNewMemberPhone] = useState("")
-    const [newMemberGroupId, setNewMemberGroupId] = useState(groups[0]?.id || "")
-    const [newMemberBranchId, setNewMemberBranchId] = useState<string>("none")
+    const [newMemberBranchId, setNewMemberBranchId] = useState<string>("")
+    const [newMemberGroupId, setNewMemberGroupId] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+
+    // Filter groups based on selected branch
+    const availableGroups = newMemberBranchId
+        ? groups.filter(group => group.branch?.id === newMemberBranchId)
+        : []
 
     const handleBulkImportMembers = async (data: any[]) => {
         const membersToImport = data.map(row => {
@@ -139,8 +144,8 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
     })
 
     const handleAddMember = async () => {
-        if (!newMemberName || !newMemberGroupId) {
-            toast.error("Please fill in all fields")
+        if (!newMemberName || !newMemberBranchId || !newMemberGroupId) {
+            toast.error("Please fill in all required fields (Name, Branch, and Group)")
             return
         }
 
@@ -150,14 +155,14 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                 name: newMemberName,
                 phoneNumber: newMemberPhone || undefined,
                 groupId: newMemberGroupId,
-                branchId: newMemberBranchId === "none" ? undefined : newMemberBranchId
+                branchId: newMemberBranchId
             })
             toast.success("Member added successfully")
             setIsAddDialogOpen(false)
             setNewMemberName("")
             setNewMemberPhone("")
-            setNewMemberGroupId(groups[0]?.id || "")
-            setNewMemberBranchId("none")
+            setNewMemberBranchId("")
+            setNewMemberGroupId("")
             setTimeout(() => window.location.reload(), 500)
         } catch (error) {
             toast.error("Failed to add member")
@@ -447,31 +452,56 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                                 />
                                             </div>
                                             <div className="grid gap-2">
-                                                <label className="text-sm font-medium">Ministry Group</label>
-                                                <Select value={newMemberGroupId} onValueChange={setNewMemberGroupId}>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select group" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {groups.map(group => (
-                                                            <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <label className="text-sm font-medium">Branch (Optional)</label>
-                                                <Select value={newMemberBranchId} onValueChange={setNewMemberBranchId}>
+                                                <label className="text-sm font-medium">
+                                                    Branch <span className="text-destructive">*</span>
+                                                </label>
+                                                <Select 
+                                                    value={newMemberBranchId} 
+                                                    onValueChange={(value) => {
+                                                        setNewMemberBranchId(value)
+                                                        // Reset group selection when branch changes
+                                                        setNewMemberGroupId("")
+                                                    }}
+                                                >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Select branch" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="none">None</SelectItem>
                                                         {branches.map(branch => (
                                                             <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <label className="text-sm font-medium">
+                                                    Ministry Group <span className="text-destructive">*</span>
+                                                </label>
+                                                <Select 
+                                                    value={newMemberGroupId} 
+                                                    onValueChange={setNewMemberGroupId}
+                                                    disabled={!newMemberBranchId}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder={newMemberBranchId ? "Select group" : "Select branch first"} />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {availableGroups.length > 0 ? (
+                                                            availableGroups.map(group => (
+                                                                <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
+                                                            ))
+                                                        ) : (
+                                                            <SelectItem value="none" disabled>
+                                                                {newMemberBranchId ? "No groups found in this branch" : "Select a branch first"}
+                                                            </SelectItem>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                {newMemberBranchId && availableGroups.length === 0 && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        No groups found in this branch. Please create a group first.
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <DialogFooter>
