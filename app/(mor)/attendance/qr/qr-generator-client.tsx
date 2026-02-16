@@ -19,7 +19,6 @@ interface QRGeneratorClientProps {
 
 export function QRGeneratorClient({ branches }: QRGeneratorClientProps) {
     const [selectedBranch, setSelectedBranch] = useState<string>(branches[0]?.id || "")
-    const [eventType, setEventType] = useState<string>("SATURDAY_FELLOWSHIP")
     const [baseUrl, setBaseUrl] = useState<string>("")
     const [copied, setCopied] = useState(false)
 
@@ -27,6 +26,8 @@ export function QRGeneratorClient({ branches }: QRGeneratorClientProps) {
         setBaseUrl(window.location.origin)
     }, [])
 
+    // For now, we focus QR check-in on Saturday Fellowship only
+    const eventType = "SATURDAY_FELLOWSHIP"
     const checkInUrl = `${baseUrl}/check-in?branchId=${selectedBranch}&type=${eventType}`
 
     const handleCopy = () => {
@@ -46,8 +47,8 @@ export function QRGeneratorClient({ branches }: QRGeneratorClientProps) {
         <div className="grid gap-8 md:grid-cols-2">
             <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
                 <CardHeader>
-                    <CardTitle>Configuration</CardTitle>
-                    <CardDescription>Select the branch and event type for the QR code.</CardDescription>
+                    <CardTitle>Saturday Fellowship QR</CardTitle>
+                    <CardDescription>Select the branch to generate a Saturday Fellowship check-in QR.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
@@ -60,21 +61,6 @@ export function QRGeneratorClient({ branches }: QRGeneratorClientProps) {
                                 {branches.map(branch => (
                                     <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
                                 ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Event Type</label>
-                        <Select value={eventType} onValueChange={setEventType}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select event type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="SATURDAY_FELLOWSHIP">Saturday Fellowship</SelectItem>
-                                <SelectItem value="LEADERSHIP_MEETING">Leadership Meeting</SelectItem>
-                                <SelectItem value="CBS">CBS</SelectItem>
-                                <SelectItem value="EVANGELISM">Evangelism</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

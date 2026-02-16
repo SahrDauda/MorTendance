@@ -22,8 +22,10 @@ export default async function QRPage() {
     return (
         <div className="space-y-8">
             <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold tracking-tight">QR Code Generator</h1>
-                <p className="text-muted-foreground">Generate static QR codes for branch check-ins.</p>
+                <h1 className="text-3xl font-bold tracking-tight">Saturday Fellowship QR</h1>
+                <p className="text-muted-foreground">
+                    Generate a simple QR code for Saturday Fellowship self check-in, per branch.
+                </p>
             </div>
 
             <QRGeneratorClient branches={branches} />

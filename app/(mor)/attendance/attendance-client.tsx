@@ -499,7 +499,8 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
         ? (allMembers.reduce((acc, m) => acc + (m._count?.attendance || 0), 0) / allMembers.length).toFixed(1)
         : 0
 
-    const showSaturdayOverview = eventType === EventType.SATURDAY_FELLOWSHIP && totalGroups > 0
+    const isAdminLikeRole = ["SUPER_ADMIN", "ADMIN", "BRANCH_HEAD", "COORDINATOR"].includes(userRole)
+    const showSaturdayOverview = isAdminLikeRole && eventType === EventType.SATURDAY_FELLOWSHIP && totalGroups > 0
 
     return (
         <>
