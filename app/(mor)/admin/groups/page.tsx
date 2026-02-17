@@ -27,6 +27,14 @@ export default async function GroupsPage() {
             where: {
                 role: { in: ["SENIOR_LEADER", "JUNIOR_LEADER", "PROBATION_LEADER"] }
             },
+            include: {
+                managedBranch: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+            },
             orderBy: { name: 'asc' }
         })
     ])

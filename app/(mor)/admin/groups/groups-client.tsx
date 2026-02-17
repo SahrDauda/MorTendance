@@ -30,7 +30,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { toast } from "sonner"
-import { addGroupAction } from "../actions"
+import { addGroupAction, updateGroupAction } from "../actions"
 
 interface Group {
     id: string
@@ -45,7 +45,14 @@ interface Group {
 interface GroupsClientProps {
     initialGroups: Group[]
     branches: { id: string, name: string }[]
-    leaders: { id: string, name: string }[]
+    leaders: {
+        id: string
+        name: string
+        managedBranch?: {
+            id: string
+            name: string
+        } | null
+    }[]
 }
 
 export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientProps) {
@@ -54,12 +61,21 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
     const [isSaving, setIsSaving] = useState(false)
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+    const [newGroupBranchId, setNewGroupBranchId] = useState<string>("")
+    const [isEditMode, setIsEditMode] = useState(false)
+    const [editName, setEditName] = useState("")
+    const [editBranchId, setEditBranchId] = useState<string>("")
+    const [editLeaderId, setEditLeaderId] = useState<string>("")
 
     const filteredGroups = initialGroups.filter(group =>
         group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         group.branch?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         group.leader?.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
+
+    const filteredLeadersForNewGroup = newGroupBranchId
+        ? leaders.filter((leader) => leader.managedBranch?.id === newGroupBranchId)
+        : []
 
     const handleAddGroup = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -113,7 +129,13 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Branch</label>
-                                    <Select name="branchId" required>
+                                    <Select
+                                        name="branchId"
+                                        required
+                                        onValueChange={(value) => {
+                                            setNewGroupBranchId(value)
+                                        }}
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select branch" />
                                         </SelectTrigger>
@@ -126,12 +148,23 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Leader (Optional)</label>
-                                    <Select name="leaderId">
+                                    <Select
+                                        name="leaderId"
+                                        disabled={!newGroupBranchId || filteredLeadersForNewGroup.length === 0}
+                                    >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Select leader" />
+                                            <SelectValue
+                                                placeholder={
+                                                    !newGroupBranchId
+                                                        ? "Select branch first"
+                                                        : filteredLeadersForNewGroup.length === 0
+                                                            ? "No leaders in this branch"
+                                                            : "Select leader"
+                                                }
+                                            />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {leaders.map(l => (
+                                            {filteredLeadersForNewGroup.map(l => (
                                                 <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -162,11 +195,15 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
                         </TableHeader>
                         <TableBody>
                             {filteredGroups.map((group) => (
-                                <TableRow 
-                                    key={group.id} 
+                                <TableRow
+                                    key={group.id}
                                     className="border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
                                     onClick={() => {
                                         setSelectedGroup(group)
+                                        setEditName(group.name)
+                                        setEditBranchId(group.branchId || "")
+                                        setEditLeaderId(group.leaderId || "")
+                                        setIsEditMode(false)
                                         setIsDetailDialogOpen(true)
                                     }}
                                 >
@@ -215,46 +252,164 @@ export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientP
                     {selectedGroup && (
                         <>
                             <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <Users className="h-5 w-5 text-primary" />
-                                    {selectedGroup.name}
+                                <DialogTitle className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Users className="h-5 w-5 text-primary" />
+                                        <span>{selectedGroup.name}</span>
+                                    </div>
+                                    <Button
+                                        variant={isEditMode ? "outline" : "default"}
+                                        size="sm"
+                                        onClick={() => setIsEditMode((prev) => !prev)}
+                                    >
+                                        {isEditMode ? "Cancel Edit" : "Edit Group"}
+                                    </Button>
                                 </DialogTitle>
                             </DialogHeader>
                             <div className="space-y-6 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Branch</p>
-                                        <p className="text-sm font-semibold">
-                                            {selectedGroup.branch ? (
-                                                <Badge variant="secondary" className="bg-muted/50 font-medium text-xs gap-1">
-                                                    <Building2 className="h-3 w-3" /> {selectedGroup.branch.name}
-                                                </Badge>
-                                            ) : (
-                                                <span className="text-muted-foreground italic">No Branch</span>
-                                            )}
-                                        </p>
+                                {isEditMode ? (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+                                                Group Name
+                                            </label>
+                                            <Input
+                                                value={editName}
+                                                onChange={(e) => setEditName(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+                                                    Branch
+                                                </label>
+                                                <Select
+                                                    value={editBranchId}
+                                                    onValueChange={(value) => {
+                                                        setEditBranchId(value)
+                                                        setEditLeaderId("")
+                                                    }}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select branch" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {branches.map((b) => (
+                                                            <SelectItem key={b.id} value={b.id}>
+                                                                {b.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+                                                    Leader
+                                                </label>
+                                                <Select
+                                                    value={editLeaderId || ""}
+                                                    onValueChange={(value) => setEditLeaderId(value)}
+                                                    disabled={!editBranchId}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue
+                                                            placeholder={
+                                                                !editBranchId
+                                                                    ? "Select branch first"
+                                                                    : "Select leader"
+                                                            }
+                                                        />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {leaders
+                                                            .filter((leader) => leader.managedBranch?.id === editBranchId)
+                                                            .map((leader) => (
+                                                                <SelectItem key={leader.id} value={leader.id}>
+                                                                    {leader.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Leader</p>
-                                        <p className="text-sm font-semibold">
-                                            {selectedGroup.leader ? (
-                                                <div className="flex items-center gap-2">
-                                                    <User className="h-4 w-4 text-muted-foreground" />
-                                                    {selectedGroup.leader.name}
-                                                </div>
-                                            ) : (
-                                                <span className="text-muted-foreground italic">Unassigned</span>
-                                            )}
-                                        </p>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Branch</p>
+                                            <p className="text-sm font-semibold">
+                                                {selectedGroup.branch ? (
+                                                    <Badge variant="secondary" className="bg-muted/50 font-medium text-xs gap-1">
+                                                        <Building2 className="h-3 w-3" /> {selectedGroup.branch.name}
+                                                    </Badge>
+                                                ) : (
+                                                    <span className="text-muted-foreground italic">No Branch</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Leader</p>
+                                            <p className="text-sm font-semibold">
+                                                {selectedGroup.leader ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <User className="h-4 w-4 text-muted-foreground" />
+                                                        {selectedGroup.leader.name}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted-foreground italic">Unassigned</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Total Members</p>
+                                            <p className="text-sm font-semibold text-primary">{selectedGroup._count.members}</p>
+                                        </div>
                                     </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Total Members</p>
-                                        <p className="text-sm font-semibold text-primary">{selectedGroup._count.members}</p>
-                                    </div>
-                                </div>
+                                )}
                             </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>Close</Button>
+                            <DialogFooter className="flex items-center justify-between">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsDetailDialogOpen(false)
+                                        setIsEditMode(false)
+                                    }}
+                                >
+                                    Close
+                                </Button>
+                                {isEditMode && (
+                                    <Button
+                                        onClick={async () => {
+                                            if (!editName.trim() || !editBranchId) {
+                                                toast.error("Group name and branch are required")
+                                                return
+                                            }
+                                            setIsSaving(true)
+                                            try {
+                                                const result = await updateGroupAction({
+                                                    id: selectedGroup.id,
+                                                    name: editName.trim(),
+                                                    branchId: editBranchId,
+                                                    leaderId: editLeaderId || undefined,
+                                                })
+                                                if (result.error) {
+                                                    toast.error(result.error)
+                                                } else {
+                                                    toast.success("Group updated successfully")
+                                                    setIsDetailDialogOpen(false)
+                                                    setIsEditMode(false)
+                                                }
+                                            } catch (error) {
+                                                toast.error("Failed to update group")
+                                            } finally {
+                                                setIsSaving(false)
+                                            }
+                                        }}
+                                        disabled={isSaving}
+                                    >
+                                        {isSaving ? "Saving..." : "Save Changes"}
+                                    </Button>
+                                )}
                             </DialogFooter>
                         </>
                     )}

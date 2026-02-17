@@ -218,6 +218,36 @@ export async function addGroupAction(formData: any) {
     }
 }
 
+export async function updateGroupAction(data: {
+    id: string
+    name: string
+    branchId: string
+    leaderId?: string | null
+}) {
+    const session = await auth()
+    if (!session || session.user.role !== "ADMIN") {
+        throw new Error("Unauthorized")
+    }
+
+    try {
+        const updatedGroup = await db.ministryGroup.update({
+            where: { id: data.id },
+            data: {
+                name: data.name,
+                branchId: data.branchId,
+                leaderId: data.leaderId || undefined,
+            },
+        })
+
+        await logAction("UPDATE", "MINISTRY_GROUP", updatedGroup.id, `Updated group: ${updatedGroup.name}`)
+
+        revalidatePath("/admin/groups")
+        return { success: true, group: updatedGroup }
+    } catch (error: any) {
+        return { error: error.message || "Failed to update group" }
+    }
+}
+
 export async function getUsersAction() {
     const session = await auth()
     if (!session || session.user.role !== "ADMIN") {
