@@ -7,414 +7,245 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Search, Building2, User, Users } from "lucide-react"
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-    DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select"
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 import { toast } from "sonner"
-import { addGroupAction, updateGroupAction } from "../actions"
+import { addGroupAction } from "../actions"
 
 interface Group {
-    id: string
-    name: string
-    branchId?: string
-    leaderId?: string
-    branch?: { name: string }
-    leader?: { name: string }
-    _count: { members: number }
+  id: string
+  name: string
+  branchId?: string
+  leaderId?: string
+  branch?: { name: string }
+  leader?: { name: string }
+  _count: { members: number }
 }
 
 interface GroupsClientProps {
-    initialGroups: Group[]
-    branches: { id: string, name: string }[]
-    leaders: {
-        id: string
-        name: string
-        managedBranch?: {
-            id: string
-            name: string
-        } | null
-    }[]
+  initialGroups: Group[]
+  branches: { id: string; name: string }[]
+  leaders: {
+    id: string
+    name: string
+    managedBranch?: { id: string; name: string } | null
+  }[]
 }
 
-export function GroupsClient({ initialGroups, branches, leaders }: GroupsClientProps) {
-    const [searchTerm, setSearchTerm] = useState("")
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-    const [isSaving, setIsSaving] = useState(false)
-    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
-    const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
-    const [newGroupBranchId, setNewGroupBranchId] = useState<string>("")
-    const [isEditMode, setIsEditMode] = useState(false)
-    const [editName, setEditName] = useState("")
-    const [editBranchId, setEditBranchId] = useState<string>("")
-    const [editLeaderId, setEditLeaderId] = useState<string>("")
+export function GroupsClient({
+  initialGroups,
+  branches,
+  leaders,
+}: GroupsClientProps) {
+  const [groups, setGroups] = useState<Group[]>(initialGroups)
+  const [searchTerm, setSearchTerm] = useState("")
 
-    const filteredGroups = initialGroups.filter(group =>
-        group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        group.branch?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        group.leader?.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+
+  const [newGroupName, setNewGroupName] = useState("")
+  const [newGroupBranchId, setNewGroupBranchId] = useState("")
+  const [newGroupLeaderId, setNewGroupLeaderId] = useState("")
+
+  const [isSaving, setIsSaving] = useState(false)
+
+  // ✅ SAFE FILTER
+  const filteredGroups = groups.filter((group) => {
+    const term = searchTerm.toLowerCase()
+    return (
+      group.name.toLowerCase().includes(term) ||
+      group.branch?.name?.toLowerCase().includes(term) ||
+      group.leader?.name?.toLowerCase().includes(term)
     )
+  })
 
-    const filteredLeadersForNewGroup = newGroupBranchId
-        ? leaders.filter((leader) => leader.managedBranch?.id === newGroupBranchId)
-        : []
+  const filteredLeadersForNew = newGroupBranchId
+    ? leaders.filter((l) => l.managedBranch?.id === newGroupBranchId)
+    : []
 
-    const handleAddGroup = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        setIsSaving(true)
-        const formData = new FormData(e.currentTarget)
-        const data = Object.fromEntries(formData.entries())
+  // =============================
+  // ADD GROUP
+  // =============================
 
-        try {
-            const result = await addGroupAction(data)
-            if (result.error) {
-                toast.error(result.error)
-            } else {
-                toast.success("Group added successfully")
-                setIsAddDialogOpen(false)
-            }
-        } catch (error) {
-            toast.error("An unexpected error occurred")
-        } finally {
-            setIsSaving(false)
-        }
+  const handleAddGroup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (isSaving) return
+
+    if (!newGroupName.trim()) {
+      toast.error("Group name is required")
+      return
     }
 
-    return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search groups, branches, or leaders..."
-                        className="pl-9 bg-background/50 border-border/50"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
+    if (!newGroupBranchId) {
+      toast.error("Branch is required")
+      return
+    }
 
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="gap-2 shadow-lg shadow-primary/20">
-                            <Plus className="h-4 w-4" /> Add Ministry Group
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[400px]">
-                        <form onSubmit={handleAddGroup}>
-                            <DialogHeader>
-                                <DialogTitle>Add New Ministry Group</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Group Name</label>
-                                    <Input name="name" placeholder="e.g. Youth Fellowship" required />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Branch</label>
-                                    <Select
-                                        name="branchId"
-                                        required
-                                        onValueChange={(value) => {
-                                            setNewGroupBranchId(value)
-                                        }}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select branch" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {branches.map(b => (
-                                                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Leader (Optional)</label>
-                                    <Select
-                                        name="leaderId"
-                                        disabled={!newGroupBranchId || filteredLeadersForNewGroup.length === 0}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue
-                                                placeholder={
-                                                    !newGroupBranchId
-                                                        ? "Select branch first"
-                                                        : filteredLeadersForNewGroup.length === 0
-                                                            ? "No leaders in this branch"
-                                                            : "Select leader"
-                                                }
-                                            />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {filteredLeadersForNewGroup.map(l => (
-                                                <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                                <Button type="submit" disabled={isSaving}>
-                                    {isSaving ? "Saving..." : "Add Group"}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </div>
+    setIsSaving(true)
 
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="border-border/50 bg-muted/20">
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px]">Group Name</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px]">Branch</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px]">Leader</TableHead>
-                                <TableHead className="font-bold uppercase tracking-wider text-[10px] text-center">Members</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredGroups.map((group) => (
-                                <TableRow
-                                    key={group.id}
-                                    className="border-border/50 hover:bg-primary/5 transition-colors cursor-pointer"
-                                    onClick={() => {
-                                        setSelectedGroup(group)
-                                        setEditName(group.name)
-                                        setEditBranchId(group.branchId || "")
-                                        setEditLeaderId(group.leaderId || "")
-                                        setIsEditMode(false)
-                                        setIsDetailDialogOpen(true)
-                                    }}
-                                >
-                                    <TableCell className="font-semibold">
-                                        <div className="flex items-center gap-2">
-                                            <Users className="h-4 w-4 text-primary" />
-                                            {group.name}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        {group.branch ? (
-                                            <Badge variant="secondary" className="bg-muted/50 font-medium text-[10px] gap-1">
-                                                <Building2 className="h-3 w-3" /> {group.branch.name}
-                                            </Badge>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground italic">No Branch</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {group.leader ? (
-                                            <div className="flex items-center gap-2 text-sm">
-                                                <User className="h-3 w-3 text-muted-foreground" />
-                                                <span>{group.leader.name}</span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground italic">Unassigned</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-center font-bold text-primary">
-                                        {group._count.members}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                    {filteredGroups.length === 0 && (
-                        <div className="p-12 text-center text-muted-foreground">
-                            No ministry groups found.
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+    try {
+      const result: any = await addGroupAction({
+        name: newGroupName.trim(),
+        branchId: newGroupBranchId,
+        leaderId: newGroupLeaderId || undefined,
+      })
 
-            <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-                <DialogContent className="sm:max-w-[600px]">
-                    {selectedGroup && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <Users className="h-5 w-5 text-primary" />
-                                        <span>{selectedGroup.name}</span>
-                                    </div>
-                                    <Button
-                                        variant={isEditMode ? "outline" : "default"}
-                                        size="sm"
-                                        onClick={() => setIsEditMode((prev) => !prev)}
-                                    >
-                                        {isEditMode ? "Cancel Edit" : "Edit Group"}
-                                    </Button>
-                                </DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-6 py-4">
-                                {isEditMode ? (
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                                                Group Name
-                                            </label>
-                                            <Input
-                                                value={editName}
-                                                onChange={(e) => setEditName(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                                                    Branch
-                                                </label>
-                                                <Select
-                                                    value={editBranchId}
-                                                    onValueChange={(value) => {
-                                                        setEditBranchId(value)
-                                                        setEditLeaderId("")
-                                                    }}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select branch" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {branches.map((b) => (
-                                                            <SelectItem key={b.id} value={b.id}>
-                                                                {b.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                                                    Leader
-                                                </label>
-                                                <Select
-                                                    value={editLeaderId || ""}
-                                                    onValueChange={(value) => setEditLeaderId(value)}
-                                                    disabled={!editBranchId}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue
-                                                            placeholder={
-                                                                !editBranchId
-                                                                    ? "Select branch first"
-                                                                    : "Select leader"
-                                                            }
-                                                        />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {leaders
-                                                            .filter((leader) => leader.managedBranch?.id === editBranchId)
-                                                            .map((leader) => (
-                                                                <SelectItem key={leader.id} value={leader.id}>
-                                                                    {leader.name}
-                                                                </SelectItem>
-                                                            ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Branch</p>
-                                            <p className="text-sm font-semibold">
-                                                {selectedGroup.branch ? (
-                                                    <Badge variant="secondary" className="bg-muted/50 font-medium text-xs gap-1">
-                                                        <Building2 className="h-3 w-3" /> {selectedGroup.branch.name}
-                                                    </Badge>
-                                                ) : (
-                                                    <span className="text-muted-foreground italic">No Branch</span>
-                                                )}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Leader</p>
-                                            <p className="text-sm font-semibold">
-                                                {selectedGroup.leader ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <User className="h-4 w-4 text-muted-foreground" />
-                                                        {selectedGroup.leader.name}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground italic">Unassigned</span>
-                                                )}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Total Members</p>
-                                            <p className="text-sm font-semibold text-primary">{selectedGroup._count.members}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <DialogFooter className="flex items-center justify-between">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setIsDetailDialogOpen(false)
-                                        setIsEditMode(false)
-                                    }}
-                                >
-                                    Close
-                                </Button>
-                                {isEditMode && (
-                                    <Button
-                                        onClick={async () => {
-                                            if (!editName.trim() || !editBranchId) {
-                                                toast.error("Group name and branch are required")
-                                                return
-                                            }
-                                            setIsSaving(true)
-                                            try {
-                                                const result = await updateGroupAction({
-                                                    id: selectedGroup.id,
-                                                    name: editName.trim(),
-                                                    branchId: editBranchId,
-                                                    leaderId: editLeaderId || undefined,
-                                                })
-                                                if (result.error) {
-                                                    toast.error(result.error)
-                                                } else {
-                                                    toast.success("Group updated successfully")
-                                                    setIsDetailDialogOpen(false)
-                                                    setIsEditMode(false)
-                                                }
-                                            } catch (error) {
-                                                toast.error("Failed to update group")
-                                            } finally {
-                                                setIsSaving(false)
-                                            }
-                                        }}
-                                        disabled={isSaving}
-                                    >
-                                        {isSaving ? "Saving..." : "Save Changes"}
-                                    </Button>
-                                )}
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+
+      toast.success("Group added successfully")
+
+      if (result.group) {
+        const created = result.group
+        const branchMeta = branches.find((b) => b.id === created.branchId)
+        const leaderMeta = leaders.find((l) => l.id === created.leaderId)
+
+        setGroups((prev) => [
+          ...prev,
+          {
+            id: created.id,
+            name: created.name,
+            branchId: created.branchId,
+            leaderId: created.leaderId || undefined,
+            branch: branchMeta ? { name: branchMeta.name } : undefined,
+            leader: leaderMeta ? { name: leaderMeta.name } : undefined,
+            _count: { members: 0 },
+          },
+        ])
+      }
+
+      resetAddForm()
+    } catch {
+      toast.error("Unexpected error")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const resetAddForm = () => {
+    setNewGroupName("")
+    setNewGroupBranchId("")
+    setNewGroupLeaderId("")
+    setIsAddDialogOpen(false)
+  }
+
+  // =============================
+  // UI
+  // =============================
+
+  return (
+    <div className="space-y-6">
+
+      {/* SEARCH + ADD */}
+      <div className="flex justify-between gap-4">
+        <div className="relative w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search groups..."
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-    )
+
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Ministry Group
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <form onSubmit={handleAddGroup} className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>Add New Ministry Group</DialogTitle>
+              </DialogHeader>
+
+              <Input
+                placeholder="Group Name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+              />
+
+              <Select
+                value={newGroupBranchId}
+                onValueChange={(v) => {
+                  setNewGroupBranchId(v)
+                  setNewGroupLeaderId("")
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={resetAddForm}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Add Group"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* TABLE */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Group</TableHead>
+                <TableHead>Branch</TableHead>
+                <TableHead>Leader</TableHead>
+                <TableHead>Members</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredGroups.map((group) => (
+                <TableRow key={group.id}>
+                  <TableCell>{group.name}</TableCell>
+                  <TableCell>{group.branch?.name || "—"}</TableCell>
+                  <TableCell>{group.leader?.name || "—"}</TableCell>
+                  <TableCell>{group._count.members}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+    </div>
+  )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search, MoreHorizontal, UserPlus, Calendar, Users, UserCheck, TrendingUp, Download, LayoutGrid, List, Building2, Shield, Upload } from "lucide-react"
+import { Search, MoreHorizontal, UserPlus, Calendar, Users, UserCheck, TrendingUp, Download, LayoutGrid, List, Building2, Shield, Upload, Pencil } from "lucide-react"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -40,6 +40,7 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BulkImportDialog } from "@/components/shared/bulk-import-dialog"
 import { addMemberAction, bulkAddMembersAction } from "./actions"
+import { updateGroupAction } from "../admin/actions"
 
 interface Member {
     id: string
@@ -104,6 +105,13 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
     const [newMemberGroupId, setNewMemberGroupId] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+
+    // Group edit state (admin only)
+    const [isEditGroupDialogOpen, setIsEditGroupDialogOpen] = useState(false)
+    const [editingGroup, setEditingGroup] = useState<Group | null>(null)
+    const [editGroupName, setEditGroupName] = useState("")
+    const [editGroupBranchId, setEditGroupBranchId] = useState<string>("")
+    const [isSavingGroup, setIsSavingGroup] = useState(false)
 
     // Filter groups based on selected branch
     const availableGroups = newMemberBranchId
@@ -291,6 +299,50 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
     const totalGroups = groups.length
     const groupsWithLeaders = groups.filter(g => g.leader).length
     const totalGroupMembers = groups.reduce((acc, g) => acc + (g._count?.members || 0), 0)
+
+    const openEditGroupDialog = (group: Group) => {
+        setEditingGroup(group)
+        setEditGroupName(group.name)
+        setEditGroupBranchId(group.branch?.id || "")
+        setIsEditGroupDialogOpen(true)
+    }
+
+    const handleUpdateGroup = async () => {
+        if (!editingGroup) return
+        if (!editGroupName.trim()) {
+            toast.error("Group name is required")
+            return
+        }
+        if (!editGroupBranchId) {
+            toast.error("Branch is required")
+            return
+        }
+
+        setIsSavingGroup(true)
+        try {
+            const result: any = await updateGroupAction({
+                id: editingGroup.id,
+                name: editGroupName.trim(),
+                branchId: editGroupBranchId,
+                leaderId: editingGroup.leader?.id,
+            })
+
+            if (result?.error) {
+                toast.error(result.error)
+                return
+            }
+
+            toast.success("Group updated successfully")
+            // Reload to reflect latest data everywhere
+            setTimeout(() => {
+                window.location.reload()
+            }, 400)
+        } catch {
+            toast.error("Failed to update group")
+        } finally {
+            setIsSavingGroup(false)
+        }
+    }
 
     return (
         <>
@@ -798,9 +850,21 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                                 </div>
                                                 {group.name}
                                             </CardTitle>
-                                            <Badge variant="secondary" className="font-bold">
-                                                {group._count?.members || 0} Members
-                                            </Badge>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="secondary" className="font-bold">
+                                                    {group._count?.members || 0} Members
+                                                </Badge>
+                                                {userRole === "ADMIN" && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 rounded-full hover:bg-primary/10"
+                                                        onClick={() => openEditGroupDialog(group)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
@@ -817,14 +881,6 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                             </div>
                                         </div>
 
-                                        <div className="pt-4 flex items-center gap-2 border-t border-border/50">
-                                            <Button variant="outline" size="sm" className="flex-1 h-9 rounded-xl border-border/50 hover:bg-primary/5">
-                                                Edit Group
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-destructive hover:bg-destructive/5">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </div>
                                     </CardContent>
                                 </Card>
                             ))}
@@ -838,6 +894,86 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {/* Edit Group Dialog (admin only) */}
+            <Dialog
+                open={isEditGroupDialogOpen}
+                onOpenChange={(open) => {
+                    setIsEditGroupDialogOpen(open)
+                    if (!open) {
+                        setEditingGroup(null)
+                        setEditGroupName("")
+                        setEditGroupBranchId("")
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[420px]">
+                    {editingGroup && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>Edit Group</DialogTitle>
+                                <DialogDescription>
+                                    Update the group name and branch. Leader stays the same.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-2">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                        Group Name
+                                    </label>
+                                    <Input
+                                        value={editGroupName}
+                                        onChange={(e) => setEditGroupName(e.target.value)}
+                                        placeholder="e.g. Youth Fellowship"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                        Branch
+                                    </label>
+                                    <Select
+                                        value={editGroupBranchId}
+                                        onValueChange={setEditGroupBranchId}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select branch" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {branches.map((branch) => (
+                                                <SelectItem key={branch.id} value={branch.id}>
+                                                    {branch.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1 text-xs text-muted-foreground">
+                                    <p>
+                                        <span className="font-semibold">Current leader:</span>{" "}
+                                        {editingGroup.leader?.name || "No leader assigned"}
+                                    </p>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsEditGroupDialogOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleUpdateGroup}
+                                    disabled={isSavingGroup}
+                                >
+                                    {isSavingGroup ? "Saving..." : "Save Changes"}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* Member Detail Dialog */}
             <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
