@@ -611,6 +611,8 @@ export async function bulkCreatePreliminaryMembersAction(data: {
                     }
                 })
                 createdMembers.push(newMember)
+            } else {
+                createdMembers.push(existing)
             }
         }
 

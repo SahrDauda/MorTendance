@@ -1898,6 +1898,8 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                 newMembersMapping[m.name.toLowerCase()] = m.id;
                                             });
                                             createdCount += result.count || result.createdMembers.length;
+                                        } else {
+                                            throw new Error(result.error || `Failed to create members for group: ${groupId}`);
                                         }
                                     }
 

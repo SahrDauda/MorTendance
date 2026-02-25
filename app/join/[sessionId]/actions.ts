@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { Gender } from "@prisma/client"
 
 // Mark an existing member as present in a session
 export async function memberCheckInAction(sessionId: string, memberId: string) {
@@ -43,13 +44,14 @@ export async function memberCheckInAction(sessionId: string, memberId: string) {
     }
 }
 
-// Register a first-timer and mark them present in the session
 export async function firstTimerCheckInAction(data: {
     sessionId: string
     name: string
+    phoneNumber?: string
+    gender?: Gender
     invitedBy?: string
 }) {
-    const { sessionId, name, invitedBy } = data
+    const { sessionId, name, phoneNumber, gender, invitedBy } = data
 
     if (!sessionId || !name?.trim()) {
         return { error: "Session ID and name are required" }
@@ -84,6 +86,8 @@ export async function firstTimerCheckInAction(data: {
             const newMember = await tx.member.create({
                 data: {
                     name: name.trim(),
+                    phoneNumber: phoneNumber?.trim() || null,
+                    gender: gender || null,
                     groupId,
                     branchId: session.branchId,
                     status: "PRELIMINARY"

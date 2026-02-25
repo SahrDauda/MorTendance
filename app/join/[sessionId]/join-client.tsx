@@ -9,6 +9,7 @@ import { CheckCircle2, UserPlus, Search, Loader2, ArrowLeft, ArrowRight, UserChe
 import { memberCheckInAction, firstTimerCheckInAction } from "./actions"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Member {
     id: string
@@ -39,6 +40,8 @@ export function JoinClient({
 
     // First timer form state
     const [newcomerName, setNewcomerName] = useState("")
+    const [phoneNumber, setPhoneNumber] = useState("")
+    const [gender, setGender] = useState<"MALE" | "FEMALE" | "">("")
     const [invitedBy, setInvitedBy] = useState("")
 
     const filteredMembers = useMemo(() => {
@@ -77,7 +80,9 @@ export function JoinClient({
             const result = await firstTimerCheckInAction({
                 sessionId,
                 name: newcomerName,
-                invitedBy
+                phoneNumber: phoneNumber.trim() || undefined,
+                gender: gender || undefined,
+                invitedBy: invitedBy && invitedBy !== 'none' ? invitedBy : undefined
             })
 
             if (result.success) {
@@ -159,15 +164,44 @@ export function JoinClient({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="invitedBy">Who invited you? (Optional)</Label>
+                            <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
                             <Input
-                                id="invitedBy"
-                                placeholder="Name of the person who invited you"
-                                value={invitedBy}
-                                onChange={e => setInvitedBy(e.target.value)}
+                                id="phoneNumber"
+                                type="tel"
+                                placeholder="Your phone number"
+                                value={phoneNumber}
+                                onChange={e => setPhoneNumber(e.target.value)}
                                 className="h-12 rounded-xl"
                                 disabled={isSubmitting}
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="gender">Gender</Label>
+                            <Select value={gender} onValueChange={(val: "MALE" | "FEMALE") => setGender(val)} disabled={isSubmitting}>
+                                <SelectTrigger className="h-12 rounded-xl text-base" id="gender">
+                                    <SelectValue placeholder="Select gender" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="MALE">Male</SelectItem>
+                                    <SelectItem value="FEMALE">Female</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="invitedBy">Who invited you? (Optional)</Label>
+                            <Select value={invitedBy} onValueChange={setInvitedBy} disabled={isSubmitting}>
+                                <SelectTrigger className="h-12 rounded-xl text-base" id="invitedBy">
+                                    <SelectValue placeholder="Select a member..." />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-[250px]">
+                                    <SelectItem value="none">None / Walk-in</SelectItem>
+                                    {initialMembers.slice().sort((a, b) => a.name.localeCompare(b.name)).map(m => (
+                                        <SelectItem key={m.id} value={m.name}>
+                                            {m.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <Button
                             type="submit"
