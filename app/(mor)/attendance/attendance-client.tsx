@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { format, getDay } from "date-fns"
-import { Calendar as CalendarIcon, Check, X, Save, Loader2, Users, TrendingUp, UserCheck, Download, Plus, Search as SearchIcon, MoreHorizontal, Upload, QrCode, Copy, Printer, CheckCircle2, Trash2 } from "lucide-react"
+import { Download, Upload, Plus, Users, CalendarIcon, Trash2, Edit2, Loader2, ArrowRight, UserCheck, TrendingUp, HelpCircle, Save, QrCode, Printer, CheckCircle2, Copy, X, ExternalLink, Search as SearchIcon, Check } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,12 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { BulkImportDialog } from "@/components/shared/bulk-import-dialog"
-import { saveAttendanceAction, bulkSaveAttendanceAction, cleanupDuplicateAttendanceAction, deleteAttendanceRecordAction, deleteAttendanceSessionAction } from "./actions"
+import {
+    saveAttendanceAction, bulkSaveAttendanceAction, cleanupDuplicateAttendanceAction, deleteAttendanceRecordAction,
+    deleteAttendanceSessionAction,
+    getOrCreateSessionForQRAction,
+    bulkCreatePreliminaryMembersAction
+} from "./actions"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 
 interface Member {
@@ -125,15 +130,29 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const [isAddAttendanceOpen, setIsAddAttendanceOpen] = useState(false)
     const [memberSearchTerm, setMemberSearchTerm] = useState("")
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+    // Custom Bulk Import State
+    const [missingMembersToImport, setMissingMembersToImport] = useState<{ name: string, groupName: string, groupId: string }[]>([])
+    const [pendingImportSessions, setPendingImportSessions] = useState<any[]>([])
+    const [isMissingMembersDialogOpen, setIsMissingMembersDialogOpen] = useState(false)
+    const [isCreatingMissingMembers, setIsCreatingMissingMembers] = useState(false)
+
+    // QR Generator State
     const [isQRModalOpen, setIsQRModalOpen] = useState(false)
-    const [selectedBranchForQR, setSelectedBranchForQR] = useState<string>(branches[0]?.id || "")
+    const [selectedBranchForQR, setSelectedBranchForQR] = useState<string>("")
+    const [qrSessionId, setQrSessionId] = useState<string | null>(null)
+    const [isGeneratingQR, setIsGeneratingQR] = useState(false)
     const [qrCopied, setQrCopied] = useState(false)
+
+    // Reset QR session ID when modal opens/closes or branch changes
+    useEffect(() => {
+        setQrSessionId(null)
+    }, [isQRModalOpen, selectedBranchForQR])
     const [mounted, setMounted] = useState(false)
     const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
     const [deleteRecordDialog, setDeleteRecordDialog] = useState<{ open: boolean; recordId: string | null; memberName: string }>({ open: false, recordId: null, memberName: "" })
     const [deleteSessionDialog, setDeleteSessionDialog] = useState<{ open: boolean; sessionId: string | null; sessionName: string }>({ open: false, sessionId: null, sessionName: "" })
     const [isDeleting, setIsDeleting] = useState(false)
-    
+
     // Filter state for Member Attendance Details
     const [memberDetailFilter, setMemberDetailFilter] = useState<{
         attendanceStatus: "ALL" | "PRESENT" | "ABSENT" | "LATE"
@@ -150,7 +169,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     // Track explicitly completed groups (groups where user clicked "Complete Attendance")
     // Key: date string, Value: Set of completed group IDs for that date
     const [completedGroupsByDate, setCompletedGroupsByDate] = useLocalStorage<Record<string, string[]>>("completed_groups_by_date", {})
-    
+
     // Get today's date key
     const todayKey = date.toISOString().split('T')[0]
     const todaysCompletedGroupIds = completedGroupsByDate[todayKey] || []
@@ -163,7 +182,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
     useEffect(() => {
         setMounted(true)
-        
+
         // Restore session state from localStorage FIRST (before setting defaults)
         if (sessionState) {
             const sessionDate = new Date(sessionState.date)
@@ -215,7 +234,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
             const today = new Date()
             today.setHours(0, 0, 0, 0)
             const todayKey = today.toISOString().split('T')[0]
-            
+
             // Clean up completed groups from previous days (keep only today and future dates)
             const cleanedCompletedGroups: Record<string, string[]> = {}
             Object.keys(completedGroupsByDate).forEach(dateKey => {
@@ -252,7 +271,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     // This ensures the session persists even if user navigates away
     useEffect(() => {
         if (!mounted) return
-        
+
         if (isSessionActive) {
             setSessionState({
                 isActive: true,
@@ -273,50 +292,186 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
         }
     }, [isSessionActive, date, eventType, selectedGroupId, selectedLocationId, cutoffTime, notes, attendance, mounted])
 
-    const handleBulkImportAttendance = async (data: any[]) => {
-        // Group data by Date, EventType, and GroupName
-        const sessionsMap: Record<string, any> = {}
+    const proceedWithImport = async (newMembersMapping: Record<string, string> = {}) => {
+        setIsCreatingMissingMembers(true);
+        try {
+            // Apply new members mapping to pending sessions
+            const finalSessions = pendingImportSessions.map(session => ({
+                ...session,
+                records: session.records.map((r: any) => ({
+                    targetId: r.memberId || newMembersMapping[r.tempName?.toLowerCase()],
+                    isPresent: r.isPresent
+                })).filter((r: any) => r.targetId).map((r: any) => ({
+                    memberId: r.targetId,
+                    isPresent: r.isPresent
+                }))
+            })).filter(s => s.records.length > 0);
 
-        data.forEach(row => {
-            const dateStr = row.Date?.toString()
-            const typeStr = row.EventType?.toString().toUpperCase()
-            const groupName = row.GroupName?.toString()
-            const memberName = row.MemberName?.toString()
-            const phone = row.Phone?.toString()
-            const isPresent = row.IsPresent?.toString().toLowerCase() === "true" || row.IsPresent === 1 || row.IsPresent === "yes"
+            if (finalSessions.length === 0) {
+                toast.error("No valid attendance records left to save.");
+                return;
+            }
 
-            if (!dateStr || !typeStr || !groupName || !memberName) return
+            const result = await bulkSaveAttendanceAction(finalSessions);
+            if (result.success) {
+                setIsMissingMembersDialogOpen(false);
+                setPendingImportSessions([]);
+                setIsImportDialogOpen(false);
+                router.refresh();
+            } else {
+                toast.error(result.error || "Failed to import");
+            }
+        } catch (error: any) {
+            toast.error(error.message || "Failed to import");
+        } finally {
+            setIsCreatingMissingMembers(false);
+        }
+    }
 
-            const key = `${dateStr}_${typeStr}_${groupName}`
-            if (!sessionsMap[key]) {
-                const group = initialGroups.find(g => g.name.toLowerCase() === groupName.toLowerCase())
-                if (!group) throw new Error(`Group "${groupName}" not found`)
+    const handleBulkImportAttendance = async (data: any) => {
+        const isStandard = Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0]) && ('MemberName' in data[0]);
+        let sessionsMap: Record<string, any> = {}
+        const newMissingMembers: { name: string, groupName: string, groupId: string }[] = [];
 
-                sessionsMap[key] = {
-                    groupId: group.id,
-                    type: typeStr as EventType,
-                    date: new Date(dateStr),
-                    records: []
+        if (isStandard) {
+            data.forEach(row => {
+                const dateStr = row.Date?.toString()
+                const typeStr = row.EventType?.toString().toUpperCase()
+                const groupName = row.GroupName?.toString()
+                const memberName = row.MemberName?.toString()
+                const phone = row.Phone?.toString()
+                const isPresent = row.IsPresent?.toString().toLowerCase() === "true" || row.IsPresent === 1 || row.IsPresent === "yes"
+
+                if (!dateStr || !typeStr || !groupName || !memberName) return
+
+                const key = `${dateStr}_${typeStr}_${groupName}`
+                if (!sessionsMap[key]) {
+                    const group = initialGroups.find(g => g.name.toLowerCase() === groupName.toLowerCase())
+                    if (!group) throw new Error(`Group "${groupName}" not found`)
+
+                    sessionsMap[key] = {
+                        groupId: group.id,
+                        type: typeStr as EventType,
+                        date: new Date(dateStr),
+                        records: []
+                    }
                 }
-            }
 
-            const member = allMembers.find(m =>
-                m.name.toLowerCase() === memberName.toLowerCase() &&
-                (!phone || m.phoneNumber === phone)
-            )
+                const member = allMembers.find(m =>
+                    m.name.toLowerCase() === memberName.toLowerCase() &&
+                    (!phone || m.phoneNumber === phone)
+                )
 
-            if (member) {
-                sessionsMap[key].records.push({
-                    memberId: member.id,
-                    isPresent
-                })
-            }
-        })
+                if (member) {
+                    sessionsMap[key].records.push({ memberId: member.id, isPresent })
+                }
+            })
+        } else {
+            const allSheets = Array.isArray(data) ? data[0] : data;
+            if (!allSheets) throw new Error("Invalid format");
 
-        const sessionsToSave = Object.values(sessionsMap)
-        if (sessionsToSave.length === 0) throw new Error("No valid attendance records found in file")
+            Object.entries(allSheets).forEach(([sheetName, rows]) => {
+                if (!sheetName.toLowerCase().includes("group")) return;
+                const sheetData = rows as any[][];
+                if (!sheetData || sheetData.length < 5) return;
 
-        return await bulkSaveAttendanceAction(sessionsToSave)
+                const groupNameFromSheet = sheetName.replace(/group/i, "").trim();
+                const group = initialGroups.find(g => g.name.toLowerCase().includes(groupNameFromSheet.toLowerCase()) || groupNameFromSheet.toLowerCase().includes(g.name.toLowerCase()));
+                if (!group) return;
+
+                const monthRow = sheetData[0] || [];
+                const weekRow = sheetData[2] || [];
+
+                const validCols: { colIndex: number, date: Date, type: EventType }[] = [];
+                let currentMonthStr = "";
+                const monthMap: Record<string, number> = {
+                    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11
+                };
+
+                const targetYear = date.getFullYear();
+
+                for (let c = 2; c < Math.min(weekRow.length, monthRow.length > 0 ? monthRow.length : 100); c++) {
+                    if (monthRow[c] && typeof monthRow[c] === 'string') {
+                        currentMonthStr = monthRow[c].toLowerCase().replace(/[^a-z]/g, '');
+                    }
+                    const weekHeader = weekRow[c]?.toString();
+                    if (!weekHeader?.toLowerCase().startsWith("week")) continue;
+
+                    const currentMonthIndex = monthMap[currentMonthStr.substring(0, 3)] ?? monthMap[currentMonthStr];
+                    if (currentMonthIndex === undefined) continue;
+
+                    const weekNum = parseInt(weekHeader.replace(/\D/g, ""), 10);
+                    if (isNaN(weekNum)) continue;
+
+                    let d: Date;
+                    if (weekNum > 5) {
+                        d = new Date(targetYear, 0, 1);
+                        while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+                        d.setDate(d.getDate() + (weekNum - 1) * 7);
+                    } else {
+                        d = new Date(targetYear, currentMonthIndex, 1);
+                        while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
+                        d.setDate(d.getDate() + (weekNum - 1) * 7);
+                    }
+
+                    validCols.push({ colIndex: c, date: d, type: EventType.SATURDAY_FELLOWSHIP });
+                }
+
+                for (let r = 4; r < sheetData.length; r++) {
+                    const memberName = sheetData[r][0]?.toString().trim();
+                    if (!memberName || memberName.toLowerCase() === 'leaders') continue;
+
+                    const existingMember = allMembers.find(m => m.name.toLowerCase() === memberName.toLowerCase() && m.groupId === group.id);
+
+                    if (!existingMember && !newMissingMembers.some(nm => nm.name.toLowerCase() === memberName.toLowerCase())) {
+                        newMissingMembers.push({ name: memberName, groupName: group.name, groupId: group.id });
+                    }
+
+                    for (const col of validCols) {
+                        const cellVal = sheetData[r][col.colIndex]?.toString().trim().toUpperCase();
+                        if (cellVal === 'PR') {
+                            const dateKey = col.date.toISOString().split('T')[0];
+                            const sessionKey = `${dateKey}_${col.type}_${group.id}`;
+
+                            if (!sessionsMap[sessionKey]) {
+                                sessionsMap[sessionKey] = {
+                                    groupId: group.id,
+                                    type: col.type,
+                                    date: col.date,
+                                    records: []
+                                };
+                            }
+
+                            sessionsMap[sessionKey].records.push({
+                                memberId: existingMember?.id,
+                                tempName: memberName,
+                                isPresent: true
+                            });
+                        }
+                    }
+                }
+            });
+        }
+
+        const sessionsToSave = Object.values(sessionsMap);
+
+        if (newMissingMembers.length > 0) {
+            setMissingMembersToImport(newMissingMembers);
+            setPendingImportSessions(sessionsToSave);
+            setIsMissingMembersDialogOpen(true);
+            return { success: true };
+        }
+
+        if (sessionsToSave.length === 0) throw new Error("No valid attendance records found in file");
+
+        const result = await bulkSaveAttendanceAction(sessionsToSave);
+        if (result.success) {
+            setIsImportDialogOpen(false);
+            router.refresh();
+        } else {
+            throw new Error(result.error || "Failed to import");
+        }
+        return { success: result.success, count: result.sessionsCount };
     }
 
     const selectedGroup = initialGroups.find(g => g.id === selectedGroupId)
@@ -1453,55 +1608,102 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
                         {selectedBranchForQR && mounted && (
                             <div className="flex flex-col items-center gap-4 p-6 bg-muted/30 rounded-xl">
-                                <div className="bg-white p-4 rounded-2xl shadow-lg">
-                                    <QRCodeSVG
-                                        value={`${window.location.origin}/check-in?branchId=${selectedBranchForQR}&type=SATURDAY_FELLOWSHIP`}
-                                        size={200}
-                                        level="H"
-                                        includeMargin={true}
-                                    />
-                                </div>
-                                <div className="text-center space-y-1">
-                                    <p className="font-semibold text-lg">
-                                        {branches.find(b => b.id === selectedBranchForQR)?.name || "Branch"}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                        Saturday Fellowship
-                                    </p>
-                                </div>
-                                <div className="flex gap-2 w-full">
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1 gap-2"
-                                        onClick={() => {
-                                            const checkInUrl = `${window.location.origin}/check-in?branchId=${selectedBranchForQR}&type=SATURDAY_FELLOWSHIP`
-                                            navigator.clipboard.writeText(checkInUrl)
-                                            setQrCopied(true)
-                                            toast.success("Check-in link copied!")
-                                            setTimeout(() => setQrCopied(false), 2000)
-                                        }}
-                                    >
-                                        {qrCopied ? (
-                                            <>
-                                                <CheckCircle2 className="h-4 w-4" />
-                                                Copied!
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="h-4 w-4" />
-                                                Copy Link
-                                            </>
-                                        )}
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1 gap-2"
-                                        onClick={() => window.print()}
-                                    >
-                                        <Printer className="h-4 w-4" />
-                                        Print
-                                    </Button>
-                                </div>
+                                {!qrSessionId ? (
+                                    <div className="w-full space-y-4 text-center">
+                                        <div className="p-6 rounded-full bg-muted inline-block">
+                                            <QrCode className="h-16 w-16 text-muted-foreground opacity-50" />
+                                        </div>
+                                        <Button
+                                            className="w-full gap-2 h-12 text-lg font-bold"
+                                            onClick={async () => {
+                                                setIsGeneratingQR(true)
+                                                try {
+                                                    const result = await getOrCreateSessionForQRAction({
+                                                        branchId: selectedBranchForQR,
+                                                        groupId: selectedGroupId === "all" ? undefined : selectedGroupId,
+                                                        type: eventType
+                                                    })
+                                                    if (result.success && result.sessionId) {
+                                                        setQrSessionId(result.sessionId)
+                                                        toast.success("Attendance session prepared!")
+                                                    } else {
+                                                        toast.error(result.error || "Failed to prepare session")
+                                                    }
+                                                } catch (error: any) {
+                                                    toast.error("Failed to generate QR")
+                                                } finally {
+                                                    setIsGeneratingQR(false)
+                                                }
+                                            }}
+                                            disabled={isGeneratingQR}
+                                        >
+                                            {isGeneratingQR ? (
+                                                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Preparing...</>
+                                            ) : (
+                                                "Generate QR for Today"
+                                            )}
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="bg-white p-4 rounded-2xl shadow-lg">
+                                            <QRCodeSVG
+                                                value={`https://morsystem.vercel.app/join/${qrSessionId}`}
+                                                size={200}
+                                                level="H"
+                                                includeMargin={true}
+                                            />
+                                        </div>
+                                        <div className="p-3 bg-muted/50 rounded-xl border border-border/50 break-all w-full text-center">
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold mb-1">Production Link</p>
+                                            <p className="text-xs font-mono">https://morsystem.vercel.app/join/{qrSessionId}</p>
+                                        </div>
+                                        <div className="text-center space-y-1">
+                                            <p className="font-semibold text-lg">
+                                                {branches.find(b => b.id === selectedBranchForQR)?.name || "Branch"}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                                                {eventType.replace(/_/g, ' ')}
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-2 w-full">
+                                            <Button
+                                                variant="outline"
+                                                className="flex-1 gap-2 border-primary/20 hover:bg-primary/5"
+                                                onClick={() => {
+                                                    const checkInUrl = `https://morsystem.vercel.app/join/${qrSessionId}`
+                                                    navigator.clipboard.writeText(checkInUrl)
+                                                    setQrCopied(true)
+                                                    toast.success("Check-in link copied!")
+                                                    setTimeout(() => setQrCopied(false), 2000)
+                                                }}
+                                            >
+                                                {qrCopied ? (
+                                                    <><CheckCircle2 className="h-4 w-4 text-green-500" /> Copied!</>
+                                                ) : (
+                                                    <><Copy className="h-4 w-4" /> Copy Link</>
+                                                )}
+                                            </Button>
+                                            <Button
+                                                className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-white"
+                                                onClick={() => {
+                                                    const localUrl = `${window.location.origin}/join/${qrSessionId}`
+                                                    window.open(localUrl, '_blank')
+                                                }}
+                                            >
+                                                <ExternalLink className="h-4 w-4" /> Demo
+                                            </Button>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full mt-2"
+                                            onClick={() => setQrSessionId(null)}
+                                        >
+                                            Reset
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1516,7 +1718,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <p className="text-sm text-muted-foreground">
-                            Are you sure you want to delete the attendance record for <strong>{deleteRecordDialog.memberName}</strong>? 
+                            Are you sure you want to delete the attendance record for <strong>{deleteRecordDialog.memberName}</strong>?
                             This action cannot be undone and will be logged in the audit trail.
                         </p>
                     </div>
@@ -1570,7 +1772,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <p className="text-sm text-muted-foreground">
-                            Are you sure you want to delete the entire attendance session for <strong>{deleteSessionDialog.sessionName}</strong>? 
+                            Are you sure you want to delete the entire attendance session for <strong>{deleteSessionDialog.sessionName}</strong>?
                             This will delete all attendance records in this session. This action cannot be undone and will be logged in the audit trail.
                         </p>
                     </div>
@@ -1620,8 +1822,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                 isOpen={isImportDialogOpen}
                 onOpenChange={setIsImportDialogOpen}
                 title="Import Attendance"
-                description="Upload a CSV or Excel file with attendance records. MemberName and GroupName must match existing records."
+                description="Upload the standard CSV, or a full database Excel file (e.g. Eastern Branch or Empowerment format). Member names will be automatically mapped."
                 templateHeaders={["MemberName", "Phone", "Date", "EventType", "IsPresent", "GroupName"]}
+                parseMode="raw-all-sheets"
                 sampleData={[
                     {
                         MemberName: "John Doe",
@@ -1634,6 +1837,87 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                 ]}
                 onImport={handleBulkImportAttendance}
             />
+
+            {/* Missing Members Dialog */}
+            <Dialog open={isMissingMembersDialogOpen} onOpenChange={(open) => !isCreatingMissingMembers && setIsMissingMembersDialogOpen(open)}>
+                <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Missing Members Found</DialogTitle>
+                        <p className="text-sm text-muted-foreground mt-2">
+                            The following members were found in the Excel file but do not exist in the system yet.
+                            They will be created as "Preliminary" members before importing attendance.
+                        </p>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="bg-muted/30 p-4 rounded-xl border border-border/50 max-h-[40vh] overflow-y-auto space-y-2">
+                            {missingMembersToImport.map((m, i) => (
+                                <div key={i} className="flex justify-between items-center text-sm p-3 rounded-lg bg-background border border-border/50">
+                                    <span className="font-semibold text-foreground">{m.name}</span>
+                                    <span className="text-xs text-muted-foreground font-medium px-2 py-1 bg-primary/10 rounded-full">{m.groupName}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setIsMissingMembersDialogOpen(false);
+                                setMissingMembersToImport([]);
+                            }}
+                            disabled={isCreatingMissingMembers}
+                        >
+                            Cancel Import
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                setIsCreatingMissingMembers(true);
+                                try {
+                                    const newMembersMapping: Record<string, string> = {};
+                                    const branchId = branches[0]?.id as string;
+
+                                    const missingByGroup = missingMembersToImport.reduce((acc, m) => {
+                                        if (!acc[m.groupId]) acc[m.groupId] = [];
+                                        acc[m.groupId].push(m.name);
+                                        return acc;
+                                    }, {} as Record<string, string[]>);
+
+                                    let createdCount = 0;
+                                    for (const [groupId, names] of Object.entries(missingByGroup)) {
+                                        const result = await bulkCreatePreliminaryMembersAction({
+                                            branchId,
+                                            groupId,
+                                            names
+                                        });
+                                        if (result.success && result.createdMembers) {
+                                            result.createdMembers.forEach((m: any) => {
+                                                newMembersMapping[m.name.toLowerCase()] = m.id;
+                                            });
+                                            createdCount += result.count || result.createdMembers.length;
+                                        }
+                                    }
+
+                                    toast.success(`Created ${createdCount} missing members. Saving attendance...`);
+                                    await proceedWithImport(newMembersMapping);
+                                } catch (error: any) {
+                                    toast.error(error.message || "Failed to create missing members");
+                                    setIsCreatingMissingMembers(false);
+                                }
+                            }}
+                            disabled={isCreatingMissingMembers}
+                            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                        >
+                            {isCreatingMissingMembers ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating & Importing...</>
+                            ) : (
+                                "Add Members & Continue"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     )
 }

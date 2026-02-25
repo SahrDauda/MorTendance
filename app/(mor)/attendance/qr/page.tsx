@@ -9,15 +9,16 @@ export default async function QRPage() {
         redirect("/auth/signin")
     }
 
-    const branches = await db.branch.findMany({
-        select: {
-            id: true,
-            name: true
-        },
-        orderBy: {
-            name: "asc"
-        }
-    })
+    const [branches, groups] = await Promise.all([
+        db.branch.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: "asc" }
+        }),
+        db.ministryGroup.findMany({
+            select: { id: true, name: true, branchId: true },
+            orderBy: { name: "asc" }
+        })
+    ])
 
     return (
         <div className="space-y-8">
@@ -28,7 +29,7 @@ export default async function QRPage() {
                 </p>
             </div>
 
-            <QRGeneratorClient branches={branches} />
+            <QRGeneratorClient branches={branches} groups={groups} />
         </div>
     )
 }

@@ -15,6 +15,7 @@ export const authConfig = {
                 pathname.startsWith('/auth') ||
                 pathname.startsWith('/api/auth') ||
                 pathname.startsWith('/check-in') || // Allow public check-in
+                pathname.startsWith('/join') ||     // Allow public QR session check-in
                 pathname === '/'
 
             if (isPublicRoute) {

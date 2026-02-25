@@ -266,7 +266,7 @@ export async function cleanupDuplicateAttendanceAction() {
 
         // Group sessions by unique key (group/date/type)
         const sessionGroups = new Map<string, typeof allSessions>()
-        
+
         for (const sess of allSessions) {
             const key = `${sess.groupId || 'null'}_${sess.cbsLocationId || 'null'}_${sess.date.toISOString().split('T')[0]}_${sess.type}`
             if (!sessionGroups.has(key)) {
@@ -344,8 +344,8 @@ export async function cleanupDuplicateAttendanceAction() {
         }
 
         revalidatePath("/attendance")
-        return { 
-            success: true, 
+        return {
+            success: true,
             deletedRecords,
             mergedSessions
         }
@@ -461,9 +461,9 @@ export async function deleteAttendanceRecordAction(recordId: string) {
 
         revalidatePath("/attendance")
         revalidatePath("/dashboard")
-        return { 
-            success: true, 
-            message: `Attendance for ${record.member.name} has been deleted` 
+        return {
+            success: true,
+            message: `Attendance for ${record.member.name} has been deleted`
         }
     } catch (error: any) {
         console.error("Failed to delete attendance record:", error)
@@ -520,12 +520,110 @@ export async function deleteAttendanceSessionAction(sessionId: string) {
 
         revalidatePath("/attendance")
         revalidatePath("/dashboard")
-        return { 
-            success: true, 
-            message: `Attendance session with ${attendanceSession._count.records} records has been deleted` 
+        return {
+            success: true,
+            message: `Attendance session with ${attendanceSession._count.records} records has been deleted`
         }
     } catch (error: any) {
         console.error("Failed to delete attendance session:", error)
         throw new Error(error.message || "Failed to delete attendance session")
     }
 }
+
+export async function getOrCreateSessionForQRAction(data: {
+    branchId: string
+    groupId?: string
+    type: EventType
+}) {
+    const session = await auth()
+    if (!session) throw new Error("Unauthorized")
+
+    try {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        // Find existing session for today
+        let attendanceSession = await db.attendanceSession.findFirst({
+            where: {
+                branchId: data.branchId,
+                groupId: data.groupId || null,
+                type: data.type,
+                date: today,
+            }
+        })
+
+        if (!attendanceSession) {
+            // Create new session if it doesn't exist
+            // We use the current user as the recorder
+            attendanceSession = await db.attendanceSession.create({
+                data: {
+                    branchId: data.branchId,
+                    groupId: data.groupId || undefined,
+                    type: data.type,
+                    date: today,
+                    recorderId: session.user.id,
+                }
+            })
+        }
+
+        return { success: true, sessionId: attendanceSession.id }
+    } catch (error: any) {
+        console.error("Failed to get/create session for QR:", error)
+        return { error: error.message || "Failed to prepare attendance session" }
+    }
+}
+
+export async function bulkCreatePreliminaryMembersAction(data: {
+    branchId: string;
+    groupId: string;
+    names: string[];
+}) {
+    try {
+        const session = await auth()
+        if (!session?.user) {
+            return { error: "Unauthorized" }
+        }
+
+        const validNames = data.names.filter(n => n && n.trim().length > 0)
+
+        if (validNames.length === 0) {
+            return { error: "No valid names provided" }
+        }
+
+        const createdMembers = []
+
+        for (const name of validNames) {
+            // Basic check if already exists by exact name
+            const existing = await db.member.findFirst({
+                where: {
+                    name: { equals: name, mode: 'insensitive' },
+                    branchId: data.branchId
+                }
+            })
+
+            if (!existing) {
+                const newMember = await db.member.create({
+                    data: {
+                        name: name.trim(),
+                        status: "PRELIMINARY",
+                        branchId: data.branchId,
+                        groupId: data.groupId
+                    }
+                })
+                createdMembers.push(newMember)
+            }
+        }
+
+        revalidatePath("/members")
+        revalidatePath("/attendance")
+        return {
+            success: true,
+            count: createdMembers.length,
+            createdMembers: createdMembers.map(m => ({ id: m.id, name: m.name }))
+        }
+    } catch (error: any) {
+        console.error("Failed to bulk create preliminary members:", error)
+        return { error: error.message || "Failed to create missing members" }
+    }
+}
+
