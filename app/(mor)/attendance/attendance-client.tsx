@@ -312,8 +312,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                 return;
             }
 
-            const result = await bulkSaveAttendanceAction(finalSessions);
+            const result = await bulkSaveAttendanceAction(finalSessions) as any;
             if (result.success) {
+                toast.success(`Successfully imported ${result.count || finalSessions.length} sessions.`);
                 setIsMissingMembersDialogOpen(false);
                 setPendingImportSessions([]);
                 setIsImportDialogOpen(false);
@@ -464,14 +465,15 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
         if (sessionsToSave.length === 0) throw new Error("No valid attendance records found in file");
 
-        const result = await bulkSaveAttendanceAction(sessionsToSave);
+        const result = await bulkSaveAttendanceAction(sessionsToSave) as any;
         if (result.success) {
+            toast.success("Import Successful", { description: "Attendance records have been imported." });
             setIsImportDialogOpen(false);
             router.refresh();
         } else {
             throw new Error(result.error || "Failed to import");
         }
-        return { success: result.success, count: result.sessionsCount };
+        return { success: result.success, count: result.count };
     }
 
     const selectedGroup = initialGroups.find(g => g.id === selectedGroupId)
