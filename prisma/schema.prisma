@@ -167,9 +167,13 @@ enum UserRole {
 }
 
 enum MemberStatus {
-  PRELIMINARY
+  LEADER
+  INTENSE
+  CONSISTENT
   SEMI_CONSISTENT
-  ESTABLISHED
+  INCONSISTENT
+  FIRST_TIMER
+  PRELIMINARY
 }
 
 enum EventType {

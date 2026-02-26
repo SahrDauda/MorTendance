@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import * as XLSX from "xlsx"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
-import { EventType } from "@prisma/client"
+import { EventType, MemberStatus } from "@prisma/client"
 import {
     Table,
     TableBody,
@@ -50,8 +50,8 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 interface Member {
     id: string
     name: string
-    status: string
-    phoneNumber?: string
+    status: MemberStatus | string
+    phoneNumber?: string | null
     groupId: string
     group?: { id: string, name: string }
     _count?: { attendance: number }
@@ -133,7 +133,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const [memberSearchTerm, setMemberSearchTerm] = useState("")
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
     // Custom Bulk Import State
-    const [missingMembersToImport, setMissingMembersToImport] = useState<{ name: string, groupName: string, groupId: string }[]>([])
+    const [missingMembersToImport, setMissingMembersToImport] = useState<{ name: string, groupName: string, groupId: string, status?: MemberStatus | string }[]>([])
     const [pendingImportSessions, setPendingImportSessions] = useState<any[]>([])
     const [isMissingMembersDialogOpen, setIsMissingMembersDialogOpen] = useState(false)
     const [isCreatingMissingMembers, setIsCreatingMissingMembers] = useState(false)
@@ -337,7 +337,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const handleBulkImportAttendance = async (data: any) => {
         const isStandard = Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0]) && ('MemberName' in data[0]);
         let sessionsMap: Record<string, any> = {}
-        const newMissingMembers: { name: string, groupName: string, groupId: string }[] = [];
+        const newMissingMembers: { name: string, groupName: string, groupId: string, status?: MemberStatus | string }[] = [];
 
         if (isStandard) {
             data.forEach(row => {
@@ -423,14 +423,32 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                     validCols.push({ colIndex: c, date: d, type: EventType.SATURDAY_FELLOWSHIP });
                 }
 
-                for (let r = 4; r < sheetData.length; r++) {
-                    const memberName = sheetData[r][0]?.toString().trim();
-                    if (!memberName || memberName.toLowerCase() === 'leaders') continue;
+                let currentStatus: MemberStatus | string = "PRELIMINARY";
+                const statusMap: Record<string, string> = {
+                    'leaders': 'LEADER',
+                    'intense': 'INTENSE',
+                    'consistent': 'CONSISTENT',
+                    'semi-consistent': 'SEMI_CONSISTENT',
+                    'inconsistent': 'INCONSISTENT',
+                    'first timer': 'FIRST_TIMER'
+                };
 
+                for (let r = 4; r < sheetData.length; r++) {
+                    const rowVal = sheetData[r][0]?.toString().trim();
+                    if (!rowVal) continue;
+
+                    // Check if this row is a status header
+                    const normalizedRow = rowVal.toLowerCase();
+                    if (statusMap[normalizedRow]) {
+                        currentStatus = statusMap[normalizedRow];
+                        continue;
+                    }
+
+                    const memberName = rowVal;
                     const existingMember = allMembers.find(m => m.name.toLowerCase() === memberName.toLowerCase() && m.groupId === group.id);
 
                     if (!existingMember && !newMissingMembers.some(nm => nm.name.toLowerCase() === memberName.toLowerCase())) {
-                        newMissingMembers.push({ name: memberName, groupName: group.name, groupId: group.id });
+                        newMissingMembers.push({ name: memberName, groupName: group.name, groupId: group.id, status: currentStatus });
                     }
 
                     for (const col of validCols) {
@@ -451,6 +469,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                             sessionsMap[sessionKey].records.push({
                                 memberId: existingMember?.id,
                                 tempName: memberName,
+                                status: currentStatus, // Pass status for potential record creation
                                 isPresent: true
                             });
                         }
@@ -1893,16 +1912,16 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
                                     const missingByGroup = missingMembersToImport.reduce((acc, m) => {
                                         if (!acc[m.groupId]) acc[m.groupId] = [];
-                                        acc[m.groupId].push(m.name);
+                                        acc[m.groupId].push({ name: m.name, status: m.status as MemberStatus });
                                         return acc;
-                                    }, {} as Record<string, string[]>);
+                                    }, {} as Record<string, { name: string, status?: MemberStatus }[]>);
 
                                     let createdCount = 0;
-                                    for (const [groupId, names] of Object.entries(missingByGroup)) {
+                                    for (const [groupId, members] of Object.entries(missingByGroup)) {
                                         const result = await bulkCreatePreliminaryMembersAction({
                                             branchId,
                                             groupId,
-                                            names
+                                            members
                                         });
                                         if (result.success && result.createdMembers) {
                                             result.createdMembers.forEach((m: any) => {

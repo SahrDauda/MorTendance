@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { revalidatePath } from "next/cache"
-import { EventType } from "@prisma/client"
+import { EventType, MemberStatus } from "@prisma/client"
 
 interface AttendanceRecord {
     memberId: string
@@ -576,7 +576,7 @@ export async function getOrCreateSessionForQRAction(data: {
 export async function bulkCreatePreliminaryMembersAction(data: {
     branchId: string;
     groupId: string;
-    names: string[];
+    members: { name: string; status?: MemberStatus }[];
 }) {
     try {
         const session = await auth()
@@ -584,19 +584,24 @@ export async function bulkCreatePreliminaryMembersAction(data: {
             return { error: "Unauthorized" }
         }
 
-        const validNames = data.names.filter(n => n && n.trim().length > 0)
-
-        if (validNames.length === 0) {
-            return { error: "No valid names provided" }
+        if (!data.members || data.members.length === 0) {
+            return { error: "No valid members provided" }
         }
 
         const createdMembers = []
 
-        for (const name of validNames) {
-            // Basic check if already exists by exact name
+        for (const member of data.members) {
+            const { name, status } = member
+            if (!name || name.trim().length === 0) {
+                continue // Skip empty names
+            }
+
+            const memberStatus = status || "PRELIMINARY"
+
             const existing = await db.member.findFirst({
                 where: {
-                    name: { equals: name, mode: 'insensitive' },
+                    name: { equals: name.trim(), mode: 'insensitive' },
+                    groupId: data.groupId,
                     branchId: data.branchId
                 }
             })
@@ -605,14 +610,23 @@ export async function bulkCreatePreliminaryMembersAction(data: {
                 const newMember = await db.member.create({
                     data: {
                         name: name.trim(),
-                        status: "PRELIMINARY",
+                        status: memberStatus,
                         branchId: data.branchId,
                         groupId: data.groupId
                     }
                 })
                 createdMembers.push(newMember)
             } else {
-                createdMembers.push(existing)
+                // Update status if provided or if existing status is PRELIMINARY and new status is different
+                if (status && existing.status !== memberStatus) {
+                    const updatedMember = await db.member.update({
+                        where: { id: existing.id },
+                        data: { status: memberStatus }
+                    })
+                    createdMembers.push(updatedMember)
+                } else {
+                    createdMembers.push(existing)
+                }
             }
         }
 

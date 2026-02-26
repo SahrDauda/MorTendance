@@ -61,6 +61,10 @@ export function JoinClient({
                 setCheckedInName(result.memberName!)
                 setMode("success")
                 toast.success(`Welcome, ${result.memberName}!`)
+                // Redirect after brief delay
+                setTimeout(() => {
+                    window.location.href = "https://morsl.netlify.app"
+                }, 1500)
             } else {
                 toast.error(result.error || "Failed to check in")
             }
@@ -89,6 +93,10 @@ export function JoinClient({
                 setCheckedInName(result.memberName!)
                 setMode("success")
                 toast.success(`Welcome to MOR, ${result.memberName}!`)
+                // Redirect after brief delay
+                setTimeout(() => {
+                    window.location.href = "https://morsl.netlify.app"
+                }, 1500)
             } else {
                 toast.error(result.error || "Registration failed")
             }
