@@ -34,46 +34,86 @@ export function parseGroupAttendanceExcel(
     };
 
     const statusMap: Record<string, MemberStatus> = {
-        'leader': 'LEADER' as MemberStatus,
-        'leaders': 'LEADER' as MemberStatus,
-        'intense': 'INTENSE' as MemberStatus,
-        'consistent': 'CONSISTENT' as MemberStatus,
-        'semi-consistent': 'SEMI_CONSISTENT' as MemberStatus,
-        'inconsistent': 'INCONSISTENT' as MemberStatus,
-        'unstable': 'INCONSISTENT' as MemberStatus,
-        'first timer': 'FIRST_TIMER' as MemberStatus,
-        'first timers': 'FIRST_TIMER' as MemberStatus,
-        'preliminary': 'PRELIMINARY' as MemberStatus
+        'leader': MemberStatus.LEADER,
+        'leaders': MemberStatus.LEADER,
+        'intense': MemberStatus.INTENSE,
+        'consistent': MemberStatus.CONSISTENT,
+        'semi-consistent': MemberStatus.SEMI_CONSISTENT,
+        'inconsistent': MemberStatus.INCONSISTENT,
+        'unstable': MemberStatus.INCONSISTENT,
+        'first timer': MemberStatus.FIRST_TIMER,
+        'first timers': MemberStatus.FIRST_TIMER,
+        'preliminary': MemberStatus.PRELIMINARY
     };
 
     Object.entries(data).forEach(([sheetName, rows]) => {
-        // More lenient sheet detection:
-        // Try to match the sheet name to a group name directly or after removing year/group keywords
-        const normalizedSheet = sheetName.toLowerCase();
+        if (!rows || rows.length < 3) return;
 
-        // Extract Year from sheet name
-        const yearMatch = sheetName.match(/\b(20\d{2})\b/);
-        const targetYear = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+        let group: { id: string, name: string } | undefined = undefined;
+        let targetYear = new Date().getFullYear();
 
-        const cleanSheetName = normalizedSheet
-            .replace(/group/i, "")
-            .replace(/attendance/i, "")
-            .replace(/\b20\d{2}\b/g, "")
-            .trim();
+        // 1. Search for group name and year inside the first 6 rows of the sheet
+        for (let i = 0; i < Math.min(rows.length, 6); i++) {
+            const row = rows[i] || [];
+            for (let j = 0; j < Math.min(row.length, 10); j++) {
+                const cellVal = row[j]?.toString().trim() || "";
+                if (!cellVal) continue;
 
-        if (!cleanSheetName) return;
+                // Try to find year
+                const yearMatch = cellVal.match(/\b(20\d{2})\b/);
+                if (yearMatch) {
+                    targetYear = parseInt(yearMatch[1], 10);
+                }
 
-        const group = initialGroups.find(g => {
-            const normalizedGroupName = g.name.toLowerCase();
-            return normalizedSheet.includes(normalizedGroupName) ||
-                normalizedGroupName.includes(cleanSheetName) ||
-                cleanSheetName.includes(normalizedGroupName);
-        });
+                // Try to find group
+                if (!group) {
+                    const normalizedCell = cellVal.toLowerCase();
+                    const cleanCell = normalizedCell.replace(/group/i, "").replace(/attendance/i, "").trim();
+
+                    group = initialGroups.find(g => {
+                        const gn = g.name.toLowerCase();
+                        return gn === cleanCell || normalizedCell.includes(gn) || cleanCell.includes(gn);
+                    });
+                }
+            }
+        }
+
+        // 2. Fallback to sheet name if not found inside
+        if (!group) {
+            const normalizedSheet = sheetName.toLowerCase();
+            const yearMatch = sheetName.match(/\b(20\d{2})\b/);
+            if (yearMatch) targetYear = parseInt(yearMatch[1], 10);
+
+            const cleanSheetName = normalizedSheet
+                .replace(/group/i, "")
+                .replace(/attendance/i, "")
+                .replace(/\b20\d{2}\b/g, "")
+                .trim();
+
+            if (cleanSheetName) {
+                group = initialGroups.find(g => {
+                    const gn = g.name.toLowerCase();
+                    return normalizedSheet.includes(gn) || gn.includes(cleanSheetName) || cleanSheetName.includes(gn);
+                });
+            }
+        }
 
         if (!group) return;
 
-        const monthRow = rows[0] || [];
-        const weekRow = rows[2] || [];
+        // 3. Coordinate mapping (Find labels and data start)
+        let weekRowIndex = -1;
+        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+            if (rows[i]?.some(cell => cell?.toString().trim().toLowerCase().startsWith("week"))) {
+                weekRowIndex = i;
+                break;
+            }
+        }
+
+        if (weekRowIndex === -1) return;
+
+        const monthRow = rows[weekRowIndex - 2] || [];
+        const weekRow = rows[weekRowIndex] || [];
+        const dataStartRow = weekRowIndex + 2;
 
         const validCols: { colIndex: number, date: Date, label: string }[] = [];
         let currentMonthStr = "";
@@ -107,7 +147,7 @@ export function parseGroupAttendanceExcel(
 
         let currentStatus: MemberStatus = MemberStatus.PRELIMINARY;
 
-        for (let r = 4; r < rows.length; r++) {
+        for (let r = dataStartRow; r < rows.length; r++) {
             const rowVal = rows[r][0]?.toString().trim();
             if (!rowVal) continue;
 
@@ -132,7 +172,6 @@ export function parseGroupAttendanceExcel(
             for (const col of validCols) {
                 const cellVal = rows[r][col.colIndex]?.toString().trim().toUpperCase();
                 if (cellVal === 'PR') {
-                    const sessionKey = `${col.date.toISOString()}_${group.id}`;
                     let session = sessions.find(s => s.groupId === group.id && s.date.getTime() === col.date.getTime());
 
                     if (!session) {
