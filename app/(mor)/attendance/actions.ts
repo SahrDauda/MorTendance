@@ -355,80 +355,7 @@ export async function cleanupDuplicateAttendanceAction() {
     }
 }
 
-export async function bulkSaveAttendanceAction(sessions: SaveAttendanceParams[]) {
-    const session = await auth()
-    if (!session) throw new Error("Unauthorized")
 
-    try {
-        const results = await db.$transaction(async (tx) => {
-            const createdSessions = []
-            for (const s of sessions) {
-                // 1. Deduplicate records for this session to avoid unique constraint failures
-                const uniqueRecordsMap = new Map();
-                s.records.forEach(r => {
-                    if (r.memberId) {
-                        uniqueRecordsMap.set(r.memberId, r);
-                    }
-                });
-                const uniqueRecords = Array.from(uniqueRecordsMap.values());
-
-                if (uniqueRecords.length === 0) {
-                    console.warn(`[bulkSaveAttendanceAction] Skipping session for group ${s.groupId} on ${s.date} - no valid unique records`);
-                    continue;
-                }
-
-                // 2. Determine branchId
-                let effectiveBranchId = s.branchId
-                if (!effectiveBranchId && s.groupId) {
-                    const group = await tx.ministryGroup.findUnique({
-                        where: { id: s.groupId },
-                        select: { branchId: true }
-                    })
-                    effectiveBranchId = group?.branchId || undefined
-                }
-
-                if (!effectiveBranchId && s.groupId) {
-                    const firstMember = await tx.member.findFirst({
-                        where: { groupId: s.groupId },
-                        select: { branchId: true }
-                    })
-                    effectiveBranchId = firstMember?.branchId || undefined
-                }
-
-                if (!effectiveBranchId) {
-                    console.error(`[bulkSaveAttendanceAction] FAILED: Could not determine branchId for group ${s.groupId}. skipping session.`);
-                    continue // Skip if branch cannot be determined
-                }
-
-                const attendanceSession = await tx.attendanceSession.create({
-                    data: {
-                        type: s.type,
-                        date: s.date,
-                        branchId: effectiveBranchId,
-                        groupId: s.groupId,
-                        recorderId: session.user.id,
-                        notes: s.notes,
-                        records: {
-                            create: uniqueRecords.map(r => ({
-                                memberId: r.memberId,
-                                isPresent: r.isPresent
-                            }))
-                        }
-                    }
-                })
-                createdSessions.push(attendanceSession)
-            }
-            return createdSessions
-        })
-
-        revalidatePath("/attendance")
-        revalidatePath("/dashboard")
-        return { success: true, count: results.length }
-    } catch (error: any) {
-        console.error("Failed to bulk save attendance:", error)
-        throw new Error("Failed to bulk save attendance")
-    }
-}
 
 // Delete a single attendance record (admin only)
 export async function deleteAttendanceRecordAction(recordId: string) {
@@ -590,73 +517,100 @@ export async function getOrCreateSessionForQRAction(data: {
     }
 }
 
-export async function bulkCreatePreliminaryMembersAction(data: {
+
+export async function unifiedBulkImportAction(data: {
     branchId: string;
-    groupId: string;
-    members: { name: string; status?: MemberStatus }[];
+    members: { name: string; status: MemberStatus; groupId: string }[];
+    sessions: {
+        groupId: string;
+        type: EventType;
+        date: Date;
+        notes: string;
+        records: { tempName: string; isPresent: boolean }[];
+    }[];
 }) {
+    const session = await auth();
+    if (!session) return { error: "Unauthorized" };
+
     try {
-        const session = await auth()
-        if (!session?.user) {
-            return { error: "Unauthorized" }
-        }
+        const result = await db.$transaction(async (tx) => {
+            const memberIdMap = new Map<string, string>();
 
-        if (!data.members || data.members.length === 0) {
-            return { error: "No valid members provided" }
-        }
-
-        const createdMembers = []
-
-        for (const member of data.members) {
-            const { name, status } = member
-            if (!name || name.trim().length === 0) {
-                continue // Skip empty names
-            }
-
-            const memberStatus = status || "PRELIMINARY"
-
-            const existing = await db.member.findFirst({
-                where: {
-                    name: { equals: name.trim(), mode: 'insensitive' },
-                    groupId: data.groupId,
-                    branchId: data.branchId
-                }
-            })
-
-            if (!existing) {
-                const newMember = await db.member.create({
-                    data: {
-                        name: name.trim(),
-                        status: memberStatus,
-                        branchId: data.branchId,
-                        groupId: data.groupId
+            // 1. Upsert members
+            for (const m of data.members) {
+                const existing = await tx.member.findFirst({
+                    where: {
+                        name: { equals: m.name.trim(), mode: 'insensitive' },
+                        groupId: m.groupId,
+                        branchId: data.branchId
                     }
-                })
-                createdMembers.push(newMember)
-            } else {
-                // Update status if provided or if existing status is PRELIMINARY and new status is different
-                if (status && existing.status !== memberStatus) {
-                    const updatedMember = await db.member.update({
-                        where: { id: existing.id },
-                        data: { status: memberStatus }
-                    })
-                    createdMembers.push(updatedMember)
-                } else {
-                    createdMembers.push(existing)
-                }
-            }
-        }
+                });
 
-        revalidatePath("/members")
-        revalidatePath("/attendance")
-        return {
-            success: true,
-            count: createdMembers.length,
-            createdMembers: createdMembers.map(m => ({ id: m.id, name: m.name }))
-        }
+                let memberId;
+                if (existing) {
+                    await tx.member.update({
+                        where: { id: existing.id },
+                        data: { status: m.status }
+                    });
+                    memberId = existing.id;
+                } else {
+                    const newMember = await tx.member.create({
+                        data: {
+                            name: m.name.trim(),
+                            status: m.status,
+                            groupId: m.groupId,
+                            branchId: data.branchId
+                        }
+                    });
+                    memberId = newMember.id;
+                }
+                memberIdMap.set(`${m.name.trim().toLowerCase()}_${m.groupId}`, memberId);
+            }
+
+            // 2. Process Sessions
+            let createdCount = 0;
+            for (const s of data.sessions) {
+                // Deduplicate records and map to IDs
+                const uniqueRecordsMap = new Map();
+                for (const r of s.records) {
+                    const id = memberIdMap.get(`${r.tempName.trim().toLowerCase()}_${s.groupId}`);
+                    if (id) {
+                        uniqueRecordsMap.set(id, { memberId: id, isPresent: r.isPresent });
+                    }
+                }
+                const uniqueRecords = Array.from(uniqueRecordsMap.values());
+
+                if (uniqueRecords.length === 0) continue;
+
+                await tx.attendanceSession.create({
+                    data: {
+                        type: s.type,
+                        date: s.date,
+                        branchId: data.branchId,
+                        groupId: s.groupId,
+                        recorderId: session.user.id,
+                        notes: s.notes,
+                        records: {
+                            create: uniqueRecords.map(r => ({
+                                memberId: r.memberId,
+                                isPresent: r.isPresent
+                            }))
+                        }
+                    }
+                });
+                createdCount++;
+            }
+
+            return { success: true, count: createdCount };
+        });
+
+        revalidatePath("/members");
+        revalidatePath("/attendance");
+        revalidatePath("/dashboard");
+
+        return result;
     } catch (error: any) {
-        console.error("Failed to bulk create preliminary members:", error)
-        return { error: error.message || "Failed to create missing members" }
+        console.error("Unified bulk import failed:", error);
+        return { error: error.message || "Bulk import failed" };
     }
 }
-

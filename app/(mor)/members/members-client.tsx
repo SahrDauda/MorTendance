@@ -38,8 +38,8 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BulkImportDialog } from "@/components/shared/bulk-import-dialog"
-import { addMemberAction, bulkAddMembersAction } from "./actions"
+import { UnifiedImportDialog } from "@/components/shared/unified-import-dialog"
+import { addMemberAction } from "./actions"
 import { updateGroupAction } from "../admin/actions"
 
 interface Member {
@@ -104,7 +104,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
     const [newMemberBranchId, setNewMemberBranchId] = useState<string>("")
     const [newMemberGroupId, setNewMemberGroupId] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+    const [isUnifiedImportOpen, setIsUnifiedImportOpen] = useState(false)
 
     // Group edit state (admin only)
     const [isEditGroupDialogOpen, setIsEditGroupDialogOpen] = useState(false)
@@ -118,25 +118,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
         ? groups.filter(group => group.branch?.id === newMemberBranchId)
         : []
 
-    const handleBulkImportMembers = async (data: any[]) => {
-        const membersToImport = data.map(row => {
-            const group = groups.find(g => g.name.toLowerCase() === row.GroupName?.toString().toLowerCase())
-            const branch = branches.find(b => b.name.toLowerCase() === row.BranchName?.toString().toLowerCase())
 
-            if (!group) {
-                throw new Error(`Group "${row.GroupName}" not found for member "${row.Name}"`)
-            }
-
-            return {
-                name: row.Name?.toString(),
-                phoneNumber: row.Phone?.toString() || undefined,
-                groupId: group.id,
-                branchId: branch?.id
-            }
-        })
-
-        return await bulkAddMembersAction(membersToImport)
-    }
 
     const filteredMembers = initialMembers.filter(member => {
         const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -466,7 +448,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                 <Button
                                     variant="outline"
                                     className="gap-2"
-                                    onClick={() => setIsImportDialogOpen(true)}
+                                    onClick={() => setIsUnifiedImportOpen(true)}
                                 >
                                     <Upload className="h-4 w-4" />
                                     Bulk Import
@@ -507,8 +489,8 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                                 <label className="text-sm font-medium">
                                                     Branch <span className="text-destructive">*</span>
                                                 </label>
-                                                <Select 
-                                                    value={newMemberBranchId} 
+                                                <Select
+                                                    value={newMemberBranchId}
                                                     onValueChange={(value) => {
                                                         setNewMemberBranchId(value)
                                                         // Reset group selection when branch changes
@@ -529,8 +511,8 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                                 <label className="text-sm font-medium">
                                                     Ministry Group <span className="text-destructive">*</span>
                                                 </label>
-                                                <Select 
-                                                    value={newMemberGroupId} 
+                                                <Select
+                                                    value={newMemberGroupId}
                                                     onValueChange={setNewMemberGroupId}
                                                     disabled={!newMemberBranchId}
                                                 >
@@ -1038,16 +1020,11 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                 </DialogContent>
             </Dialog>
 
-            <BulkImportDialog
-                isOpen={isImportDialogOpen}
-                onOpenChange={setIsImportDialogOpen}
-                title="Import Members"
-                description="Upload a CSV or Excel file with member details. GroupName must match an existing ministry group."
-                templateHeaders={["Name", "Phone", "GroupName", "BranchName"]}
-                sampleData={[
-                    { Name: "John Doe", Phone: "08012345678", GroupName: groups[0]?.name || "Group A", BranchName: branches[0]?.name || "Branch 1" }
-                ]}
-                onImport={handleBulkImportMembers}
+            <UnifiedImportDialog
+                isOpen={isUnifiedImportOpen}
+                onOpenChange={setIsUnifiedImportOpen}
+                branches={branches}
+                groups={groups.map(g => ({ id: g.id, name: g.name }))}
             />
         </>
     )

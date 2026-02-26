@@ -38,12 +38,11 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { BulkImportDialog } from "@/components/shared/bulk-import-dialog"
+import { UnifiedImportDialog } from "@/components/shared/unified-import-dialog"
 import {
-    saveAttendanceAction, bulkSaveAttendanceAction, cleanupDuplicateAttendanceAction, deleteAttendanceRecordAction,
+    saveAttendanceAction, cleanupDuplicateAttendanceAction, deleteAttendanceRecordAction,
     deleteAttendanceSessionAction,
-    getOrCreateSessionForQRAction,
-    bulkCreatePreliminaryMembersAction
+    getOrCreateSessionForQRAction
 } from "./actions"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 
@@ -131,12 +130,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
     const [isAddAttendanceOpen, setIsAddAttendanceOpen] = useState(false)
     const [memberSearchTerm, setMemberSearchTerm] = useState("")
-    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
-    // Custom Bulk Import State
-    const [missingMembersToImport, setMissingMembersToImport] = useState<{ name: string, groupName: string, groupId: string, status?: MemberStatus | string }[]>([])
-    const [pendingImportSessions, setPendingImportSessions] = useState<any[]>([])
-    const [isMissingMembersDialogOpen, setIsMissingMembersDialogOpen] = useState(false)
-    const [isCreatingMissingMembers, setIsCreatingMissingMembers] = useState(false)
+    const [isUnifiedImportOpen, setIsUnifiedImportOpen] = useState(false)
 
     // QR Generator State
     const [isQRModalOpen, setIsQRModalOpen] = useState(false)
@@ -297,222 +291,9 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
         }
     }, [isSessionActive, date, eventType, selectedGroupId, selectedLocationId, cutoffTime, notes, attendance, mounted])
 
-    const proceedWithImport = async (newMembersMapping: Record<string, string> = {}) => {
-        setIsCreatingMissingMembers(true);
-        try {
-            const branchId = branches?.[0]?.id;
-            // Apply new members mapping to pending sessions
-            const finalSessions = pendingImportSessions.map(session => ({
-                ...session,
-                branchId, // Pass the branch ID
-                records: session.records.map((r: any) => ({
-                    targetId: r.memberId || newMembersMapping[r.tempName?.toLowerCase()],
-                    isPresent: r.isPresent
-                })).filter((r: any) => r.targetId).map((r: any) => ({
-                    memberId: r.targetId,
-                    isPresent: r.isPresent
-                }))
-            })).filter(s => s.records.length > 0);
 
-            if (finalSessions.length === 0) {
-                toast.error("No valid attendance records left to save.");
-                return;
-            }
 
-            const result = await bulkSaveAttendanceAction(finalSessions) as any;
-            if (result.success) {
-                const savedCount = result.count || finalSessions.length;
-                toast.success(`Successfully imported ${savedCount} sessions.`);
-                setIsMissingMembersDialogOpen(false);
-                setPendingImportSessions([]);
-                setIsImportDialogOpen(false);
-                router.refresh();
-            } else {
-                toast.error(result.error || "Failed to import");
-            }
-        } catch (error: any) {
-            toast.error(error.message || "Failed to import");
-        } finally {
-            setIsCreatingMissingMembers(false);
-        }
-    }
 
-    const handleBulkImportAttendance = async (data: any) => {
-        const isStandard = Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && !Array.isArray(data[0]) && ('MemberName' in data[0]);
-        let sessionsMap: Record<string, any> = {}
-        const newMissingMembers: { name: string, groupName: string, groupId: string, status?: MemberStatus | string }[] = [];
-
-        if (isStandard) {
-            data.forEach(row => {
-                const dateStr = row.Date?.toString()
-                const typeStr = row.EventType?.toString().toUpperCase()
-                const groupName = row.GroupName?.toString()
-                const memberName = row.MemberName?.toString()
-                const phone = row.Phone?.toString()
-                const isPresent = row.IsPresent?.toString().toLowerCase() === "true" || row.IsPresent === 1 || row.IsPresent === "yes"
-
-                if (!dateStr || !typeStr || !groupName || !memberName) return
-
-                const key = `${dateStr}_${typeStr}_${groupName}`
-                if (!sessionsMap[key]) {
-                    const group = initialGroups.find(g => g.name.toLowerCase() === groupName.toLowerCase())
-                    if (!group) throw new Error(`Group "${groupName}" not found`)
-
-                    sessionsMap[key] = {
-                        groupId: group.id,
-                        type: typeStr as EventType,
-                        date: new Date(dateStr),
-                        records: []
-                    }
-                }
-
-                const member = allMembers.find(m =>
-                    m.name.toLowerCase() === memberName.toLowerCase() &&
-                    (!phone || m.phoneNumber === phone)
-                )
-
-                if (member) {
-                    sessionsMap[key].records.push({ memberId: member.id, isPresent })
-                } else if (memberName) {
-                    // Collect missing member for standard import too
-                    const group = initialGroups.find(g => g.name.toLowerCase() === groupName.toLowerCase())
-                    if (group && !newMissingMembers.some(nm => nm.name.toLowerCase() === memberName.toLowerCase())) {
-                        newMissingMembers.push({ name: memberName, groupName: group.name, groupId: group.id, status: "PRELIMINARY" });
-                    }
-                    sessionsMap[key].records.push({ tempName: memberName, isPresent })
-                }
-            })
-        } else {
-            const allSheets = Array.isArray(data) ? data[0] : data;
-            if (!allSheets) throw new Error("Invalid format");
-
-            Object.entries(allSheets).forEach(([sheetName, rows]) => {
-                if (!sheetName.toLowerCase().includes("group")) return;
-                const sheetData = rows as any[][];
-                if (!sheetData || sheetData.length < 5) return;
-
-                const groupNameFromSheet = sheetName.replace(/group/i, "").trim();
-                const group = initialGroups.find(g => g.name.toLowerCase().includes(groupNameFromSheet.toLowerCase()) || groupNameFromSheet.toLowerCase().includes(g.name.toLowerCase()));
-                if (!group) return;
-
-                const monthRow = sheetData[0] || [];
-                const weekRow = sheetData[2] || [];
-
-                const validCols: { colIndex: number, date: Date, type: EventType }[] = [];
-                let currentMonthStr = "";
-                const monthMap: Record<string, number> = {
-                    jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11
-                };
-
-                const targetYear = date.getFullYear();
-
-                for (let c = 2; c < Math.min(weekRow.length, monthRow.length > 0 ? monthRow.length : 100); c++) {
-                    if (monthRow[c] && typeof monthRow[c] === 'string') {
-                        currentMonthStr = monthRow[c].toLowerCase().replace(/[^a-z]/g, '');
-                    }
-                    const weekHeader = weekRow[c]?.toString();
-                    if (!weekHeader?.toLowerCase().startsWith("week")) continue;
-
-                    const currentMonthIndex = monthMap[currentMonthStr.substring(0, 3)] ?? monthMap[currentMonthStr];
-                    if (currentMonthIndex === undefined) continue;
-
-                    const weekNum = parseInt(weekHeader.replace(/\D/g, ""), 10);
-                    if (isNaN(weekNum)) continue;
-
-                    let d: Date;
-                    if (weekNum > 5) {
-                        d = new Date(targetYear, 0, 1);
-                        while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-                        d.setDate(d.getDate() + (weekNum - 1) * 7);
-                    } else {
-                        d = new Date(targetYear, currentMonthIndex, 1);
-                        while (d.getDay() !== 6) d.setDate(d.getDate() + 1);
-                        d.setDate(d.getDate() + (weekNum - 1) * 7);
-                    }
-
-                    validCols.push({ colIndex: c, date: d, type: EventType.SATURDAY_FELLOWSHIP });
-                }
-
-                let currentStatus: MemberStatus | string = "PRELIMINARY";
-                const statusMap: Record<string, string> = {
-                    'leaders': 'LEADER',
-                    'intense': 'INTENSE',
-                    'consistent': 'CONSISTENT',
-                    'semi-consistent': 'SEMI_CONSISTENT',
-                    'inconsistent': 'INCONSISTENT',
-                    'first timer': 'FIRST_TIMER'
-                };
-
-                for (let r = 4; r < sheetData.length; r++) {
-                    const rowVal = sheetData[r][0]?.toString().trim();
-                    if (!rowVal) continue;
-
-                    // Check if this row is a status header
-                    const normalizedRow = rowVal.toLowerCase();
-                    if (statusMap[normalizedRow]) {
-                        currentStatus = statusMap[normalizedRow];
-                        continue;
-                    }
-
-                    const memberName = rowVal;
-                    const existingMember = allMembers.find(m => m.name.toLowerCase() === memberName.toLowerCase() && m.groupId === group.id);
-
-                    if (!existingMember && !newMissingMembers.some(nm => nm.name.toLowerCase() === memberName.toLowerCase())) {
-                        newMissingMembers.push({ name: memberName, groupName: group.name, groupId: group.id, status: currentStatus });
-                    }
-
-                    for (const col of validCols) {
-                        const cellVal = sheetData[r][col.colIndex]?.toString().trim().toUpperCase();
-                        if (cellVal === 'PR') {
-                            const dateKey = col.date.toISOString().split('T')[0];
-                            const sessionKey = `${dateKey}_${col.type}_${group.id}`;
-
-                            if (!sessionsMap[sessionKey]) {
-                                sessionsMap[sessionKey] = {
-                                    groupId: group.id,
-                                    type: col.type,
-                                    date: col.date,
-                                    records: []
-                                };
-                            }
-
-                            sessionsMap[sessionKey].records.push({
-                                memberId: existingMember?.id,
-                                tempName: memberName,
-                                status: currentStatus, // Pass status for potential record creation
-                                isPresent: true
-                            });
-                        }
-                    }
-                }
-            });
-        }
-
-        const sessionsToSave = Object.values(sessionsMap);
-
-        if (newMissingMembers.length > 0) {
-            setMissingMembersToImport(newMissingMembers);
-            setPendingImportSessions(sessionsToSave);
-            setIsMissingMembersDialogOpen(true);
-            return { success: true };
-        }
-
-        if (sessionsToSave.length === 0) throw new Error("No valid attendance records found in file");
-
-        const result = await bulkSaveAttendanceAction(sessionsToSave.map(s => ({
-            ...s,
-            branchId: branches?.[0]?.id // Pass default branch ID
-        }))) as any;
-        if (result.success) {
-            const savedCount = result.count || sessionsToSave.length;
-            toast.success("Import Successful", { description: `Imported ${savedCount} sessions.` });
-            setIsImportDialogOpen(false);
-            router.refresh();
-        } else {
-            throw new Error(result.error || "Failed to import");
-        }
-        return { success: result.success, count: result.count };
-    }
 
     const selectedGroup = initialGroups.find(g => g.id === selectedGroupId)
 
@@ -855,7 +636,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                         variant="outline"
                         size="sm"
                         className="flex-shrink-0 gap-2 rounded-xl"
-                        onClick={() => setIsImportDialogOpen(true)}
+                        onClick={() => setIsUnifiedImportOpen(true)}
                     >
                         <Upload className="h-4 w-4" /> Import
                     </Button>
@@ -954,7 +735,7 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                         <Button
                             variant="outline"
                             className="gap-2"
-                            onClick={() => setIsImportDialogOpen(true)}
+                            onClick={() => setIsUnifiedImportOpen(true)}
                         >
                             <Upload className="h-4 w-4" />
                             Bulk Import
@@ -1320,7 +1101,10 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                                                             )}
                                                         </TableCell>
                                                         <TableCell className="text-sm font-medium">
-                                                            {format(new Date(session.date), "MMM d, yyyy")}
+                                                            <div className="flex flex-col">
+                                                                <span>{format(new Date(session.date), "MMM d, yyyy")}</span>
+                                                                {session.notes && <span className="text-[10px] text-primary font-bold uppercase">{session.notes}</span>}
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge variant="secondary" className="bg-muted/50 font-medium text-[10px]">
@@ -1864,108 +1648,12 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
                 </DialogContent>
             </Dialog>
 
-            <BulkImportDialog
-                isOpen={isImportDialogOpen}
-                onOpenChange={setIsImportDialogOpen}
-                title="Import Attendance"
-                description="Upload the standard CSV, or a full database Excel file (e.g. Eastern Branch or Empowerment format). Member names will be automatically mapped."
-                templateHeaders={["MemberName", "Phone", "Date", "EventType", "IsPresent", "GroupName"]}
-                parseMode="raw-all-sheets"
-                sampleData={[
-                    {
-                        MemberName: "John Doe",
-                        Phone: "08012345678",
-                        Date: format(new Date(), "yyyy-MM-dd"),
-                        EventType: "SATURDAY_FELLOWSHIP",
-                        IsPresent: "Yes",
-                        GroupName: initialGroups[0]?.name || "Group A"
-                    }
-                ]}
-                onImport={handleBulkImportAttendance}
+            <UnifiedImportDialog
+                isOpen={isUnifiedImportOpen}
+                onOpenChange={setIsUnifiedImportOpen}
+                branches={branches}
+                groups={initialGroups}
             />
-
-            {/* Missing Members Dialog */}
-            <Dialog open={isMissingMembersDialogOpen} onOpenChange={(open) => !isCreatingMissingMembers && setIsMissingMembersDialogOpen(open)}>
-                <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Missing Members Found</DialogTitle>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            The following members were found in the Excel file but do not exist in the system yet.
-                            They will be created as "Preliminary" members before importing attendance.
-                        </p>
-                    </DialogHeader>
-
-                    <div className="space-y-4 py-4">
-                        <div className="bg-muted/30 p-4 rounded-xl border border-border/50 max-h-[40vh] overflow-y-auto space-y-2">
-                            {missingMembersToImport.map((m, i) => (
-                                <div key={i} className="flex justify-between items-center text-sm p-3 rounded-lg bg-background border border-border/50">
-                                    <span className="font-semibold text-foreground">{m.name}</span>
-                                    <span className="text-xs text-muted-foreground font-medium px-2 py-1 bg-primary/10 rounded-full">{m.groupName}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setIsMissingMembersDialogOpen(false);
-                                setMissingMembersToImport([]);
-                            }}
-                            disabled={isCreatingMissingMembers}
-                        >
-                            Cancel Import
-                        </Button>
-                        <Button
-                            onClick={async () => {
-                                setIsCreatingMissingMembers(true);
-                                try {
-                                    const newMembersMapping: Record<string, string> = {};
-                                    const branchId = branches[0]?.id as string;
-
-                                    const missingByGroup = missingMembersToImport.reduce((acc, m) => {
-                                        if (!acc[m.groupId]) acc[m.groupId] = [];
-                                        acc[m.groupId].push({ name: m.name, status: m.status as MemberStatus });
-                                        return acc;
-                                    }, {} as Record<string, { name: string, status?: MemberStatus }[]>);
-
-                                    let createdCount = 0;
-                                    for (const [groupId, members] of Object.entries(missingByGroup)) {
-                                        const result = await bulkCreatePreliminaryMembersAction({
-                                            branchId,
-                                            groupId,
-                                            members
-                                        });
-                                        if (result.success && result.createdMembers) {
-                                            result.createdMembers.forEach((m: any) => {
-                                                newMembersMapping[m.name.toLowerCase()] = m.id;
-                                            });
-                                            createdCount += result.count || result.createdMembers.length;
-                                        } else {
-                                            throw new Error(result.error || `Failed to create members for group: ${groupId}`);
-                                        }
-                                    }
-
-                                    toast.success(`Created ${createdCount} missing members. Saving attendance...`);
-                                    await proceedWithImport(newMembersMapping);
-                                } catch (error: any) {
-                                    toast.error(error.message || "Failed to create missing members");
-                                    setIsCreatingMissingMembers(false);
-                                }
-                            }}
-                            disabled={isCreatingMissingMembers}
-                            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-                        >
-                            {isCreatingMissingMembers ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating & Importing...</>
-                            ) : (
-                                "Add Members & Continue"
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </>
     )
 }
