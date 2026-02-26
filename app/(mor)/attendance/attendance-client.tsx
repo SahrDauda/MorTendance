@@ -102,6 +102,7 @@ interface AttendanceClientProps {
     userRole: string
     todaysSaturdayGroupIds?: string[]
     branches?: { id: string, name: string }[]
+    initialDate?: number
 }
 
 interface SessionState {
@@ -115,11 +116,12 @@ interface SessionState {
     attendance: Record<string, { isPresent: boolean; isLate?: boolean }>
 }
 
-export function AttendanceClient({ initialGroups, allMembers, cbsLocations, leaders, recentSessions = [], userRole, todaysSaturdayGroupIds = [], branches = [] }: AttendanceClientProps) {
+export function AttendanceClient({ initialGroups, allMembers, cbsLocations, leaders, recentSessions = [], userRole, todaysSaturdayGroupIds = [], branches = [], initialDate }: AttendanceClientProps) {
     const router = useRouter()
+    const [mounted, setMounted] = useState(false)
     const [selectedGroupId, setSelectedGroupId] = useState<string>(initialGroups[0]?.id || "")
     const [selectedLocationId, setSelectedLocationId] = useState<string>(cbsLocations[0]?.id || "")
-    const [date, setDate] = useState<Date>(new Date())
+    const [date, setDate] = useState<Date>(() => initialDate ? new Date(initialDate) : new Date())
     const [eventType, setEventType] = useState<EventType>(EventType.SATURDAY_FELLOWSHIP)
     const [notes, setNotes] = useState("")
     const [cutoffTime, setCutoffTime] = useState("09:00") // Default 9:00 AM
@@ -142,16 +144,19 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const [qrSessionId, setQrSessionId] = useState<string | null>(null)
     const [isGeneratingQR, setIsGeneratingQR] = useState(false)
     const [qrCopied, setQrCopied] = useState(false)
+    const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
+    const [deleteRecordDialog, setDeleteRecordDialog] = useState<{ open: boolean; recordId: string | null; memberName: string }>({ open: false, recordId: null, memberName: "" })
+    const [deleteSessionDialog, setDeleteSessionDialog] = useState<{ open: boolean; sessionId: string | null; sessionName: string }>({ open: false, sessionId: null, sessionName: "" })
+    const [isDeleting, setIsDeleting] = useState(false)
 
     // Reset QR session ID when modal opens/closes or branch changes
     useEffect(() => {
         setQrSessionId(null)
     }, [isQRModalOpen, selectedBranchForQR])
-    const [mounted, setMounted] = useState(false)
-    const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
-    const [deleteRecordDialog, setDeleteRecordDialog] = useState<{ open: boolean; recordId: string | null; memberName: string }>({ open: false, recordId: null, memberName: "" })
-    const [deleteSessionDialog, setDeleteSessionDialog] = useState<{ open: boolean; sessionId: string | null; sessionName: string }>({ open: false, sessionId: null, sessionName: "" })
-    const [isDeleting, setIsDeleting] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     // Filter state for Member Attendance Details
     const [memberDetailFilter, setMemberDetailFilter] = useState<{
@@ -716,6 +721,12 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
     const isAdminLikeRole = ["SUPER_ADMIN", "ADMIN", "BRANCH_HEAD", "COORDINATOR"].includes(userRole)
     const showSaturdayOverview = isAdminLikeRole && eventType === EventType.SATURDAY_FELLOWSHIP && totalGroups > 0
+
+    if (!mounted) {
+        return <div className="min-h-screen flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    }
 
     return (
         <>

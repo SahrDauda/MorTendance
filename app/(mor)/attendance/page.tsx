@@ -180,6 +180,7 @@ export default async function AttendancePage() {
                 userRole={session.user.role}
                 todaysSaturdayGroupIds={todaysSaturdayGroupIds}
                 branches={branches as any}
+                initialDate={today.getTime()}
             />
         </div>
     )
