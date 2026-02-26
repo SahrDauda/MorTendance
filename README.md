@@ -1,4 +1,4 @@
-# MorTendance Attendance System
+# Ministry of Reconciliation Attendance System
 
 ## What is this?
 MorTendance is a simple web application that helps ministry leaders keep track of attendance, member information, and generate easy‑to‑read reports. It works on any modern browser and stores data in a secure database.
