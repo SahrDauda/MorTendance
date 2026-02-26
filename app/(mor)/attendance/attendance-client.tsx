@@ -300,9 +300,11 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
     const proceedWithImport = async (newMembersMapping: Record<string, string> = {}) => {
         setIsCreatingMissingMembers(true);
         try {
+            const branchId = branches?.[0]?.id;
             // Apply new members mapping to pending sessions
             const finalSessions = pendingImportSessions.map(session => ({
                 ...session,
+                branchId, // Pass the branch ID
                 records: session.records.map((r: any) => ({
                     targetId: r.memberId || newMembersMapping[r.tempName?.toLowerCase()],
                     isPresent: r.isPresent
@@ -319,7 +321,8 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
             const result = await bulkSaveAttendanceAction(finalSessions) as any;
             if (result.success) {
-                toast.success(`Successfully imported ${result.count || finalSessions.length} sessions.`);
+                const savedCount = result.count || finalSessions.length;
+                toast.success(`Successfully imported ${savedCount} sessions.`);
                 setIsMissingMembersDialogOpen(false);
                 setPendingImportSessions([]);
                 setIsImportDialogOpen(false);
@@ -370,6 +373,13 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
                 if (member) {
                     sessionsMap[key].records.push({ memberId: member.id, isPresent })
+                } else if (memberName) {
+                    // Collect missing member for standard import too
+                    const group = initialGroups.find(g => g.name.toLowerCase() === groupName.toLowerCase())
+                    if (group && !newMissingMembers.some(nm => nm.name.toLowerCase() === memberName.toLowerCase())) {
+                        newMissingMembers.push({ name: memberName, groupName: group.name, groupId: group.id, status: "PRELIMINARY" });
+                    }
+                    sessionsMap[key].records.push({ tempName: memberName, isPresent })
                 }
             })
         } else {
@@ -489,9 +499,13 @@ export function AttendanceClient({ initialGroups, allMembers, cbsLocations, lead
 
         if (sessionsToSave.length === 0) throw new Error("No valid attendance records found in file");
 
-        const result = await bulkSaveAttendanceAction(sessionsToSave) as any;
+        const result = await bulkSaveAttendanceAction(sessionsToSave.map(s => ({
+            ...s,
+            branchId: branches?.[0]?.id // Pass default branch ID
+        }))) as any;
         if (result.success) {
-            toast.success("Import Successful", { description: "Attendance records have been imported." });
+            const savedCount = result.count || sessionsToSave.length;
+            toast.success("Import Successful", { description: `Imported ${savedCount} sessions.` });
             setIsImportDialogOpen(false);
             router.refresh();
         } else {

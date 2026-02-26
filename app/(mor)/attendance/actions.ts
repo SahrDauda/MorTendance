@@ -363,9 +363,23 @@ export async function bulkSaveAttendanceAction(sessions: SaveAttendanceParams[])
         const results = await db.$transaction(async (tx) => {
             const createdSessions = []
             for (const s of sessions) {
-                // Determine branchId if not provided
+                // 1. Deduplicate records for this session to avoid unique constraint failures
+                const uniqueRecordsMap = new Map();
+                s.records.forEach(r => {
+                    if (r.memberId) {
+                        uniqueRecordsMap.set(r.memberId, r);
+                    }
+                });
+                const uniqueRecords = Array.from(uniqueRecordsMap.values());
+
+                if (uniqueRecords.length === 0) {
+                    console.warn(`[bulkSaveAttendanceAction] Skipping session for group ${s.groupId} on ${s.date} - no valid unique records`);
+                    continue;
+                }
+
+                // 2. Determine branchId
                 let effectiveBranchId = s.branchId
-                if (!effectiveBranchId) {
+                if (!effectiveBranchId && s.groupId) {
                     const group = await tx.ministryGroup.findUnique({
                         where: { id: s.groupId },
                         select: { branchId: true }
@@ -373,7 +387,7 @@ export async function bulkSaveAttendanceAction(sessions: SaveAttendanceParams[])
                     effectiveBranchId = group?.branchId || undefined
                 }
 
-                if (!effectiveBranchId) {
+                if (!effectiveBranchId && s.groupId) {
                     const firstMember = await tx.member.findFirst({
                         where: { groupId: s.groupId },
                         select: { branchId: true }
@@ -381,7 +395,10 @@ export async function bulkSaveAttendanceAction(sessions: SaveAttendanceParams[])
                     effectiveBranchId = firstMember?.branchId || undefined
                 }
 
-                if (!effectiveBranchId) continue // Skip if branch cannot be determined
+                if (!effectiveBranchId) {
+                    console.error(`[bulkSaveAttendanceAction] FAILED: Could not determine branchId for group ${s.groupId}. skipping session.`);
+                    continue // Skip if branch cannot be determined
+                }
 
                 const attendanceSession = await tx.attendanceSession.create({
                     data: {
@@ -392,7 +409,7 @@ export async function bulkSaveAttendanceAction(sessions: SaveAttendanceParams[])
                         recorderId: session.user.id,
                         notes: s.notes,
                         records: {
-                            create: s.records.map(r => ({
+                            create: uniqueRecords.map(r => ({
                                 memberId: r.memberId,
                                 isPresent: r.isPresent
                             }))
