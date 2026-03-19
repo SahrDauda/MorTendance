@@ -151,16 +151,44 @@ export default async function AttendancePage() {
                     lt: startOfTomorrow
                 }
             },
-            select: {
-                id: true,
-                groupId: true,
-            }
+				select: {
+					id: true,
+					groupId: true,
+					status: true,
+					completedAt: true,
+					_count: {
+						select: { records: true }
+					}
+				}
         })
     ])
 
-    const todaysSaturdayGroupIds = todaysSaturdaySessions
-        .map((s) => s.groupId)
-        .filter((id): id is string => !!id)
+		const saturdayOverview = groups.map(group => {
+			const todaysSession = todaysSaturdaySessions.find(s => s.groupId === group.id)
+			const memberCount = group.members.length
+
+			if (!todaysSession) {
+				return {
+					groupId: group.id,
+					groupName: group.name,
+					memberCount,
+					markedCount: 0,
+					status: "PENDING" as const,
+					sessionId: null,
+					completedAt: null,
+				}
+			}
+
+			return {
+				groupId: group.id,
+				groupName: group.name,
+				memberCount,
+				markedCount: todaysSession._count.records,
+				status: todaysSession.status === "COMPLETED" ? ("COMPLETED" as const) : ("DRAFT" as const),
+				sessionId: todaysSession.id,
+				completedAt: todaysSession.completedAt,
+			}
+		})
 
     return (
         <div className="space-y-8">
@@ -178,7 +206,7 @@ export default async function AttendancePage() {
                 leaders={leaders as any}
                 recentSessions={recentSessions as any}
                 userRole={session.user.role}
-                todaysSaturdayGroupIds={todaysSaturdayGroupIds}
+					saturdayOverview={saturdayOverview as any}
                 branches={branches as any}
                 initialDate={today.getTime()}
             />

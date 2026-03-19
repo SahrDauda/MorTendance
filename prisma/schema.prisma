@@ -31,6 +31,7 @@ model User {
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
   recordedSessions AttendanceSession[] @relation("SessionRecorder")
+  completedSessions AttendanceSession[] @relation("SessionCompleter")
   auditLogs        AuditLog[]
   managedBranch    Branch?             @relation("BranchHead")
   managedCBS       CBSLocation[]       @relation("CBSLeader")
@@ -100,11 +101,15 @@ model AttendanceSession {
   cbsLocationId String?            @map("cbs_location_id")
   cutoffTime    String?            @map("cutoff_time")
   isActive      Boolean            @default(true) @map("is_active")
+  status        AttendanceSessionStatus @default(DRAFT)
+  completedAt   DateTime?          @map("completed_at")
+  completedById String?            @map("completed_by_id")
   records       AttendanceRecord[]
   branch        Branch             @relation(fields: [branchId], references: [id])
   cbsLocation   CBSLocation?       @relation(fields: [cbsLocationId], references: [id])
   group         MinistryGroup?     @relation(fields: [groupId], references: [id])
   recorder      User               @relation("SessionRecorder", fields: [recorderId], references: [id])
+  completedBy   User?              @relation("SessionCompleter", fields: [completedById], references: [id])
 
   @@map("attendance_sessions")
 }
@@ -154,6 +159,11 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+enum AttendanceSessionStatus {
+  DRAFT
+  COMPLETED
 }
 
 enum UserRole {

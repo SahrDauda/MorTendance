@@ -171,6 +171,11 @@ export async function saveAttendanceAction({ groupId, cbsLocationId, branchId, t
             let attendanceSession
 
             if (existingSession) {
+                // Prevent modifying completed sessions (must be reopened first)
+                if (existingSession.status === "COMPLETED") {
+                    throw new Error("This attendance session has already been completed and cannot be modified. Please reopen it from the Attendance page if you need to make changes.")
+                }
+
                 // Update existing session
                 attendanceSession = await tx.attendanceSession.update({
                     where: { id: existingSession.id },
@@ -312,6 +317,209 @@ export async function cleanupDuplicateAttendanceAction() {
                     mergedSessions++
                 }
             }
+
+    }
+}
+
+// Mark a Saturday Fellowship attendance session as completed for a group/date.
+// This will auto-fill all missing members as absent and close the session for further edits.
+export async function completeSaturdayAttendanceAction(params: { groupId: string; date: Date }) {
+    const session = await auth()
+    if (!session) throw new Error("Unauthorized")
+
+    const { groupId, date } = params
+
+    if (!groupId) {
+        throw new Error("Group is required to complete Saturday attendance")
+    }
+
+    // Only allow privileged roles to complete attendance for now
+    if (![
+        "SUPER_ADMIN",
+        "ADMIN",
+        "BRANCH_HEAD",
+        "COORDINATOR",
+    ].includes(session.user.role)) {
+        throw new Error("Unauthorized: Admin or branch leadership access required")
+    }
+
+    const sessionDate = new Date(date)
+    sessionDate.setHours(0, 0, 0, 0)
+
+    const group = await db.ministryGroup.findUnique({
+        where: { id: groupId },
+        include: {
+            members: {
+                select: { id: true }
+            },
+            branch: {
+                select: { id: true }
+            }
+        }
+    })
+
+    if (!group) {
+        throw new Error("Group not found")
+    }
+
+    if (!group.branch) {
+        throw new Error("Group is not linked to a branch. Please assign a branch before completing attendance.")
+    }
+
+    const branchId = group.branch.id
+
+    // If the user is a BRANCH_HEAD, ensure they only manage their own branch
+    if (session.user.role === "BRANCH_HEAD") {
+        const currentUser = await db.user.findUnique({
+            where: { id: session.user.id },
+            select: {
+                managedBranch: {
+                    select: { id: true }
+                }
+            }
+        })
+
+        if (!currentUser?.managedBranch || currentUser.managedBranch.id !== branchId) {
+            throw new Error("You can only complete attendance for your own branch.")
+        }
+    }
+
+    const result = await db.$transaction(async (tx) => {
+        const existingSession = await tx.attendanceSession.findFirst({
+            where: {
+                type: EventType.SATURDAY_FELLOWSHIP,
+                date: sessionDate,
+                branchId,
+                groupId,
+            },
+            include: {
+                records: {
+                    select: { memberId: true }
+                }
+            }
+        })
+
+        // If already completed, treat as idempotent success
+        if (existingSession && existingSession.status === "COMPLETED") {
+            return existingSession
+        }
+
+        let attendanceSession = existingSession
+
+        if (!attendanceSession) {
+            attendanceSession = await tx.attendanceSession.create({
+                data: {
+                    type: EventType.SATURDAY_FELLOWSHIP,
+                    date: sessionDate,
+                    branchId,
+                    groupId,
+                    recorderId: session.user.id,
+                }
+            })
+        }
+
+        const existingMemberIds = new Set(existingSession?.records.map(r => r.memberId) ?? [])
+        const missingMemberIds = group.members
+            .map(m => m.id)
+            .filter(id => !existingMemberIds.has(id))
+
+        if (missingMemberIds.length > 0) {
+            await tx.attendanceRecord.createMany({
+                data: missingMemberIds.map(memberId => ({
+                    sessionId: attendanceSession!.id,
+                    memberId,
+                    isPresent: false,
+                    isLate: false,
+                })),
+                skipDuplicates: true,
+            })
+        }
+
+        const updated = await tx.attendanceSession.update({
+            where: { id: attendanceSession.id },
+            data: {
+                status: "COMPLETED",
+                completedAt: new Date(),
+                completedById: session.user.id,
+                isActive: false,
+            }
+        })
+
+        return updated
+    })
+
+    revalidatePath("/attendance")
+    revalidatePath("/dashboard")
+
+    return { success: true, sessionId: result.id, status: result.status }
+}
+
+// Reopen a previously completed Saturday Fellowship attendance session
+export async function reopenSaturdayAttendanceAction(params: { groupId: string; date: Date }) {
+    const session = await auth()
+    if (!session) throw new Error("Unauthorized")
+
+    const { groupId, date } = params
+
+    if (!groupId) {
+        throw new Error("Group is required to reopen Saturday attendance")
+    }
+
+    if (![
+        "SUPER_ADMIN",
+        "ADMIN",
+        "BRANCH_HEAD",
+        "COORDINATOR",
+    ].includes(session.user.role)) {
+        throw new Error("Unauthorized: Admin or branch leadership access required")
+    }
+
+    const sessionDate = new Date(date)
+    sessionDate.setHours(0, 0, 0, 0)
+
+    const group = await db.ministryGroup.findUnique({
+        where: { id: groupId },
+        select: {
+            branchId: true,
+        }
+    })
+
+    if (!group || !group.branchId) {
+        throw new Error("Group is not linked to a branch.")
+    }
+
+    const attendanceSession = await db.attendanceSession.findFirst({
+        where: {
+            type: EventType.SATURDAY_FELLOWSHIP,
+            date: sessionDate,
+            branchId: group.branchId,
+            groupId,
+        }
+    })
+
+    if (!attendanceSession) {
+        throw new Error("No Saturday attendance session found to reopen for this group and date.")
+    }
+
+    // If not completed, nothing to do
+    if (attendanceSession.status !== "COMPLETED") {
+        return { success: true, sessionId: attendanceSession.id, status: attendanceSession.status }
+    }
+
+    const updated = await db.attendanceSession.update({
+        where: { id: attendanceSession.id },
+        data: {
+            status: "DRAFT",
+            completedAt: null,
+            completedById: null,
+            isActive: true,
+        }
+    })
+
+    revalidatePath("/attendance")
+    revalidatePath("/dashboard")
+
+    return { success: true, sessionId: updated.id, status: updated.status }
         }
 
         // Also check for duplicate records within the same session (shouldn't happen due to unique constraint, but just in case)
