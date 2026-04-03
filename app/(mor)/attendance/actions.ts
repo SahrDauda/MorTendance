@@ -318,8 +318,50 @@ export async function cleanupDuplicateAttendanceAction() {
                 }
             }
 
+
+    }
+
+        // Also check for duplicate records within the same session (shouldn't happen due to unique constraint, but just in case)
+        const allRecords = await db.attendanceRecord.findMany({
+            orderBy: {
+                createdAt: 'asc'
+            }
+        })
+
+        const recordMap = new Map<string, typeof allRecords>()
+        for (const record of allRecords) {
+            const key = `${record.sessionId}_${record.memberId}`
+            if (!recordMap.has(key)) {
+                recordMap.set(key, [])
+            }
+            recordMap.get(key)!.push(record)
+        }
+
+        for (const [key, records] of recordMap) {
+            if (records.length > 1) {
+                // Keep first, delete rest
+                const toDelete = records.slice(1)
+                await db.attendanceRecord.deleteMany({
+                    where: {
+                        id: { in: toDelete.map(r => r.id) }
+                    }
+                })
+                deletedRecords += toDelete.length
+            }
+        }
+
+        revalidatePath("/attendance")
+        return {
+            success: true,
+            deletedRecords,
+            mergedSessions
+        }
+    } catch (error: any) {
+        console.error("Failed to cleanup duplicates:", error)
+        throw new Error(error.message || "Failed to cleanup duplicates")
     }
 }
+
 
 // Mark a Saturday Fellowship attendance session as completed for a group/date.
 // This will auto-fill all missing members as absent and close the session for further edits.
@@ -414,6 +456,11 @@ export async function completeSaturdayAttendanceAction(params: { groupId: string
                     branchId,
                     groupId,
                     recorderId: session.user.id,
+                },
+                include: {
+                    records: {
+                        select: { memberId: true }
+                    }
                 }
             })
         }
@@ -520,47 +567,6 @@ export async function reopenSaturdayAttendanceAction(params: { groupId: string; 
     revalidatePath("/dashboard")
 
     return { success: true, sessionId: updated.id, status: updated.status }
-        }
-
-        // Also check for duplicate records within the same session (shouldn't happen due to unique constraint, but just in case)
-        const allRecords = await db.attendanceRecord.findMany({
-            orderBy: {
-                createdAt: 'asc'
-            }
-        })
-
-        const recordMap = new Map<string, typeof allRecords>()
-        for (const record of allRecords) {
-            const key = `${record.sessionId}_${record.memberId}`
-            if (!recordMap.has(key)) {
-                recordMap.set(key, [])
-            }
-            recordMap.get(key)!.push(record)
-        }
-
-        for (const [key, records] of recordMap) {
-            if (records.length > 1) {
-                // Keep first, delete rest
-                const toDelete = records.slice(1)
-                await db.attendanceRecord.deleteMany({
-                    where: {
-                        id: { in: toDelete.map(r => r.id) }
-                    }
-                })
-                deletedRecords += toDelete.length
-            }
-        }
-
-        revalidatePath("/attendance")
-        return {
-            success: true,
-            deletedRecords,
-            mergedSessions
-        }
-    } catch (error: any) {
-        console.error("Failed to cleanup duplicates:", error)
-        throw new Error(error.message || "Failed to cleanup duplicates")
-    }
 }
 
 

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Branch {
@@ -28,6 +29,7 @@ model User {
   name             String
   passwordHash     String              @map("password_hash")
   role             UserRole            @default(PROBATION_LEADER)
+  passwordUpdated  Boolean             @default(false) @map("password_updated")
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
   recordedSessions AttendanceSession[] @relation("SessionRecorder")
@@ -77,14 +79,14 @@ model Member {
   address           String?
   gender            Gender?
   schoolName        String?            @map("school_name")
-  groupId           String             @map("group_id")
-  branchId          String?            @map("branch_id")
+  groupId           String?            @map("group_id")
+  branchId          String             @map("branch_id")
   status            MemberStatus       @default(PRELIMINARY)
   joinedAt          DateTime           @default(now()) @map("joined_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
   attendanceRecords AttendanceRecord[]
-  branch            Branch?            @relation(fields: [branchId], references: [id])
-  group             MinistryGroup      @relation(fields: [groupId], references: [id])
+  branch            Branch             @relation(fields: [branchId], references: [id])
+  group             MinistryGroup?     @relation(fields: [groupId], references: [id])
 
   @@map("members")
 }

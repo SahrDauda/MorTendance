@@ -193,7 +193,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
         const data = initialMembers.map(m => ({
             Name: m.name,
             Phone: m.phoneNumber || "N/A",
-            Group: m.group.name,
+            Group: m.group?.name || "No Group",
             Status: m.status,
             AttendanceCount: m._count.attendance
         }))
@@ -209,7 +209,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
         const tableData = initialMembers.map(m => [
             m.name,
             m.phoneNumber || "N/A",
-            m.group.name,
+            m.group?.name || "No Group",
             m.status,
             m._count.attendance.toString()
         ])
@@ -582,7 +582,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge variant="secondary" className="bg-muted/50 font-medium">
-                                                            {member.group.name}
+                                                            {member.group?.name || "No Group"}
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell>
@@ -622,7 +622,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {groups.map(group => {
-                                    const groupMembers = filteredMembers.filter(m => m.group.id === group.id)
+                                    const groupMembers = filteredMembers.filter(m => m.group?.id === group.id)
                                     if (groupMembers.length === 0 && selectedGroup !== "all") return null
                                     if (groupMembers.length === 0 && selectedGroup === "all") return null // Hide empty groups in group view unless filtered? Actually better to show them if they exist
 
@@ -696,7 +696,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                                     {member.phoneNumber && <p className="text-[10px] text-muted-foreground">{member.phoneNumber}</p>}
                                                     <div className="flex gap-2">
                                                         <Badge variant="secondary" className="text-[10px] h-5">
-                                                            {member.group.name}
+                                                            {member.group?.name || "No Group"}
                                                         </Badge>
                                                         <Badge className={cn(
                                                             "uppercase font-bold text-[9px] h-5",
@@ -975,7 +975,7 @@ export function MembersClient({ initialMembers, groups, branches, userRole = "PR
                                 </div>
                                 <div className="mt-8">
                                     <h2 className="text-2xl font-bold text-foreground">{selectedMember.name}</h2>
-                                    <p className="text-sm text-muted-foreground">{selectedMember.group.name} Fellowship</p>
+                                    <p className="text-sm text-muted-foreground">{selectedMember.group?.name ? `${selectedMember.group.name} Fellowship` : "No Group"}</p>
                                 </div>
                             </div>
 
