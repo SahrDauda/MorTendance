@@ -5,9 +5,9 @@ import { EventType } from "@prisma/client"
 export default async function CheckInPage({
     searchParams,
 }: {
-    searchParams: Promise<{ branchId?: string; type?: string }>
+    searchParams: Promise<{ branchId?: string; type?: string; sessionId?: string }>
 }) {
-    const { branchId, type = "SATURDAY_FELLOWSHIP" } = await searchParams
+    const { branchId, type = "SATURDAY_FELLOWSHIP", sessionId } = await searchParams
 
     if (!branchId) {
         return (
@@ -38,6 +38,7 @@ export default async function CheckInPage({
                 branchId={branchId}
                 branchName={branch.name}
                 eventType={type as EventType}
+                sessionId={sessionId}
             />
         </div>
     )

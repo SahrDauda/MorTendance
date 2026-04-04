@@ -13,9 +13,10 @@ interface CheckInClientProps {
     branchId: string
     branchName: string
     eventType: string
+    sessionId?: string
 }
 
-export function CheckInClient({ branchId, branchName, eventType }: CheckInClientProps) {
+export function CheckInClient({ branchId, branchName, eventType, sessionId }: CheckInClientProps) {
     const [identifier, setIdentifier] = useState("")
     const [status, setStatus] = useState<"idle" | "loading" | "success" | "error" | "not_found">("idle")
     const [message, setMessage] = useState("")
@@ -30,7 +31,8 @@ export function CheckInClient({ branchId, branchName, eventType }: CheckInClient
             const result = await checkInAction({
                 identifier,
                 branchId,
-                type: eventType
+                type: eventType,
+                sessionId
             })
 
             if (result.success) {

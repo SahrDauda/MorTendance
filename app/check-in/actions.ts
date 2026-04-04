@@ -8,6 +8,7 @@ export async function checkInAction(data: {
     identifier: string // phone or email
     branchId: string
     type: string
+    sessionId?: string
 }) {
     if (!data.identifier || !data.branchId || !data.type) {
         return { error: "Missing required information" }
@@ -35,14 +36,28 @@ export async function checkInAction(data: {
         const today = new Date()
         today.setHours(0, 0, 0, 0)
 
-        let session = await db.attendanceSession.findFirst({
-            where: {
-                branchId: data.branchId,
-                type: data.type as EventType,
-                date: today,
-                groupId: member.groupId // Scoped to their group
+        let session;
+
+        if (data.sessionId) {
+            session = await db.attendanceSession.findUnique({
+                where: { id: data.sessionId }
+            })
+            if (!session) {
+                return { error: "Invalid attendance session QR code" }
             }
-        })
+            if (session.groupId && session.groupId !== member.groupId) {
+                return { error: "You cannot check into this session as it belongs to a different group." }
+            }
+        } else {
+            session = await db.attendanceSession.findFirst({
+                where: {
+                    branchId: data.branchId,
+                    type: data.type as EventType,
+                    date: today,
+                    groupId: member.groupId // Scoped to their group
+                }
+            })
+        }
 
         if (!session) {
             // We need a recorderId. For self-check-in, we can use a system user or the branch head.
@@ -93,7 +108,7 @@ export async function checkInAction(data: {
         return {
             success: true,
             memberName: member.name,
-            groupName: member.group.name
+            groupName: member.group?.name || "No Group"
         }
     } catch (error: any) {
         console.error("Check-in error:", error)
