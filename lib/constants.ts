@@ -50,6 +50,11 @@ export const ROUTES = {
   LOGS: "/admin/logs",
   MINISTRY_SETTINGS: "/admin/settings",
   PROFILE: "/profile",
+  CAMP_MEMBERS: "/camp/members",
+  CAMP_ROOMS: "/camp/rooms",
+  CAMP_GROUPS: "/camp/groups",
+  CAMP_ATTENDANCE: "/camp/attendance",
+  CAMP_TAGS: "/camp/print-tags",
 } as const
 
 // ============================================================================

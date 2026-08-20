@@ -96,13 +96,18 @@ export async function POST(req: NextRequest) {
     })
     if (!group) return NextResponse.json({ error: "Group not found" }, { status: 404 })
 
+    const branchId = group.branchId || (await db.branch.findFirst())?.id
+    if (!branchId) {
+      return NextResponse.json({ error: "Branch not found for group" }, { status: 400 })
+    }
+
     const member = await db.member.create({
       data: {
         name: name.trim(),
-        phoneNumber: phoneNumber || undefined,
-        gender: gender || undefined,
+        phoneNumber: phoneNumber || null,
+        gender: gender || null,
         groupId,
-        branchId: group.branchId || undefined,
+        branchId,
         status: "PRELIMINARY",
       },
       include: {

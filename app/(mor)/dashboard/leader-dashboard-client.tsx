@@ -159,7 +159,7 @@ export function LeaderDashboardClient({
                 name: newMemberName,
                 phoneNumber: newMemberPhone || undefined,
                 groupId: newMemberGroupId,
-                branchId: selectedGroup?.branchId || undefined
+                branchId: selectedGroup?.branchId || ""
             })
             toast.success("Member added successfully")
             setIsAddMemberOpen(false)

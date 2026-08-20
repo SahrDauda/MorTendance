@@ -128,11 +128,17 @@ export function AdminDashboardClient({
 
         setIsSubmittingMember(true)
         try {
+            const selectedGroup = groups.find((g: any) => g.id === newMemberGroupId)
+            const targetBranchId =
+                newMemberBranchId !== "none" && newMemberBranchId
+                    ? newMemberBranchId
+                    : (selectedGroup as any)?.branchId || branches[0]?.id || ""
+
             await addMemberAction({
                 name: newMemberName,
                 phoneNumber: newMemberPhone || undefined,
                 groupId: newMemberGroupId,
-                branchId: newMemberBranchId === "none" ? undefined : newMemberBranchId
+                branchId: targetBranchId,
             })
             toast.success("Member added successfully", {
                 description: `${newMemberName} has been added to the system.`

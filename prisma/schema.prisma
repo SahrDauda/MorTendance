@@ -201,3 +201,82 @@ enum Gender {
   MALE
   FEMALE
 }
+
+// ==========================================
+// MOR CAMP SPECIFIC TABLES (ISOLATED SCHEMA)
+// ==========================================
+
+model CampMember {
+  id             String           @id @default(uuid())
+  badgeId        String           @unique @map("badge_id")
+  fullName       String           @map("full_name")
+  phone          String?
+  gender         String           @default("Male")
+  branch         String?
+  caregroup      String?
+  room           String?
+  position       String           @default("General Member")
+  goingOut       Boolean          @default(false) @map("going_out")
+  paid           Boolean          @default(false)
+  paidAmount     Float?           @default(0) @map("paid_amount")
+  paymentClaimed Boolean          @default(false) @map("payment_claimed")
+  couponNum      Int              @default(0) @map("coupon_num")
+  foodReceived   Boolean          @default(false) @map("food_received")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  attendances    CampAttendance[]
+
+  @@map("camp_members")
+}
+
+model CampGroup {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  leader    String?
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("camp_groups")
+}
+
+model CampBranch {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  district    String?
+  coordinator String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("camp_branches")
+}
+
+model CampRoom {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  gender    String   @default("Male")
+  capacity  Int      @default(10)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("camp_rooms")
+}
+
+model CampAttendance {
+  id        String     @id @default(uuid())
+  memberId  String     @map("member_id")
+  session   String
+  isPresent Boolean    @default(true) @map("is_present")
+  scannedAt DateTime   @default(now()) @map("scanned_at")
+  member    CampMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, session])
+  @@map("camp_attendances")
+}
+
+model CampSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("camp_settings")
+}
