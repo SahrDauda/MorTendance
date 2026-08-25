@@ -4,19 +4,16 @@ import { db } from "@/lib/db"
 export const dynamic = "force-dynamic"
 
 const DEFAULT_AYAC_ROOMS = [
-  // 10 Male Rooms
+  // 7 Male Rooms
   { name: "Gethsemane", gender: "Male", capacity: 30, notes: "Male Lodging" },
   { name: "Zion", gender: "Male", capacity: 30, notes: "Male Lodging" },
   { name: "Moriah", gender: "Male", capacity: 30, notes: "Male Lodging" },
   { name: "Sinai", gender: "Male", capacity: 30, notes: "Male Lodging" },
   { name: "Carmel", gender: "Male", capacity: 30, notes: "Male Lodging" },
-  { name: "Tabor", gender: "Male", capacity: 30, notes: "Male Lodging" },
   { name: "Horeb", gender: "Male", capacity: 30, notes: "Male Lodging" },
-  { name: "Olives", gender: "Male", capacity: 30, notes: "Male Lodging" },
-  { name: "Peniel", gender: "Male", capacity: 30, notes: "Male Lodging" },
   { name: "Patmos", gender: "Male", capacity: 30, notes: "Male Lodging" },
 
-  // 10 Female Rooms
+  // 12 Female Rooms
   { name: "Bethel", gender: "Female", capacity: 30, notes: "Female Lodging" },
   { name: "Bethany", gender: "Female", capacity: 30, notes: "Female Lodging" },
   { name: "Shiloh", gender: "Female", capacity: 30, notes: "Female Lodging" },
@@ -27,6 +24,8 @@ const DEFAULT_AYAC_ROOMS = [
   { name: "Siloam", gender: "Female", capacity: 30, notes: "Female Lodging" },
   { name: "Sychar", gender: "Female", capacity: 30, notes: "Female Lodging" },
   { name: "Emmaus", gender: "Female", capacity: 30, notes: "Female Lodging" },
+  { name: "Peniel", gender: "Female", capacity: 30, notes: "Female Lodging" },
+  { name: "Tabor", gender: "Female", capacity: 30, notes: "Female Lodging" },
 ]
 
 export async function GET() {
