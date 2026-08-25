@@ -62,7 +62,6 @@
     "next": "16.0.7",
     "next-auth": "^5.0.0-beta.25",
     "next-themes": "latest",
-    "pdfjs-dist": "^3.11.174",
     "prisma": "^5.20.0",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",

@@ -1,11 +1,51 @@
 "use client"
 
-import * as pdfjsLib from "pdfjs-dist"
 import type { ParsedAttendeeRow } from "@/components/camp/camp-bulk-import-dialog"
 
-// Set standard CDN worker for pdfjs in browser
-if (typeof window !== "undefined") {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+/**
+ * Dynamically loads PDF.js from CDN to avoid Turbopack & SSR bundling conflicts.
+ */
+async function getPdfJsLib(): Promise<any> {
+  if (typeof window === "undefined") return null
+  if ((window as any).pdfjsLib) return (window as any).pdfjsLib
+
+  return new Promise((resolve, reject) => {
+    // Check if script is already being loaded
+    const existing = document.querySelector('script[src*="pdf.min.js"]')
+    if (existing) {
+      const interval = setInterval(() => {
+        if ((window as any).pdfjsLib) {
+          clearInterval(interval)
+          resolve((window as any).pdfjsLib)
+        }
+      }, 50)
+      setTimeout(() => {
+        clearInterval(interval)
+        if ((window as any).pdfjsLib) {
+          resolve((window as any).pdfjsLib)
+        } else {
+          reject(new Error("Timeout loading PDF.js"))
+        }
+      }, 5000)
+      return
+    }
+
+    const script = document.createElement("script")
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+    script.async = true
+    script.onload = () => {
+      const lib = (window as any).pdfjsLib
+      if (lib) {
+        lib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+        resolve(lib)
+      } else {
+        reject(new Error("PDF.js library did not attach to window"))
+      }
+    }
+    script.onerror = () => reject(new Error("Failed to load PDF.js script from CDN"))
+    document.head.appendChild(script)
+  })
 }
 
 const KNOWN_BRANCHES = [
@@ -62,8 +102,13 @@ const IGNORE_HEADER_WORDS = [
  * Extracts and parses attendee rows from a PDF file.
  */
 export async function parseAttendeesFromPDF(file: File): Promise<ParsedAttendeeRow[]> {
+  const pdfjs = await getPdfJsLib()
+  if (!pdfjs) {
+    throw new Error("PDF parser could not be initialized in this browser environment.")
+  }
+
   const arrayBuffer = await file.arrayBuffer()
-  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) })
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) })
   const pdfDoc = await loadingTask.promise
 
   const rawLines: string[] = []
