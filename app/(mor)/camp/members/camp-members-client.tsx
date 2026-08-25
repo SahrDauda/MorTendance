@@ -484,7 +484,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             onClick={() => setBulkImportOpen(true)}
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            Bulk Import (Excel)
+            Bulk Import (Excel / PDF)
           </Button>
 
           <Button
@@ -805,7 +805,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between gap-3 text-xs mt-2">
               <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
                 <FileSpreadsheet className="w-4 h-4 flex-shrink-0" />
-                <span>Have a list in Excel? Import multiple attendees in one click.</span>
+                <span>Have a list in Excel or PDF? Import multiple attendees in one click.</span>
               </div>
               <Button
                 type="button"

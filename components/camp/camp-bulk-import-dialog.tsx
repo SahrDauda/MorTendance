@@ -15,14 +15,17 @@ import { toast } from "sonner"
 import {
   UploadCloud,
   FileSpreadsheet,
+  FileText,
   Download,
   AlertCircle,
   CheckCircle2,
   X,
   FileCheck2,
   Sparkles,
+  RefreshCw,
 } from "lucide-react"
 import * as XLSX from "xlsx"
+import { parseAttendeesFromPDF } from "@/lib/campPdfParser"
 
 export interface ParsedAttendeeRow {
   fullName: string
@@ -50,6 +53,7 @@ export function CampBulkImportDialog({
   const [file, setFile] = useState<File | null>(null)
   const [parsedRows, setParsedRows] = useState<ParsedAttendeeRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [parsing, setParsing] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -101,11 +105,38 @@ export function CampBulkImportDialog({
     toast.success("Excel template downloaded!")
   }
 
-  // Parse Excel / CSV file
-  const processFile = (uploadedFile: File) => {
+  // Parse Excel, CSV, or PDF file
+  const processFile = async (uploadedFile: File) => {
     setFile(uploadedFile)
-    const reader = new FileReader()
+    const isPdf =
+      uploadedFile.type === "application/pdf" ||
+      uploadedFile.name.toLowerCase().endsWith(".pdf")
 
+    if (isPdf) {
+      try {
+        setParsing(true)
+        const rows = await parseAttendeesFromPDF(uploadedFile)
+        setParsedRows(rows)
+        const validCount = rows.filter((r) => r.isValid).length
+        if (rows.length === 0) {
+          toast.error(
+            "No attendee names could be extracted from this PDF. Please ensure it contains selectable text."
+          )
+        } else {
+          toast.success(`Extracted ${rows.length} attendees from PDF (${validCount} valid)`)
+        }
+      } catch (err: any) {
+        console.error("PDF parse error:", err)
+        toast.error("Failed to parse PDF document. Please check the file or use an Excel spreadsheet.")
+        setParsedRows([])
+      } finally {
+        setParsing(false)
+      }
+      return
+    }
+
+    // Process Spreadsheet (.xlsx, .xls, .csv)
+    const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
@@ -159,7 +190,7 @@ export function CampBulkImportDialog({
             gender,
             phone,
             branch,
-            caregroup,
+            caregroup: caregroup || "AUTO",
             room: room || "AUTO",
             position,
             isValid,
@@ -239,7 +270,7 @@ export function CampBulkImportDialog({
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!loading) {
+        if (!loading && !parsing) {
           onOpenChange(v)
           if (!v) resetState()
         }
@@ -253,7 +284,7 @@ export function CampBulkImportDialog({
                 <FileSpreadsheet className="w-5 h-5" />
               </div>
               <DialogTitle className="text-xl font-bold">
-                Bulk Import Attendees via Excel
+                Bulk Import Attendees (Excel & PDF)
               </DialogTitle>
             </div>
             <Button
@@ -267,7 +298,7 @@ export function CampBulkImportDialog({
             </Button>
           </div>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
-            Upload an Excel (.xlsx, .xls) or CSV file with attendee names. Badge IDs and room allocations will be generated automatically.
+            Upload an Excel (.xlsx, .xls), CSV, or PDF list of attendees. Badge IDs, groups, and rooms will be generated automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -291,7 +322,7 @@ export function CampBulkImportDialog({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx, .xls, .csv"
+                accept=".xlsx, .xls, .csv, .pdf"
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -300,10 +331,10 @@ export function CampBulkImportDialog({
               </div>
               <div>
                 <p className="font-bold text-foreground text-sm">
-                  Click to browse or drag & drop your Excel file here
+                  Click to browse or drag & drop your Excel or PDF file here
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Supports .xlsx, .xls, and .csv files
+                  Supports .xlsx, .xls, .csv, and .pdf documents
                 </p>
               </div>
             </div>
@@ -313,13 +344,29 @@ export function CampBulkImportDialog({
               <div className="flex items-center justify-between bg-muted/40 p-3 rounded-xl border">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-emerald-500/20 text-emerald-600 rounded-lg">
-                    <FileCheck2 className="w-5 h-5" />
+                    {file.name.toLowerCase().endsWith(".pdf") ? (
+                      <FileText className="w-5 h-5 text-red-500" />
+                    ) : (
+                      <FileCheck2 className="w-5 h-5" />
+                    )}
                   </div>
                   <div>
                     <div className="font-bold text-sm text-foreground">{file.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {(file.size / 1024).toFixed(1)} KB • {parsedRows.length} rows loaded (
-                      <span className="text-emerald-600 font-semibold">{validRows.length} valid</span>)
+                      {(file.size / 1024).toFixed(1)} KB •{" "}
+                      {parsing ? (
+                        <span className="text-primary font-semibold animate-pulse">
+                          Parsing document text...
+                        </span>
+                      ) : (
+                        <span>
+                          {parsedRows.length} rows loaded (
+                          <strong className="text-emerald-600 font-semibold">
+                            {validRows.length} valid
+                          </strong>
+                          )
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -329,73 +376,93 @@ export function CampBulkImportDialog({
                   size="sm"
                   className="text-xs text-red-500 hover:bg-red-500/10 gap-1"
                   onClick={resetState}
-                  disabled={loading}
+                  disabled={loading || parsing}
                 >
                   <X className="w-4 h-4" />
                   Remove
                 </Button>
               </div>
 
-              {/* Preview Table */}
-              <div className="border rounded-xl overflow-hidden bg-background">
-                <div className="p-2.5 bg-muted/60 border-b flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  <span>Attendee Preview ({parsedRows.length} Rows)</span>
-                  <span>Status</span>
+              {parsing ? (
+                <div className="py-12 text-center text-muted-foreground space-y-2">
+                  <RefreshCw className="w-7 h-7 animate-spin mx-auto text-primary" />
+                  <p className="text-sm font-semibold">Extracting attendees from PDF...</p>
+                  <p className="text-xs">Reading pages, names, branches, and phone numbers</p>
                 </div>
+              ) : (
+                /* Preview Table */
+                <div className="border rounded-xl overflow-hidden bg-background">
+                  <div className="p-2.5 bg-muted/60 border-b flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <span>Attendee Preview ({parsedRows.length} Rows)</span>
+                    <span>Status</span>
+                  </div>
 
-                <div className="max-h-64 overflow-y-auto divide-y text-xs">
-                  {parsedRows.slice(0, 100).map((row, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-2.5 flex items-center justify-between gap-2 ${
-                        !row.isValid ? "bg-red-500/5 text-muted-foreground" : "hover:bg-muted/20"
-                      }`}
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-1 flex-1">
-                        <div>
-                          <span className="font-bold text-foreground">{row.fullName}</span>
-                          <span className="text-[11px] text-muted-foreground ml-1.5">
-                            ({row.gender})
-                          </span>
-                        </div>
-                        <div className="text-muted-foreground">
-                          {row.phone || <span className="italic">No phone</span>}
-                        </div>
-                        <div className="text-muted-foreground">
-                          {row.branch || <span className="italic">No branch</span>}
-                        </div>
-                        <div className="text-muted-foreground flex items-center gap-1.5">
-                          {row.caregroup && <span>Group: {row.caregroup}</span>}
-                          {row.position === "Leader" && (
-                            <Badge variant="outline" className="text-[10px] py-0 px-1 text-purple-600 border-purple-300">
-                              Leader
-                            </Badge>
-                          )}
-                        </div>
+                  <div className="max-h-64 overflow-y-auto divide-y text-xs">
+                    {parsedRows.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground italic">
+                        No attendees found in this file.
                       </div>
+                    ) : (
+                      parsedRows.slice(0, 100).map((row, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-2.5 flex items-center justify-between gap-2 ${
+                            !row.isValid ? "bg-red-500/5 text-muted-foreground" : "hover:bg-muted/20"
+                          }`}
+                        >
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-1 flex-1">
+                            <div>
+                              <span className="font-bold text-foreground">{row.fullName}</span>
+                              <span className="text-[11px] text-muted-foreground ml-1.5">
+                                ({row.gender})
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground">
+                              {row.phone || <span className="italic">No phone</span>}
+                            </div>
+                            <div className="text-muted-foreground">
+                              {row.branch || <span className="italic">Auto branch</span>}
+                            </div>
+                            <div className="text-muted-foreground flex items-center gap-1.5">
+                              {row.caregroup && row.caregroup !== "AUTO" ? (
+                                <span>Group: {row.caregroup}</span>
+                              ) : (
+                                <Badge variant="secondary" className="text-[10px] py-0 px-1 text-primary">
+                                  Auto Group
+                                </Badge>
+                              )}
+                              {row.position === "Leader" && (
+                                <Badge variant="outline" className="text-[10px] py-0 px-1 text-purple-600 border-purple-300">
+                                  Leader
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
 
-                      <div className="flex-shrink-0">
-                        {row.isValid ? (
-                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-300 text-[10px] gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Ready
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-300 text-[10px] gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            Invalid
-                          </Badge>
-                        )}
+                          <div className="flex-shrink-0">
+                            {row.isValid ? (
+                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-300 text-[10px] gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Ready
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-300 text-[10px] gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                Invalid
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    {parsedRows.length > 100 && (
+                      <div className="p-2 text-center text-xs text-muted-foreground bg-muted/30">
+                        + {parsedRows.length - 100} more attendees will be imported
                       </div>
-                    </div>
-                  ))}
-                  {parsedRows.length > 100 && (
-                    <div className="p-2 text-center text-xs text-muted-foreground bg-muted/30">
-                      + {parsedRows.length - 100} more attendees will be imported
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -404,7 +471,7 @@ export function CampBulkImportDialog({
           <div className="text-xs text-muted-foreground">
             {validRows.length > 0 && (
               <span>
-                Ready to register <strong className="text-foreground">{validRows.length}</strong> attendees with MOR Badges & Rooms.
+                Ready to register <strong className="text-foreground">{validRows.length}</strong> attendees with MOR Badges, Groups & Rooms.
               </span>
             )}
           </div>
@@ -413,7 +480,7 @@ export function CampBulkImportDialog({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={loading}
+              disabled={loading || parsing}
               className="w-full sm:w-auto"
             >
               Cancel
@@ -421,7 +488,7 @@ export function CampBulkImportDialog({
 
             <Button
               className="bg-primary text-white hover:bg-primary/90 font-bold gap-2 w-full sm:w-auto shadow-md"
-              disabled={validRows.length === 0 || loading}
+              disabled={validRows.length === 0 || loading || parsing}
               onClick={handleBulkSubmit}
             >
               <Sparkles className="w-4 h-4" />
