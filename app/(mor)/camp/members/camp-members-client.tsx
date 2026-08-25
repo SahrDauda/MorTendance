@@ -53,8 +53,11 @@ import {
   Sparkles,
   Download,
   ShieldCheck,
+  FileSpreadsheet,
+  UploadCloud,
 } from "lucide-react"
 import { MorTagDialog } from "@/components/camp/mor-tag-dialog"
+import { CampBulkImportDialog } from "@/components/camp/camp-bulk-import-dialog"
 import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
 import Link from "next/link"
 
@@ -131,6 +134,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
 
   // Modals
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [bulkImportOpen, setBulkImportOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [tagDialogOpen, setTagDialogOpen] = useState(false)
@@ -468,11 +472,20 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           </Button>
 
           <Link href="/camp/print-tags">
-            <Button variant="secondary" className="gap-2">
+            <Button variant="secondary" className="gap-2 font-medium">
               <Printer className="w-4 h-4" />
               Print All Tags
             </Button>
           </Link>
+
+          <Button
+            variant="outline"
+            className="gap-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 font-semibold"
+            onClick={() => setBulkImportOpen(true)}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            Bulk Import (Excel)
+          </Button>
 
           <Button
             className="bg-primary text-white hover:bg-primary/90 gap-2 font-semibold shadow-md"
@@ -787,6 +800,26 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             <DialogDescription>
               Add a new delegate for MOR Camp 2026. Rooms are filtered by gender with automatic random allocation.
             </DialogDescription>
+
+            {/* Quick Bulk Import helper banner */}
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center justify-between gap-3 text-xs mt-2">
+              <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                <FileSpreadsheet className="w-4 h-4 flex-shrink-0" />
+                <span>Have a list in Excel? Import multiple attendees in one click.</span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-xs h-7 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 font-bold shrink-0"
+                onClick={() => {
+                  setAddModalOpen(false)
+                  setBulkImportOpen(true)
+                }}
+              >
+                Open Bulk Import
+              </Button>
+            </div>
           </DialogHeader>
 
           <form onSubmit={handleAddMember} className="space-y-4">
@@ -1185,6 +1218,13 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           setSelectedMember(m)
           setDeleteModalOpen(true)
         }}
+      />
+
+      {/* Bulk Import Attendees Dialog */}
+      <CampBulkImportDialog
+        open={bulkImportOpen}
+        onOpenChange={setBulkImportOpen}
+        onSuccess={fetchData}
       />
     </div>
   )
