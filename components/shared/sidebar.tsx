@@ -20,7 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 const campNavigation = [
   { name: "Command Center", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { name: "Camp Attendees", href: ROUTES.CAMP_MEMBERS, icon: Users },
-  { name: "Lodging Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
+  // { name: "Lodging Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
   { name: "Camp Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },
   { name: "Check-in Desk", href: ROUTES.CAMP_ATTENDANCE, icon: QrCode },
   { name: "Print Badges", href: ROUTES.CAMP_TAGS, icon: Printer },

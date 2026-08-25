@@ -9,7 +9,7 @@ import { ROUTES } from "@/lib/constants"
 const mobileNavigation = [
   { name: "Command", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { name: "Attendees", href: ROUTES.CAMP_MEMBERS, icon: Users },
-  { name: "Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
+  // { name: "Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
   { name: "Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },
   { name: "Check-in", href: ROUTES.CAMP_ATTENDANCE, icon: QrCode },
   { name: "Badges", href: ROUTES.CAMP_TAGS, icon: Printer },

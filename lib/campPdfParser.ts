@@ -168,8 +168,8 @@ export async function parseAttendeesFromPDF(file: File): Promise<ParsedAttendeeR
             : "Male"
       }
 
-      // Room logic: only members are auto-assigned rooms
-      const room = category === "Member" ? "AUTO" : ""
+      // Room logic (Commented out)
+      const room = ""
 
       results.push({
         fullName: nameRaw,
@@ -177,7 +177,7 @@ export async function parseAttendeesFromPDF(file: File): Promise<ParsedAttendeeR
         phone: "",
         branch,
         caregroup, // empty if not in a camp team
-        room, // AUTO for Member, empty for Leader
+        room, // Room commented out
         position: category,
         isValid: true,
       })

@@ -462,14 +462,14 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             Auto-Assign Groups
           </Button>
 
-          <Button
+          {/* <Button
             variant="outline"
             className="gap-2 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 font-medium"
             onClick={handleAutoAssignRooms}
           >
             <BedDouble className="w-4 h-4" />
             Auto-Assign Rooms
-          </Button>
+          </Button> */}
 
           <Link href="/camp/print-tags">
             <Button variant="secondary" className="gap-2 font-medium">
@@ -564,7 +564,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm bg-card hover:border-teal-500/40 transition-all">
+        {/* <Card className="border shadow-sm bg-card hover:border-teal-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Lodgings Allocated
@@ -582,7 +582,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             </div>
             <p className="text-xs text-muted-foreground mt-1">Allocated to rooms</p>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Filter and Search Bar */}
@@ -629,8 +629,8 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
               </SelectContent>
             </Select>
 
-            {/* Room Filter */}
-            <Select value={roomFilter} onValueChange={setRoomFilter}>
+            {/* Room Filter (Commented out) */}
+            {/* <Select value={roomFilter} onValueChange={setRoomFilter}>
               <SelectTrigger className="w-[130px] bg-background">
                 <SelectValue placeholder="Room" />
               </SelectTrigger>
@@ -642,7 +642,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </Select> */}
 
             {/* Gender Filter */}
             <Select value={genderFilter} onValueChange={setGenderFilter}>
@@ -670,7 +670,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 <TableHead>Gender</TableHead>
                 <TableHead>Branch</TableHead>
                 <TableHead>Group</TableHead>
-                <TableHead>Room</TableHead>
+                {/* <TableHead>Room</TableHead> */}
                 <TableHead>Role</TableHead>
                 <TableHead className="text-right">Badge Tag</TableHead>
               </TableRow>
@@ -741,7 +741,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                       )}
                     </TableCell>
 
-                    <TableCell>
+                    {/* <TableCell>
                       {member.room ? (
                         <Badge
                           variant="outline"
@@ -752,7 +752,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                       ) : (
                         <span className="text-xs text-muted-foreground italic">No Room</span>
                       )}
-                    </TableCell>
+                    </TableCell> */}
 
                     <TableCell>
                       <Badge
@@ -929,9 +929,9 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
               </div>
             </div>
 
-            {/* Row 3: Lodging Room & Position */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="space-y-1.5 min-w-0">
+            {/* Row 3: Position */}
+            <div className="grid grid-cols-1 gap-3.5">
+              {/* <div className="space-y-1.5 min-w-0">
                 <Label htmlFor="room" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Lodging Room ({formData.gender})
                 </Label>
@@ -959,7 +959,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div> */}
 
               <div className="space-y-1.5 min-w-0">
                 <Label htmlFor="position" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -1112,9 +1112,9 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
               </div>
             </div>
 
-            {/* Row 3: Lodging Room & Position */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="space-y-1.5 min-w-0">
+            {/* Row 3: Position */}
+            <div className="grid grid-cols-1 gap-3.5">
+              {/* <div className="space-y-1.5 min-w-0">
                 <Label htmlFor="editRoom" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Lodging Room ({formData.gender})
                 </Label>
@@ -1137,7 +1137,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div> */}
 
               <div className="space-y-1.5 min-w-0">
                 <Label htmlFor="editPosition" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

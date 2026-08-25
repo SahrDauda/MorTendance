@@ -161,8 +161,8 @@ export function CampDashboardClient({
         </div>
       </div>
 
-      {/* 4 Key Executive Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Key Executive Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Total Attendees */}
         <Card className="border shadow-sm bg-card hover:border-primary/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -189,7 +189,8 @@ export function CampDashboardClient({
           </CardContent>
         </Card>
 
-        {/* Lodging Allocations */}
+        {/* Lodging Allocations (Commented out) */}
+        {/*
         <Card className="border shadow-sm bg-card hover:border-amber-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -212,6 +213,7 @@ export function CampDashboardClient({
             </div>
           </CardContent>
         </Card>
+        */}
 
         {/* Camp Groups */}
         <Card className="border shadow-sm bg-card hover:border-purple-500/40 transition-all">
@@ -261,7 +263,7 @@ export function CampDashboardClient({
           <span className="text-xs text-muted-foreground">Direct access to core modules</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Attendees Module */}
           <Link href="/camp/members" className="group">
             <Card className="h-full border shadow-sm bg-card hover:border-primary transition-all hover:shadow-md">
@@ -285,7 +287,8 @@ export function CampDashboardClient({
             </Card>
           </Link>
 
-          {/* Rooms Module */}
+          {/* Rooms Module (Commented out) */}
+          {/*
           <Link href="/camp/rooms" className="group">
             <Card className="h-full border shadow-sm bg-card hover:border-amber-500 transition-all hover:shadow-md">
               <CardHeader className="pb-3">
@@ -307,6 +310,7 @@ export function CampDashboardClient({
               </CardContent>
             </Card>
           </Link>
+          */}
 
           {/* Groups Module */}
           <Link href="/camp/groups" className="group">
@@ -491,7 +495,7 @@ export function CampDashboardClient({
                       <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-2 mt-0.5">
                         <span className="font-mono text-primary font-semibold">{att.badgeId}</span>
                         {att.branch && <span>• {att.branch}</span>}
-                        {att.room && <span>• Room: {att.room}</span>}
+                        {/* {att.room && <span>• Room: {att.room}</span>} */}
                         {att.caregroup && <span>• Group: {att.caregroup}</span>}
                       </div>
                     </div>

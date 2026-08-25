@@ -114,12 +114,12 @@ export function MorTagDialog({
               value: member.caregroup || "Unassigned",
               color: "text-purple-300",
             },
-            {
-              icon: <BedDouble className="w-3.5 h-3.5" />,
-              label: "Lodging Room",
-              value: member.room || "Unassigned",
-              color: "text-amber-300",
-            },
+            // {
+            //   icon: <BedDouble className="w-3.5 h-3.5" />,
+            //   label: "Lodging Room",
+            //   value: member.room || "Unassigned",
+            //   color: "text-amber-300",
+            // },
             {
               icon: <User className="w-3.5 h-3.5" />,
               label: "Position",

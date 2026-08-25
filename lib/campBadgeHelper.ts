@@ -121,7 +121,8 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
           </div>
         </div>
 
-        <!-- Room (if assigned) -->
+        <!-- Room (Commented out) -->
+        <!--
         ${room ? `
         <div style="display: flex; align-items: flex-end; width: 100%; margin-bottom: 1.2mm;">
           <span style="font-weight: 700; color: #9ca3af; font-size: 2.2mm; width: 11mm; flex-shrink: 0;">Room :</span>
@@ -130,6 +131,7 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
           </div>
         </div>
         ` : ""}
+        -->
 
         <!-- Position Badge (if Leader) -->
         ${!isLeader ? "" : `

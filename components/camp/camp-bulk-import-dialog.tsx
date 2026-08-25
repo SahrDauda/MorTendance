@@ -64,36 +64,32 @@ export function CampBulkImportDialog({
         "Full Name": "John Koroma",
         Gender: "Male",
         "Phone / WhatsApp": "077123456",
-        Branch: "Freetown Central",
-        "Camp Group": "Elijah Group",
-        Room: "AUTO",
+        Branch: "Headquarters",
+        "Camp Group": "Doxasmus",
         Role: "Leader",
       },
       {
         "Full Name": "Fatmata Sesay",
         Gender: "Female",
         "Phone / WhatsApp": "076987654",
-        Branch: "Bo Branch",
-        "Camp Group": "Deborah Group",
-        Room: "Bethany",
+        Branch: "Bo",
+        "Camp Group": "Hagiasmos",
         Role: "Member",
       },
       {
         "Full Name": "David Mansaray",
         Gender: "Male",
         "Phone / WhatsApp": "078555123",
-        Branch: "Kenema Branch",
-        "Camp Group": "David Group",
-        Room: "AUTO",
+        Branch: "Eastern",
+        "Camp Group": "Huiothesia",
         Role: "Member",
       },
       {
         "Full Name": "Grace Kamara",
         Gender: "Female",
         "Phone / WhatsApp": "079111222",
-        Branch: "Makeni Branch",
-        "Camp Group": "Esther Group",
-        Room: "AUTO",
+        Branch: "Headquarters",
+        "Camp Group": "Paligenesia",
         Role: "Member",
       },
     ]
@@ -298,7 +294,7 @@ export function CampBulkImportDialog({
             </Button>
           </div>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
-            Upload an Excel (.xlsx, .xls), CSV, or PDF list of attendees. Badge IDs, groups, and rooms will be generated automatically.
+            Upload an Excel (.xlsx, .xls), CSV, or PDF list of attendees. Badge IDs and groups will be processed automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -471,7 +467,7 @@ export function CampBulkImportDialog({
           <div className="text-xs text-muted-foreground">
             {validRows.length > 0 && (
               <span>
-                Ready to register <strong className="text-foreground">{validRows.length}</strong> attendees with MOR Badges, Groups & Rooms.
+                Ready to register <strong className="text-foreground">{validRows.length}</strong> attendees with MOR Badges & Groups.
               </span>
             )}
           </div>
