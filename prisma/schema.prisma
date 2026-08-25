@@ -253,7 +253,9 @@ model CampRoom {
   id        String   @id @default(uuid())
   name      String   @unique
   gender    String   @default("Male")
-  capacity  Int      @default(10)
+  capacity  Int      @default(30)
+  leader    String?
+  assistant String?
   notes     String?
   createdAt DateTime @default(now()) @map("created_at")
 

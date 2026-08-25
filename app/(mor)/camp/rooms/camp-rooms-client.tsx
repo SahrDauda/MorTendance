@@ -61,6 +61,8 @@ interface CampRoom {
   name: string
   gender: string
   capacity: number
+  leader?: string | null
+  assistant?: string | null
   notes: string | null
   occupied: number
   available: number
@@ -78,6 +80,7 @@ interface UnassignedMember {
 
 export function CampRoomsClient({ userRole }: { userRole: string }) {
   const [rooms, setRooms] = useState<CampRoom[]>([])
+  const [allMembers, setAllMembers] = useState<RoomOccupant[]>([])
   const [unassignedMembers, setUnassignedMembers] = useState<UnassignedMember[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -98,7 +101,9 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
   const [formData, setFormData] = useState({
     name: "",
     gender: "Male",
-    capacity: 10,
+    capacity: 30,
+    leader: "",
+    assistant: "",
     notes: "",
   })
   const [selectedMemberToAssign, setSelectedMemberToAssign] = useState("")
@@ -118,6 +123,7 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
 
       if (roomsData.success) setRooms(roomsData.data)
       if (membersData.success) {
+        setAllMembers(membersData.data)
         const unassigned = membersData.data.filter((m: any) => !m.room)
         setUnassignedMembers(unassigned)
       }
@@ -132,6 +138,11 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Eligible members for Head of Room & Assistant matching selected room gender
+  const eligibleMembersForRoom = useMemo(() => {
+    return allMembers.filter((m) => m.gender === formData.gender)
+  }, [allMembers, formData.gender])
 
   // Metrics
   const metrics = useMemo(() => {
@@ -204,7 +215,7 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
       if (data.success) {
         toast.success(`Created room "${data.data.name}"`)
         setAddModalOpen(false)
-        setFormData({ name: "", gender: "Male", capacity: 10, notes: "" })
+        setFormData({ name: "", gender: "Male", capacity: 30, leader: "", assistant: "", notes: "" })
         fetchData()
       } else {
         toast.error(data.error || "Failed to create room")
@@ -343,6 +354,8 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
       name: room.name,
       gender: room.gender,
       capacity: room.capacity,
+      leader: room.leader || "",
+      assistant: room.assistant || "",
       notes: room.notes || "",
     })
     setEditModalOpen(true)
@@ -403,7 +416,7 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           <Button
             className="bg-primary text-white hover:bg-primary/90 gap-2 font-semibold shadow-md"
             onClick={() => {
-              setFormData({ name: "", gender: "Male", capacity: 10, notes: "" })
+              setFormData({ name: "", gender: "Male", capacity: 30, leader: "", assistant: "", notes: "" })
               setAddModalOpen(true)
             }}
           >
@@ -660,6 +673,24 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                     )}
                   </div>
 
+                  {/* Head of Room & Assistant Badges */}
+                  {(room.leader || room.assistant) && (
+                    <div className="bg-muted/30 p-2 rounded-lg border space-y-1 text-xs">
+                      {room.leader && (
+                        <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-semibold truncate">
+                          <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 shrink-0">Head</span>
+                          <span className="truncate">{room.leader}</span>
+                        </div>
+                      )}
+                      {room.assistant && (
+                        <div className="flex items-center gap-1.5 text-cyan-700 dark:text-cyan-400 font-medium truncate">
+                          <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 shrink-0">Asst</span>
+                          <span className="truncate">{room.assistant}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Actions */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <Button
@@ -716,7 +747,7 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                 <Label htmlFor="roomGender">Gender Allocation</Label>
                 <Select
                   value={formData.gender}
-                  onValueChange={(val) => setFormData({ ...formData, gender: val })}
+                  onValueChange={(val) => setFormData({ ...formData, gender: val, leader: "", assistant: "" })}
                 >
                   <SelectTrigger id="roomGender">
                     <SelectValue />
@@ -741,6 +772,69 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                   }
                   required
                 />
+              </div>
+            </div>
+
+            {/* Head of Room & Assistant */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="roomLeader" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Head of Room
+                </Label>
+                <Select
+                  value={formData.leader || "NONE"}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, leader: val === "NONE" ? "" : val })
+                  }
+                >
+                  <SelectTrigger id="roomLeader" className="w-full truncate">
+                    <SelectValue placeholder="Select Head of Room" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    <SelectItem value="NONE">-- No Head of Room --</SelectItem>
+                    {formData.leader &&
+                      !eligibleMembersForRoom.some((m) => m.fullName === formData.leader) && (
+                        <SelectItem value={formData.leader}>
+                          {formData.leader} (Current)
+                        </SelectItem>
+                      )}
+                    {eligibleMembersForRoom.map((m) => (
+                      <SelectItem key={m.id} value={m.fullName}>
+                        {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="roomAssistant" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Assistant Head
+                </Label>
+                <Select
+                  value={formData.assistant || "NONE"}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, assistant: val === "NONE" ? "" : val })
+                  }
+                >
+                  <SelectTrigger id="roomAssistant" className="w-full truncate">
+                    <SelectValue placeholder="Select Assistant" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    <SelectItem value="NONE">-- No Assistant --</SelectItem>
+                    {formData.assistant &&
+                      !eligibleMembersForRoom.some((m) => m.fullName === formData.assistant) && (
+                        <SelectItem value={formData.assistant}>
+                          {formData.assistant} (Current)
+                        </SelectItem>
+                      )}
+                    {eligibleMembersForRoom.map((m) => (
+                      <SelectItem key={m.id} value={m.fullName}>
+                        {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -794,7 +888,7 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                 <Label htmlFor="editRoomGender">Gender Allocation</Label>
                 <Select
                   value={formData.gender}
-                  onValueChange={(val) => setFormData({ ...formData, gender: val })}
+                  onValueChange={(val) => setFormData({ ...formData, gender: val, leader: "", assistant: "" })}
                 >
                   <SelectTrigger id="editRoomGender">
                     <SelectValue />
@@ -819,6 +913,69 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                   }
                   required
                 />
+              </div>
+            </div>
+
+            {/* Head of Room & Assistant */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="editRoomLeader" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Head of Room
+                </Label>
+                <Select
+                  value={formData.leader || "NONE"}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, leader: val === "NONE" ? "" : val })
+                  }
+                >
+                  <SelectTrigger id="editRoomLeader" className="w-full truncate">
+                    <SelectValue placeholder="Select Head of Room" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    <SelectItem value="NONE">-- No Head of Room --</SelectItem>
+                    {formData.leader &&
+                      !eligibleMembersForRoom.some((m) => m.fullName === formData.leader) && (
+                        <SelectItem value={formData.leader}>
+                          {formData.leader} (Current)
+                        </SelectItem>
+                      )}
+                    {eligibleMembersForRoom.map((m) => (
+                      <SelectItem key={m.id} value={m.fullName}>
+                        {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="editRoomAssistant" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Assistant Head
+                </Label>
+                <Select
+                  value={formData.assistant || "NONE"}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, assistant: val === "NONE" ? "" : val })
+                  }
+                >
+                  <SelectTrigger id="editRoomAssistant" className="w-full truncate">
+                    <SelectValue placeholder="Select Assistant" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56">
+                    <SelectItem value="NONE">-- No Assistant --</SelectItem>
+                    {formData.assistant &&
+                      !eligibleMembersForRoom.some((m) => m.fullName === formData.assistant) && (
+                        <SelectItem value={formData.assistant}>
+                          {formData.assistant} (Current)
+                        </SelectItem>
+                      )}
+                    {eligibleMembersForRoom.map((m) => (
+                      <SelectItem key={m.id} value={m.fullName}>
+                        {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -897,6 +1054,23 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
             <DialogDescription>
               List of attendees allocated to this room. You can unassign attendees below.
             </DialogDescription>
+
+            {(selectedRoom?.leader || selectedRoom?.assistant) && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {selectedRoom.leader && (
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 gap-1.5 py-1 px-2.5 text-xs">
+                    <span className="font-black uppercase text-[10px]">Head:</span>
+                    <span className="font-semibold">{selectedRoom.leader}</span>
+                  </Badge>
+                )}
+                {selectedRoom.assistant && (
+                  <Badge variant="outline" className="bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-300 gap-1.5 py-1 px-2.5 text-xs">
+                    <span className="font-black uppercase text-[10px]">Assistant:</span>
+                    <span className="font-semibold">{selectedRoom.assistant}</span>
+                  </Badge>
+                )}
+              </div>
+            )}
           </DialogHeader>
 
           <div className="py-2 space-y-2 max-h-80 overflow-y-auto pr-1">

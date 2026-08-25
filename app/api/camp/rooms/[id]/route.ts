@@ -21,6 +21,8 @@ export async function PATCH(
         ...(body.name && { name: body.name.trim() }),
         ...(body.gender && { gender: body.gender }),
         ...(body.capacity !== undefined && { capacity: Number(body.capacity) }),
+        ...(body.leader !== undefined && { leader: body.leader ? body.leader.trim() : null }),
+        ...(body.assistant !== undefined && { assistant: body.assistant ? body.assistant.trim() : null }),
         ...(body.notes !== undefined && { notes: body.notes }),
       },
     })

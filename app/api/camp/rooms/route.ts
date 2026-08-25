@@ -86,7 +86,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { name, gender = "Male", capacity = 30, notes } = body
+    const { name, gender = "Male", capacity = 30, leader, assistant, notes } = body
 
     if (!name || !name.trim()) {
       return NextResponse.json(
@@ -100,6 +100,8 @@ export async function POST(request: Request) {
         name: name.trim(),
         gender,
         capacity: Number(capacity) || 30,
+        leader: leader ? leader.trim() : null,
+        assistant: assistant ? assistant.trim() : null,
         notes: notes || null,
       },
     })
