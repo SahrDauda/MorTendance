@@ -79,9 +79,9 @@ export async function POST(request: Request) {
       )
     }
 
-    // Determine room: If not specified or set to "AUTO", automatically allocate a random room for this gender
-    let assignedRoom = room
-    if (!assignedRoom || assignedRoom === "AUTO" || assignedRoom.trim() === "") {
+    // Determine room: Auto-assign ONLY for Members. Leaders are assigned manually by Admin.
+    let assignedRoom = room && room !== "AUTO" && room !== "NONE" ? room.trim() : null
+    if (!assignedRoom && position !== "Leader") {
       assignedRoom = await assignRandomCampRoom({
         gender,
         branch,
@@ -89,11 +89,8 @@ export async function POST(request: Request) {
       })
     }
 
-    // Determine group: If not specified or set to "AUTO", automatically allocate a balanced group
-    let assignedGroup = caregroup
-    if (!assignedGroup || assignedGroup === "AUTO" || assignedGroup.trim() === "") {
-      assignedGroup = await assignRandomCampGroup()
-    }
+    // Determine group: Only use provided group. If none provided or "AUTO", leave as null for Admin to assign.
+    let assignedGroup = caregroup && caregroup !== "AUTO" && caregroup !== "NONE" ? caregroup.trim() : null
 
     // Generate next MOR Badge ID (e.g. MOR-001)
     const lastMember = await db.campMember.findFirst({

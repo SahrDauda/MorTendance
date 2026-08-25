@@ -64,22 +64,42 @@ export async function POST(request: Request) {
         String(item.gender || "Male").toLowerCase() === "female" ? "Female" : "Male"
       const fullName = item.fullName.trim()
       const phone = formatPhone(item.phone)
-      const branch = item.branch ? item.branch.trim() : null
-      const caregroup = item.caregroup || item.group ? (item.caregroup || item.group).trim() : null
       const position =
         String(item.position || item.role || "Member").toLowerCase() === "leader"
           ? "Leader"
           : "Member"
 
-      // Group assignment: use provided or auto-assign balanced group
-      let assignedGroup = caregroup
-      if (!assignedGroup || assignedGroup.toUpperCase() === "AUTO") {
-        assignedGroup = await assignRandomCampGroup()
+      // Branch logic: Headquarters, Eastern, Bo. Any group not Eastern/Bo is Headquarters
+      let branch = item.branch ? item.branch.trim() : ""
+      const groupOrMinistry = (item.group || item.ministryGroup || "").trim()
+
+      if (!branch || branch === "AUTO") {
+        if (groupOrMinistry.toLowerCase() === "eastern" || branch.toLowerCase() === "eastern") {
+          branch = "Eastern"
+        } else if (groupOrMinistry.toLowerCase() === "bo" || branch.toLowerCase() === "bo") {
+          branch = "Bo"
+        } else {
+          branch = "Headquarters"
+        }
       }
 
-      // Room assignment: use provided or auto-assign matching gender
-      let assignedRoom = item.room ? item.room.trim() : ""
-      if (!assignedRoom || assignedRoom.toUpperCase() === "AUTO") {
+      // Camp Team mapping (DOX -> Doxasmus, HUIO -> Huiothesia, etc.)
+      const teamMap: { [k: string]: string } = {
+        DOX: "Doxasmus",
+        HUIO: "Huiothesia",
+        DIK: "Dikaiosis",
+        HAG: "Hagiasmos",
+        PAL: "Paligenesia",
+      }
+      let rawTeam = (item.caregroup || item.campTeam || "").trim().toUpperCase()
+      let assignedGroup = teamMap[rawTeam] || (item.caregroup ? item.caregroup.trim() : null)
+      if (assignedGroup === "AUTO" || assignedGroup === "NONE") {
+        assignedGroup = null
+      }
+
+      // Room assignment: auto-assign ONLY for Members. Leaders are assigned manually by Admin.
+      let assignedRoom = item.room && item.room !== "AUTO" && item.room !== "NONE" ? item.room.trim() : ""
+      if (!assignedRoom && position !== "Leader") {
         assignedRoom =
           (await assignRandomCampRoom({
             gender: normGender,
