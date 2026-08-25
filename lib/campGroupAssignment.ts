@@ -10,14 +10,11 @@ function shuffle<T>(array: T[]): T[] {
 }
 
 const DEFAULT_CAMP_GROUPS = [
-  { name: "Group 1 (Elijah)", color: "#3B82F6" },
-  { name: "Group 2 (Deborah)", color: "#EC4899" },
-  { name: "Group 3 (David)", color: "#10B981" },
-  { name: "Group 4 (Esther)", color: "#8B5CF6" },
-  { name: "Group 5 (Daniel)", color: "#F59E0B" },
-  { name: "Group 6 (Joshua)", color: "#06B6D4" },
-  { name: "Group 7 (Gideon)", color: "#EF4444" },
-  { name: "Group 8 (Hannah)", color: "#14B8A6" },
+  { name: "Doxasmus", color: "#3B82F6" },
+  { name: "Huiothesia", color: "#8B5CF6" },
+  { name: "Dikaiosis", color: "#10B981" },
+  { name: "Hagiasmos", color: "#F59E0B" },
+  { name: "Paligenesia", color: "#EC4899" },
 ]
 
 /**
