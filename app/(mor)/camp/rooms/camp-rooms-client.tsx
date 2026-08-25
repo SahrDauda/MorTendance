@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
 import {
   BedDouble,
@@ -43,7 +42,13 @@ import {
   AlertCircle,
   Sparkles,
   Shuffle,
+  Download,
+  ShieldCheck,
 } from "lucide-react"
+import {
+  downloadSingleRoomRosterPDF,
+  downloadAllRoomsRosterPDF,
+} from "@/lib/campRoomRosterPDF"
 
 interface RoomOccupant {
   id: string
@@ -147,12 +152,18 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
   // Metrics
   const metrics = useMemo(() => {
     const totalRooms = rooms.length
-    const totalCapacity = rooms.reduce((acc, r) => acc + r.capacity, 0)
+    const maleRoomsCount = rooms.filter((r) => r.gender === "Male").length
+    const femaleRoomsCount = rooms.filter((r) => r.gender === "Female").length
     const totalOccupants = rooms.reduce((acc, r) => acc + r.occupied, 0)
-    const availableBeds = Math.max(0, totalCapacity - totalOccupants)
-    const occupancyRate = totalCapacity > 0 ? Math.round((totalOccupants / totalCapacity) * 100) : 0
+    const roomsWithLeaders = rooms.filter((r) => r.leader).length
 
-    return { totalRooms, totalCapacity, totalOccupants, availableBeds, occupancyRate }
+    return {
+      totalRooms,
+      maleRoomsCount,
+      femaleRoomsCount,
+      totalOccupants,
+      roomsWithLeaders,
+    }
   }, [rooms])
 
   // Filtered rooms
@@ -414,6 +425,18 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           </Button>
 
           <Button
+            variant="secondary"
+            className="gap-2 font-medium"
+            onClick={() => {
+              toast.info("Exporting master room rosters PDF...")
+              downloadAllRoomsRosterPDF(rooms)
+            }}
+          >
+            <Download className="w-4 h-4 text-teal-600" />
+            Download All Rosters (PDF)
+          </Button>
+
+          <Button
             className="bg-primary text-white hover:bg-primary/90 gap-2 font-semibold shadow-md"
             onClick={() => {
               setFormData({ name: "", gender: "Male", capacity: 30, leader: "", assistant: "", notes: "" })
@@ -438,7 +461,7 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                 {unassignedMembers.length} Attendees currently without lodging rooms
               </div>
               <div className="text-xs text-muted-foreground">
-                Auto-allocate them to available gender-separated hostel rooms based on remaining bed capacity.
+                Automatically allocate delegates across available gender-separated rooms.
               </div>
             </div>
           </div>
@@ -466,31 +489,16 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black">{metrics.totalRooms}</div>
-            <p className="text-xs text-muted-foreground mt-1">Available lodging blocks</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border shadow-sm bg-card hover:border-purple-500/40 transition-all">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Bed Capacity
-            </CardTitle>
-            <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
-              <Users className="w-5 h-5" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-purple-600">
-              {metrics.totalCapacity}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Total beds registered</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {metrics.maleRoomsCount} Male • {metrics.femaleRoomsCount} Female
+            </p>
           </CardContent>
         </Card>
 
         <Card className="border shadow-sm bg-card hover:border-emerald-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Occupied Beds
+              Allocated Delegates
             </CardTitle>
             <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
               <CheckCircle2 className="w-5 h-5" />
@@ -499,18 +507,17 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           <CardContent>
             <div className="text-2xl font-black text-emerald-600">
               {metrics.totalOccupants}
-              <span className="text-xs text-muted-foreground font-normal ml-1.5">
-                ({metrics.occupancyRate}%)
-              </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Attendees allocated</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Delegates assigned to rooms
+            </p>
           </CardContent>
         </Card>
 
         <Card className="border shadow-sm bg-card hover:border-amber-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Available Beds
+              Pending Allocation
             </CardTitle>
             <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
               <AlertCircle className="w-5 h-5" />
@@ -518,10 +525,32 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black text-amber-600">
-              {metrics.availableBeds}
+              {unassignedMembers.length}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {unassignedMembers.length} attendees unassigned
+              Attendees awaiting rooms
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border shadow-sm bg-card hover:border-purple-500/40 transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Room Leadership
+            </CardTitle>
+            <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-black text-purple-600">
+              {metrics.roomsWithLeaders}
+              <span className="text-xs text-muted-foreground font-normal ml-1.5">
+                / {metrics.totalRooms}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Rooms with Head assigned
             </p>
           </CardContent>
         </Card>
@@ -569,15 +598,10 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           </div>
         ) : (
           filteredRooms.map((room) => {
-            const isFull = room.occupied >= room.capacity
-            const percent = Math.round((room.occupied / room.capacity) * 100)
-
             return (
               <Card
                 key={room.id}
-                className={`border shadow-sm transition-all flex flex-col justify-between ${
-                  isFull ? "border-red-500/30 bg-card" : "bg-card hover:shadow-md hover:border-primary/40"
-                }`}
+                className="border shadow-sm transition-all flex flex-col justify-between bg-card hover:shadow-md hover:border-primary/40"
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -627,31 +651,20 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                     </div>
                   </div>
 
-                  {/* Capacity Bar */}
-                  <div className="space-y-1.5 pt-3">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-muted-foreground">Occupancy</span>
-                      <span className={isFull ? "text-red-500 font-bold" : "text-foreground"}>
-                        {room.occupied} / {room.capacity} Beds ({percent}%)
-                      </span>
-                    </div>
-                    <Progress
-                      value={percent}
-                      className={`h-2 ${isFull ? "[&>div]:bg-red-500" : "[&>div]:bg-primary"}`}
-                    />
+                  {/* Allocated Delegates Summary */}
+                  <div className="flex items-center justify-between text-xs font-semibold pt-2">
+                    <span className="text-muted-foreground">Allocated Members</span>
+                    <Badge variant="secondary" className="font-bold text-xs bg-primary/10 text-primary border-primary/20">
+                      {room.occupied} Delegates
+                    </Badge>
                   </div>
                 </CardHeader>
 
                 <CardContent className="pt-0 space-y-3">
                   {/* Occupants list snippet */}
                   <div className="bg-muted/40 p-2.5 rounded-xl border space-y-1.5">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex justify-between">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                       <span>Occupants ({room.occupants.length})</span>
-                      {room.available > 0 && (
-                        <span className="text-emerald-600 font-semibold lowercase">
-                          {room.available} beds left
-                        </span>
-                      )}
                     </div>
 
                     {room.occupants.length === 0 ? (
@@ -692,25 +705,40 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                   )}
 
                   {/* Actions */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-3 gap-1.5 pt-1">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs gap-1.5"
+                      className="text-xs px-2 gap-1"
                       onClick={() => openLodgers(room)}
+                      title="View all occupants in this room"
                     >
                       <Users className="w-3.5 h-3.5" />
-                      View All ({room.occupied})
+                      <span>View ({room.occupied})</span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs px-2 gap-1 border-slate-700 bg-slate-900 text-slate-100 hover:bg-primary/20 hover:text-primary hover:border-primary/40 font-semibold transition-colors"
+                      onClick={() => {
+                        toast.info(`Downloading roster PDF for ${room.name}...`)
+                        downloadSingleRoomRosterPDF(room)
+                      }}
+                      title={`Download roster PDF for Room ${room.name}`}
+                    >
+                      <Download className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Roster</span>
                     </Button>
 
                     <Button
                       size="sm"
-                      className="text-xs gap-1.5 bg-primary text-white"
-                      disabled={isFull}
+                      className="text-xs px-2 gap-1 bg-primary text-white"
                       onClick={() => openQuickAssign(room)}
+                      title="Assign an attendee to this room"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
-                      {isFull ? "Full" : "Assign Bed"}
+                      <span>Assign</span>
                     </Button>
                   </div>
                 </CardContent>
@@ -731,18 +759,18 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           </DialogHeader>
 
           <form onSubmit={handleAddRoom} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="roomName">Room Name *</Label>
-              <Input
-                id="roomName"
-                placeholder="e.g. Room 1 (Upper Block)"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="roomName">Room Name *</Label>
+                <Input
+                  id="roomName"
+                  placeholder="e.g. Room 1 (Upper Block)"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="roomGender">Gender Allocation</Label>
                 <Select
@@ -757,21 +785,6 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                     <SelectItem value="Female">Female</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="roomCapacity">Capacity (Beds) *</Label>
-                <Input
-                  id="roomCapacity"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={formData.capacity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, capacity: parseInt(e.target.value, 10) || 1 })
-                  }
-                  required
-                />
               </div>
             </div>
 
@@ -873,17 +886,17 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           </DialogHeader>
 
           <form onSubmit={handleEditRoom} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="editRoomName">Room Name *</Label>
-              <Input
-                id="editRoomName"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="editRoomName">Room Name *</Label>
+                <Input
+                  id="editRoomName"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="editRoomGender">Gender Allocation</Label>
                 <Select
@@ -898,21 +911,6 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                     <SelectItem value="Female">Female</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="editRoomCapacity">Capacity (Beds) *</Label>
-                <Input
-                  id="editRoomCapacity"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={formData.capacity}
-                  onChange={(e) =>
-                    setFormData({ ...formData, capacity: parseInt(e.target.value, 10) || 1 })
-                  }
-                  required
-                />
               </div>
             </div>
 
@@ -1047,8 +1045,8 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center justify-between">
               <span>{selectedRoom?.name} — Lodgers</span>
-              <Badge variant="outline">
-                {selectedRoom?.occupied} / {selectedRoom?.capacity} Beds
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                {selectedRoom?.occupied} Allocated
               </Badge>
             </DialogTitle>
             <DialogDescription>
@@ -1107,7 +1105,21 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
             )}
           </div>
 
-          <DialogFooter className="pt-3 border-t">
+          <DialogFooter className="pt-3 border-t flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-primary/20 hover:text-primary hover:border-primary/40 font-semibold gap-1.5"
+              onClick={() => {
+                if (selectedRoom) {
+                  toast.info(`Downloading roster PDF for ${selectedRoom.name}...`)
+                  downloadSingleRoomRosterPDF(selectedRoom)
+                }
+              }}
+            >
+              <Download className="w-4 h-4 text-teal-400" />
+              Download Roster PDF
+            </Button>
+
             <Button variant="outline" onClick={() => setLodgerModalOpen(false)}>
               Done
             </Button>
@@ -1123,7 +1135,7 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
               Assign Attendee to {selectedRoom?.name}
             </DialogTitle>
             <DialogDescription>
-              Select an unassigned attendee ({selectedRoom?.gender} only) to allocate a bed in this room.
+              Select an unassigned attendee ({selectedRoom?.gender} only) to allocate to this room.
             </DialogDescription>
           </DialogHeader>
 
