@@ -581,12 +581,29 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
 
             <div className="space-y-1.5">
               <Label htmlFor="groupLeader">Group Leader (Optional)</Label>
-              <Input
-                id="groupLeader"
-                placeholder="Leader full name"
-                value={groupForm.leader}
-                onChange={(e) => setGroupForm({ ...groupForm, leader: e.target.value })}
-              />
+              <Select
+                value={groupForm.leader || "NONE"}
+                onValueChange={(val) =>
+                  setGroupForm({ ...groupForm, leader: val === "NONE" ? "" : val })
+                }
+              >
+                <SelectTrigger id="groupLeader" className="w-full">
+                  <SelectValue placeholder="Select leader from registered attendees" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="NONE">-- No Leader Assigned --</SelectItem>
+                  {groupForm.leader && !members.some((m) => m.fullName === groupForm.leader) && (
+                    <SelectItem value={groupForm.leader}>
+                      {groupForm.leader} (Current)
+                    </SelectItem>
+                  )}
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.fullName}>
+                      {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <DialogFooter className="pt-4">
@@ -629,12 +646,29 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
 
             <div className="space-y-1.5">
               <Label htmlFor="editGroupLeader">Group Leader</Label>
-              <Input
-                id="editGroupLeader"
-                placeholder="Leader full name"
-                value={groupForm.leader}
-                onChange={(e) => setGroupForm({ ...groupForm, leader: e.target.value })}
-              />
+              <Select
+                value={groupForm.leader || "NONE"}
+                onValueChange={(val) =>
+                  setGroupForm({ ...groupForm, leader: val === "NONE" ? "" : val })
+                }
+              >
+                <SelectTrigger id="editGroupLeader" className="w-full">
+                  <SelectValue placeholder="Select leader from registered attendees" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="NONE">-- No Leader Assigned --</SelectItem>
+                  {groupForm.leader && !members.some((m) => m.fullName === groupForm.leader) && (
+                    <SelectItem value={groupForm.leader}>
+                      {groupForm.leader} (Current)
+                    </SelectItem>
+                  )}
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.fullName}>
+                      {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <DialogFooter className="pt-4">
