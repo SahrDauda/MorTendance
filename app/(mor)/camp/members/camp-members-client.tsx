@@ -147,7 +147,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
     phone: "",
     gender: "Male",
     branch: "",
-    caregroup: "",
+    caregroup: "AUTO", // "AUTO" means balanced group assignment
     room: "", // Empty string means "AUTO" (random room assignment)
     position: "Member",
   })
@@ -268,7 +268,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           phone: "",
           gender: "Male",
           branch: branches.length > 0 ? branches[0].name : "",
-          caregroup: "",
+          caregroup: "AUTO",
           room: "",
           position: "Member",
         })
@@ -495,7 +495,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 phone: "",
                 gender: "Male",
                 branch: branches.length > 0 ? branches[0].name : "",
-                caregroup: "",
+                caregroup: "AUTO",
                 room: "", // Defaults to Auto-Assign
                 position: "Member",
               })
@@ -909,13 +909,16 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                   Camp Group
                 </Label>
                 <Select
-                  value={formData.caregroup}
+                  value={formData.caregroup || "AUTO"}
                   onValueChange={(val) => setFormData({ ...formData, caregroup: val })}
                 >
                   <SelectTrigger id="caregroup" className="h-10 w-full truncate">
                     <SelectValue placeholder="Select group" />
                   </SelectTrigger>
                   <SelectContent className="max-h-56">
+                    <SelectItem value="AUTO" className="text-primary font-semibold">
+                      ✨ Auto-Assign (Balanced)
+                    </SelectItem>
                     {groups.map((g) => (
                       <SelectItem key={g.id} value={g.name}>
                         {g.name}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { assignRandomCampRoom } from "@/lib/campRoomAssignment"
+import { assignRandomCampGroup } from "@/lib/campGroupAssignment"
 
 export const dynamic = "force-dynamic"
 
@@ -88,6 +89,12 @@ export async function POST(request: Request) {
       })
     }
 
+    // Determine group: If not specified or set to "AUTO", automatically allocate a balanced group
+    let assignedGroup = caregroup
+    if (!assignedGroup || assignedGroup === "AUTO" || assignedGroup.trim() === "") {
+      assignedGroup = await assignRandomCampGroup()
+    }
+
     // Generate next MOR Badge ID (e.g. MOR-001)
     const lastMember = await db.campMember.findFirst({
       orderBy: { createdAt: "desc" },
@@ -118,7 +125,7 @@ export async function POST(request: Request) {
         phone: phone ? phone.trim() : null,
         gender,
         branch: branch || null,
-        caregroup: caregroup || null,
+        caregroup: assignedGroup || null,
         room: assignedRoom || null,
         position: position || "Member",
         paid: true,

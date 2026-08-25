@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { assignRandomCampRoom } from "@/lib/campRoomAssignment"
+import { assignRandomCampGroup } from "@/lib/campGroupAssignment"
 
 export const dynamic = "force-dynamic"
 
@@ -70,6 +71,12 @@ export async function POST(request: Request) {
           ? "Leader"
           : "Member"
 
+      // Group assignment: use provided or auto-assign balanced group
+      let assignedGroup = caregroup
+      if (!assignedGroup || assignedGroup.toUpperCase() === "AUTO") {
+        assignedGroup = await assignRandomCampGroup()
+      }
+
       // Room assignment: use provided or auto-assign matching gender
       let assignedRoom = item.room ? item.room.trim() : ""
       if (!assignedRoom || assignedRoom.toUpperCase() === "AUTO") {
@@ -91,7 +98,7 @@ export async function POST(request: Request) {
           phone,
           gender: normGender,
           branch,
-          caregroup,
+          caregroup: assignedGroup || null,
           room: assignedRoom || null,
           position,
           paid: true,
