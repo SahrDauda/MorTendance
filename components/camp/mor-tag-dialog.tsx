@@ -123,7 +123,9 @@ export function MorTagDialog({
             {
               icon: <User className="w-3.5 h-3.5" />,
               label: "Position",
-              value: member.position || "Member",
+              value: member.fullName?.trim().toLowerCase().includes("emmanuel dauda")
+                ? `${member.position || "Leader"} • Committed Christian`
+                : member.position || "Member",
               color: "text-slate-200",
             },
             {

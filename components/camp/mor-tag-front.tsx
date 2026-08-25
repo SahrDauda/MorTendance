@@ -215,23 +215,48 @@ export default function MorTagFront({
         {!isGeneralMember(positionToShow) && (
           <div
             style={{
-              display: "inline-flex",
+              display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: "#facc15",
-              color: "#000000",
-              fontWeight: 900,
-              fontFamily: "Arial, Helvetica, sans-serif",
-              fontSize: compact ? "2mm" : "10px",
-              padding: compact ? "0.6mm 2.5mm" : "3px 10px",
-              borderRadius: "999px",
               marginTop: compact ? "0.8mm" : "4px",
               alignSelf: "center",
-              letterSpacing: "0.5px",
-              textTransform: "uppercase",
             }}
           >
-            {positionToShow}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#facc15",
+                color: "#000000",
+                fontWeight: 900,
+                fontFamily: "Arial, Helvetica, sans-serif",
+                fontSize: compact ? "2mm" : "10px",
+                padding: compact ? "0.6mm 2.5mm" : "3px 10px",
+                borderRadius: "999px",
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}
+            >
+              {positionToShow}
+            </div>
+            {member.fullName?.trim().toLowerCase().includes("emmanuel dauda") && (
+              <span
+                style={{
+                  color: "#f8fafc",
+                  fontFamily: "Arial, Helvetica, sans-serif",
+                  fontWeight: 800,
+                  fontSize: compact ? "1.6mm" : "8.5px",
+                  letterSpacing: "0.4px",
+                  textTransform: "uppercase",
+                  marginTop: compact ? "0.5mm" : "3px",
+                  lineHeight: 1,
+                }}
+              >
+                Committed Christian
+              </span>
+            )}
           </div>
         )}
       </div>

@@ -114,13 +114,21 @@ export async function GET(
 
     // Leader Badge
     if (isLeader) {
-      const leaderY = 75.5
+      const isEmmanuel = safeName.includes("EMMANUEL DAUDA")
+      const leaderY = isEmmanuel ? 74.0 : 75.5
       doc.setFillColor(250, 204, 21) // Amber
-      doc.roundedRect(TAG_W / 2 - 11, leaderY, 22, 4.2, 2.1, 2.1, "F")
+      doc.roundedRect(TAG_W / 2 - 11, leaderY, 22, 3.8, 1.9, 1.9, "F")
       doc.setFont("Helvetica", "bold")
       doc.setFontSize(6.5)
       doc.setTextColor(0, 0, 0)
-      doc.text(pos, TAG_W / 2, leaderY + 3, { align: "center" })
+      doc.text(pos, TAG_W / 2, leaderY + 2.8, { align: "center" })
+
+      if (isEmmanuel) {
+        doc.setFont("Helvetica", "bold")
+        doc.setFontSize(5.0)
+        doc.setTextColor(248, 250, 252) // Crisp white
+        doc.text("COMMITTED CHRISTIAN", TAG_W / 2, leaderY + 6.3, { align: "center" })
+      }
     }
 
     // Card Outer Border (Blue #93C5FD)

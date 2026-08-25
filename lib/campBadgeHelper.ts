@@ -125,20 +125,40 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
         <!-- Position Badge (if Leader) -->
         ${!isLeader ? "" : `
         <div style="
-          display: inline-flex;
+          display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
-          background: #facc15;
-          color: #000000;
-          font-weight: 900;
-          font-size: 2mm;
-          padding: 0.6mm 2.5mm;
-          border-radius: 999px;
           margin-top: 0.8mm;
           align-self: center;
-          letter-spacing: 0.5px;
         ">
-          ${pos}
+          <div style="
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #facc15;
+            color: #000000;
+            font-weight: 900;
+            font-size: 2mm;
+            padding: 0.6mm 2.5mm;
+            border-radius: 999px;
+            letter-spacing: 0.5px;
+          ">
+            ${pos}
+          </div>
+          ${safeName.includes("EMMANUEL DAUDA") ? `
+          <span style="
+            color: #f8fafc;
+            font-weight: 800;
+            font-size: 1.6mm;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            margin-top: 0.5mm;
+            line-height: 1;
+          ">
+            Committed Christian
+          </span>
+          ` : ""}
         </div>
         `}
       </div>
