@@ -72,7 +72,13 @@ export function PrintTagsClient() {
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
-      if (groupFilter !== "ALL" && m.caregroup !== groupFilter) return false
+      if (groupFilter !== "ALL") {
+        if (groupFilter === "UNASSIGNED") {
+          if (m.caregroup && m.caregroup.trim() !== "" && m.caregroup !== "Unassigned") return false
+        } else if (m.caregroup !== groupFilter) {
+          return false
+        }
+      }
       if (branchFilter !== "ALL" && m.branch !== branchFilter) return false
       return true
     })
@@ -167,6 +173,7 @@ export function PrintTagsClient() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Groups</SelectItem>
+              <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
               {groups.map((g) => (
                 <SelectItem key={g} value={g}>
                   {g}

@@ -205,16 +205,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
     })
   }
 
-  // Metrics
-  const metrics = useMemo(() => {
-    const total = members.length
-    const leadersCount = members.filter((m) => m.position === "Leader").length
-    const groupsCount = members.filter((m) => m.caregroup).length
-    const roomsCount = members.filter((m) => m.room).length
-
-    return { total, leadersCount, groupsCount, roomsCount }
-  }, [members])
-
   // Filtered members
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
@@ -227,13 +217,36 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
       }
 
       if (branchFilter !== "ALL" && m.branch !== branchFilter) return false
-      if (groupFilter !== "ALL" && m.caregroup !== groupFilter) return false
+
+      if (groupFilter !== "ALL") {
+        if (groupFilter === "UNASSIGNED") {
+          if (m.caregroup && m.caregroup.trim() !== "" && m.caregroup !== "Unassigned") return false
+        } else if (m.caregroup !== groupFilter) {
+          return false
+        }
+      }
+
       if (roomFilter !== "ALL" && m.room !== roomFilter) return false
       if (genderFilter !== "ALL" && m.gender !== genderFilter) return false
 
       return true
     })
   }, [members, search, branchFilter, groupFilter, roomFilter, genderFilter])
+
+  // Metrics based on currently filtered members
+  const metrics = useMemo(() => {
+    const total = filteredMembers.length
+    const leadersCount = filteredMembers.filter((m) => m.position === "Leader").length
+    const groupsCount = filteredMembers.filter(
+      (m) => m.caregroup && m.caregroup.trim() !== "" && m.caregroup !== "Unassigned"
+    ).length
+    const unassignedCount = filteredMembers.filter(
+      (m) => !m.caregroup || m.caregroup.trim() === "" || m.caregroup === "Unassigned"
+    ).length
+    const roomsCount = filteredMembers.filter((m) => m.room).length
+
+    return { total, leadersCount, groupsCount, unassignedCount, roomsCount }
+  }, [filteredMembers])
 
   // Add Member
   const handleAddMember = async (e: React.FormEvent) => {
@@ -521,7 +534,11 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black">{metrics.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">Confirmed for Camp 2026</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {filteredMembers.length !== members.length
+                ? `Filtered (out of ${members.length})`
+                : "Confirmed for Camp 2026"}
+            </p>
           </CardContent>
         </Card>
 
@@ -539,7 +556,9 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
               {metrics.leadersCount}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Leaders & Coordinators
+              {filteredMembers.length !== members.length
+                ? "Leaders in filtered view"
+                : "Leaders & Coordinators"}
             </p>
           </CardContent>
         </Card>
@@ -560,7 +579,13 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 / {metrics.total}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Across active groups</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {groupFilter === "UNASSIGNED"
+                ? "All unassigned"
+                : filteredMembers.length !== members.length
+                ? `${metrics.unassignedCount} unassigned in view`
+                : "Across active groups"}
+            </p>
           </CardContent>
         </Card>
 
@@ -621,6 +646,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Groups</SelectItem>
+                <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
                 {groups.map((g) => (
                   <SelectItem key={g.id} value={g.name}>
                     {g.name}
