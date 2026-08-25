@@ -1,7 +1,6 @@
 import { db } from "@/lib/db"
 import { notFound } from "next/navigation"
 import MorTagFront from "@/components/camp/mor-tag-front"
-import MorTagBack from "@/components/camp/mor-tag-back"
 import MorBadgePrintButton from "@/components/camp/mor-badge-print-button"
 import Link from "next/link"
 
@@ -17,8 +16,6 @@ export default async function BadgeDownloadPage(props: { params: Promise<{ id: s
     },
   })
   if (!member) return notFound()
-
-  const safeFilename = `${member.fullName.replace(/\s+/g, "_")}_MOR_Badge_${member.badgeId}.pdf`
 
   return (
     <div
@@ -64,44 +61,28 @@ export default async function BadgeDownloadPage(props: { params: Promise<{ id: s
       </div>
 
       <p style={{ color: "#64748b", fontSize: "13px", textAlign: "center", maxWidth: 320 }}>
-        Your PDF is generating automatically. If the download doesn&apos;t start, click the button above.
+        Your PDF is downloading automatically. If the download doesn&apos;t start, click the button above.
       </p>
 
-      {/* Badge previews – rendered at exact card dimensions directly in the DOM */}
-      <div style={{ display: "flex", flexDirection: "row", gap: "32px", alignItems: "flex-start", flexWrap: "wrap", justifyContent: "center" }}>
-
-        {/* Front */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-          <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Front</span>
-          <div style={{ boxShadow: "0 20px 40px rgba(0,0,0,0.6)", borderRadius: "8px", overflow: "hidden" }}>
-            <div id="badge-front" style={{ width: "54mm", height: "85.6mm", overflow: "hidden", boxSizing: "border-box" }}>
-              <MorTagFront
-                compact
-                width="54mm"
-                height="85.6mm"
-                member={{
-                  fullName: member.fullName,
-                  branch: member.branch ?? undefined,
-                  caregroup: member.caregroup ?? undefined,
-                  room: member.room ?? undefined,
-                  position: member.position,
-                  badgeId: member.badgeId,
-                }}
-              />
-            </div>
+      {/* Badge preview – Front only */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+        <div style={{ boxShadow: "0 20px 40px rgba(0,0,0,0.6)", borderRadius: "8px", overflow: "hidden" }}>
+          <div id="badge-front" style={{ width: "54mm", height: "85.6mm", overflow: "hidden", boxSizing: "border-box" }}>
+            <MorTagFront
+              compact
+              width="54mm"
+              height="85.6mm"
+              member={{
+                fullName: member.fullName,
+                branch: member.branch ?? undefined,
+                caregroup: member.caregroup ?? undefined,
+                room: member.room ?? undefined,
+                position: member.position,
+                badgeId: member.badgeId,
+              }}
+            />
           </div>
         </div>
-
-        {/* Back */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-          <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Back</span>
-          <div style={{ boxShadow: "0 20px 40px rgba(0,0,0,0.6)", borderRadius: "8px", overflow: "hidden" }}>
-            <div id="badge-back" style={{ width: "54mm", height: "85.6mm", overflow: "hidden", boxSizing: "border-box" }}>
-              <MorTagBack compact width="54mm" height="85.6mm" badgeId={member.badgeId} />
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   )

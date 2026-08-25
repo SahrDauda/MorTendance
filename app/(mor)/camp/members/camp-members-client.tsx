@@ -38,7 +38,6 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import {
   Users,
-  CreditCard,
   Building,
   BedDouble,
   Search,
@@ -53,6 +52,7 @@ import {
   Printer,
   Sparkles,
   Download,
+  ShieldCheck,
 } from "lucide-react"
 import { MorTagDialog } from "@/components/camp/mor-tag-dialog"
 import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
@@ -128,7 +128,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
   const [groupFilter, setGroupFilter] = useState("ALL")
   const [roomFilter, setRoomFilter] = useState("ALL")
   const [genderFilter, setGenderFilter] = useState("ALL")
-  const [paidFilter, setPaidFilter] = useState("ALL")
 
   // Modals
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -147,7 +146,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
     caregroup: "",
     room: "", // Empty string means "AUTO" (random room assignment)
     position: "Member",
-    paid: false,
   })
 
   // Fetch data from database
@@ -206,12 +204,11 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
   // Metrics
   const metrics = useMemo(() => {
     const total = members.length
-    const paidCount = members.filter((m) => m.paid).length
+    const leadersCount = members.filter((m) => m.position === "Leader").length
     const groupsCount = members.filter((m) => m.caregroup).length
     const roomsCount = members.filter((m) => m.room).length
-    const unpaidCount = total - paidCount
 
-    return { total, paidCount, groupsCount, roomsCount, unpaidCount }
+    return { total, leadersCount, groupsCount, roomsCount }
   }, [members])
 
   // Filtered members
@@ -229,14 +226,10 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
       if (groupFilter !== "ALL" && m.caregroup !== groupFilter) return false
       if (roomFilter !== "ALL" && m.room !== roomFilter) return false
       if (genderFilter !== "ALL" && m.gender !== genderFilter) return false
-      if (paidFilter !== "ALL") {
-        const isPaid = paidFilter === "PAID"
-        if (m.paid !== isPaid) return false
-      }
 
       return true
     })
-  }, [members, search, branchFilter, groupFilter, roomFilter, genderFilter, paidFilter])
+  }, [members, search, branchFilter, groupFilter, roomFilter, genderFilter])
 
   // Add Member
   const handleAddMember = async (e: React.FormEvent) => {
@@ -274,7 +267,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           caregroup: "",
           room: "",
           position: "Member",
-          paid: false,
         })
         fetchData()
       } else {
@@ -390,26 +382,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
     }
   }
 
-  // Confirm all payments
-  const handleConfirmAllPayments = async () => {
-    try {
-      toast.info("Confirming all pending payments...")
-      const res = await fetch("/api/camp/confirm-all-payments", {
-        method: "POST",
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchData()
-      } else {
-        toast.error(data.error || "Failed to confirm payments")
-      }
-    } catch (err) {
-      toast.error("Failed to confirm payments")
-    }
-  }
-
   // Open Edit Modal
   const openEdit = (member: CampMember) => {
     setSelectedMember(member)
@@ -423,7 +395,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
       caregroup: member.caregroup || "",
       room: member.room || "NONE",
       position: pos,
-      paid: member.paid,
     })
     setEditModalOpen(true)
   }
@@ -478,17 +449,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             Refresh
           </Button>
 
-          {metrics.unpaidCount > 0 && (
-            <Button
-              variant="outline"
-              className="border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10 gap-1.5"
-              onClick={handleConfirmAllPayments}
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              Confirm {metrics.unpaidCount} Payments
-            </Button>
-          )}
-
           <Button
             variant="outline"
             className="gap-2 border-primary/30 text-primary hover:bg-primary/10 font-medium"
@@ -525,7 +485,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 caregroup: "",
                 room: "", // Defaults to Auto-Assign
                 position: "Member",
-                paid: false,
               })
               setAddModalOpen(true)
             }}
@@ -549,28 +508,25 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-black">{metrics.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">Registered for Camp 2026</p>
+            <p className="text-xs text-muted-foreground mt-1">Confirmed for Camp 2026</p>
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm bg-card hover:border-emerald-500/40 transition-all">
+        <Card className="border shadow-sm bg-card hover:border-amber-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Paid (NLe 300)
+              Camp Leaders
             </CardTitle>
-            <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl">
-              <CreditCard className="w-5 h-5" />
+            <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+              <ShieldCheck className="w-5 h-5" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black text-emerald-600">
-              {metrics.paidCount}
-              <span className="text-xs text-muted-foreground font-normal ml-1.5">
-                ({metrics.total ? Math.round((metrics.paidCount / metrics.total) * 100) : 0}%)
-              </span>
+            <div className="text-2xl font-black text-amber-600">
+              {metrics.leadersCount}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics.unpaidCount} pending payment
+              Leaders & Coordinators
             </p>
           </CardContent>
         </Card>
@@ -595,17 +551,17 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
           </CardContent>
         </Card>
 
-        <Card className="border shadow-sm bg-card hover:border-amber-500/40 transition-all">
+        <Card className="border shadow-sm bg-card hover:border-teal-500/40 transition-all">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Lodgings Allocated
             </CardTitle>
-            <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+            <div className="p-2 bg-teal-500/10 text-teal-600 rounded-xl">
               <BedDouble className="w-5 h-5" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black text-amber-600">
+            <div className="text-2xl font-black text-teal-600">
               {metrics.roomsCount}
               <span className="text-xs text-muted-foreground font-normal ml-1.5">
                 / {metrics.total}
@@ -686,18 +642,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 <SelectItem value="Female">Female</SelectItem>
               </SelectContent>
             </Select>
-
-            {/* Paid Filter */}
-            <Select value={paidFilter} onValueChange={setPaidFilter}>
-              <SelectTrigger className="w-[120px] bg-background">
-                <SelectValue placeholder="Payment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Status</SelectItem>
-                <SelectItem value="PAID">Paid Only</SelectItem>
-                <SelectItem value="UNPAID">Unpaid</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </Card>
@@ -715,7 +659,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 <TableHead>Group</TableHead>
                 <TableHead>Room</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead className="text-right">Payment</TableHead>
+                <TableHead className="text-right">Badge Tag</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -811,28 +755,19 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                     </TableCell>
 
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        {member.paid ? (
-                          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Paid
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-red-500 border-red-200 gap-1">
-                            <Clock className="w-3 h-3" /> Unpaid
-                          </Badge>
-                        )}
+                      <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 px-2 bg-slate-900 border-slate-700 text-slate-200 hover:bg-primary/20 hover:border-primary/40 hover:text-primary gap-1 shadow-sm transition-colors"
+                          className="h-8 px-3 bg-slate-900 border-slate-700 text-slate-100 hover:bg-primary/20 hover:border-primary/40 hover:text-primary gap-1.5 shadow-sm transition-all text-xs font-semibold"
                           title={`Download badge PDF for ${member.fullName}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             handleDirectDownloadTag(member)
                           }}
                         >
-                          <Download className="w-3.5 h-3.5" />
-                          <span className="text-[11px] font-semibold">Tag</span>
+                          <Download className="w-3.5 h-3.5 text-teal-400" />
+                          <span>Tag</span>
                         </Button>
                       </div>
                     </TableCell>
@@ -1007,25 +942,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Payment Checkbox Card */}
-            <div className="p-3 bg-muted/40 rounded-xl border flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="paid" className="cursor-pointer font-semibold text-sm text-foreground block">
-                  Confirmed Paid (NLe 300)
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Mark camp registration fee as fully paid
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                id="paid"
-                checked={formData.paid}
-                onChange={(e) => setFormData({ ...formData, paid: e.target.checked })}
-                className="rounded border-gray-300 text-primary focus:ring-primary w-5 h-5 cursor-pointer"
-              />
             </div>
 
             <DialogFooter className="pt-3 border-t">
@@ -1204,25 +1120,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Payment Checkbox Card */}
-            <div className="p-3 bg-muted/40 rounded-xl border flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="editPaid" className="cursor-pointer font-semibold text-sm text-foreground block">
-                  Confirmed Paid (NLe 300)
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Mark camp registration fee as fully paid
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                id="editPaid"
-                checked={formData.paid}
-                onChange={(e) => setFormData({ ...formData, paid: e.target.checked })}
-                className="rounded border-gray-300 text-primary focus:ring-primary w-5 h-5 cursor-pointer"
-              />
             </div>
 
             <DialogFooter className="pt-3 border-t">

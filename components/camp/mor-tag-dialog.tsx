@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React from "react"
 import {
   Dialog,
   DialogContent,
@@ -10,20 +10,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Download,
-  Loader2,
   Edit2,
   Trash2,
   CheckCircle2,
-  Clock,
   Phone,
   Building,
   BedDouble,
   User,
   ShieldCheck,
-  Calendar,
 } from "lucide-react"
 import { CampMemberTagInfo } from "./mor-tag-front"
-import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
 import { toast } from "sonner"
 
 export interface FullCampMemberInfo extends CampMemberTagInfo {
@@ -54,8 +50,6 @@ export function MorTagDialog({
   onEdit,
   onDelete,
 }: MorTagDialogProps) {
-  const [downloading, setDownloading] = useState(false)
-
   if (!member) return null
 
   const handleDownload = () => {
@@ -81,16 +75,6 @@ export function MorTagDialog({
             <span className="text-xs bg-primary/20 text-primary px-3 py-1 rounded-full font-mono font-bold tracking-wider">
               {member.badgeId}
             </span>
-            <Badge
-              variant="outline"
-              className={
-                member.paid
-                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-semibold"
-                  : "bg-red-500/20 text-red-400 border-red-500/40 font-semibold"
-              }
-            >
-              {member.paid ? "Paid (NLe 300)" : "Unpaid"}
-            </Badge>
             {member.position === "Leader" && (
               <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 uppercase text-[10px] font-bold tracking-wider">
                 Leader
@@ -143,15 +127,9 @@ export function MorTagDialog({
               color: "text-slate-200",
             },
             {
-              icon: <Calendar className="w-3.5 h-3.5" />,
-              label: "Payment Status",
-              value: member.paid ? "✅ Confirmed" : "⏳ Unpaid",
-              color: member.paid ? "text-emerald-400" : "text-red-400",
-            },
-            {
               icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-              label: "Food Served",
-              value: member.foodReceived ? "✅ Check-in Done" : "⏳ Pending",
+              label: "Food Check-in",
+              value: member.foodReceived ? "✅ Served" : "⏳ Pending",
               color: "text-slate-200",
             },
           ].map(({ icon, label, value, color }) => (
@@ -171,17 +149,8 @@ export function MorTagDialog({
           <Button
             className="w-full bg-primary hover:bg-primary/90 text-white gap-2 font-bold h-11 text-sm shadow-lg tracking-wide"
             onClick={handleDownload}
-            disabled={downloading}
           >
-            {downloading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Generating Badge PDF...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" /> Download Tag
-              </>
-            )}
+            <Download className="w-4 h-4" /> Download Tag
           </Button>
 
           <div className="flex items-center justify-between pt-1">

@@ -36,24 +36,10 @@ export interface BadgeAttendeeData {
 }
 
 /**
- * Directly downloads a 2-page 54×85.6mm PDF badge for an attendee.
- * Creates an offscreen DOM element, renders Front & Back with base64 images,
- * captures via html2canvas (no CORS/tainting possible), and saves via jsPDF.
+ * Directly downloads a single-page 54×85.6mm Front badge PDF for an attendee.
  */
 export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promise<void> {
   const photoBase64 = await getCampPhotoBase64()
-  const QRCode = (await import("qrcode")).default
-
-  // Generate QR Code data URL (pure in-memory base64 PNG)
-  const qrDataUrl = await QRCode.toDataURL(attendee.badgeId, {
-    margin: 1,
-    width: 300,
-    errorCorrectionLevel: "M",
-    color: {
-      dark: "#000000",
-      light: "#ffffff",
-    },
-  })
 
   // Create isolated container in DOM
   const container = document.createElement("div")
@@ -79,7 +65,7 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
   }
 
   container.innerHTML = `
-    <!-- FRONT (Page 1) -->
+    <!-- FRONT (Single Page) -->
     <div id="mor-pdf-front" style="
       width: 54mm;
       height: 85.6mm;
@@ -166,54 +152,13 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
         `}
       </div>
     </div>
-
-    <!-- BACK (Page 2) -->
-    <div id="mor-pdf-back" style="
-      width: 54mm;
-      height: 85.6mm;
-      position: relative;
-      overflow: hidden;
-      background: #0b0f19;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      justifyContent: space-between;
-      align-items: center;
-      padding: 6mm 4mm;
-      border: 1mm solid #ffffff;
-      font-family: Arial, Helvetica, sans-serif;
-    ">
-      <!-- Background flyer with dark overlay -->
-      <img src="${photoBase64}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; display: block;" />
-      <div style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.88); z-index: 1;"></div>
-
-      <div style="position: relative; z-index: 2; color: #fbbf24; font-size: 3.2mm; font-weight: 800; letter-spacing: 1.5px; margin-top: 1.5mm; text-align: center;">
-        SCAN FOR CHECK-IN
-      </div>
-
-      <div style="position: relative; z-index: 2; background: white; padding: 2.5mm; border-radius: 2.5mm; display: flex; justify-content: center; align-items: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-        <img src="${qrDataUrl}" style="width: 32mm; height: 32mm; display: block;" />
-      </div>
-
-      <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 2mm;">
-        <div style="color: white; font-size: 3.2mm; font-weight: 800; letter-spacing: 1px;">
-          ${attendee.badgeId}
-        </div>
-        <div style="color: #94a3b8; font-size: 1.8mm; font-weight: 600; text-align: center;">
-          Mercy Prayer Mountain • Helpline: +23276 824044
-        </div>
-      </div>
-    </div>
   `
 
   document.body.appendChild(container)
 
   try {
-    // Small delay to ensure browser layout compute
     await new Promise((r) => setTimeout(r, 150))
-
     const frontEl = container.querySelector("#mor-pdf-front") as HTMLElement
-    const backEl = container.querySelector("#mor-pdf-back") as HTMLElement
 
     const opts = {
       scale: 3.5,
@@ -222,10 +167,7 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
       logging: false,
     }
 
-    const [canvasFront, canvasBack] = await Promise.all([
-      html2canvas(frontEl, opts),
-      html2canvas(backEl, opts),
-    ])
+    const canvasFront = await html2canvas(frontEl, opts)
 
     const TAG_W_MM = 54
     const TAG_H_MM = 85.6
@@ -237,12 +179,7 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
       compress: true,
     })
 
-    // Page 1: Front
     pdf.addImage(canvasFront.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, TAG_W_MM, TAG_H_MM, "", "FAST")
-
-    // Page 2: Back
-    pdf.addPage([TAG_W_MM, TAG_H_MM], "portrait")
-    pdf.addImage(canvasBack.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, TAG_W_MM, TAG_H_MM, "", "FAST")
 
     const filename = `${safeName.replace(/\s+/g, "_")}_MOR_Badge_${attendee.badgeId}.pdf`
     pdf.save(filename)

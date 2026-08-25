@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { jsPDF } from "jspdf"
-import QRCode from "qrcode"
 import fs from "fs"
 import path from "path"
 
@@ -40,11 +39,6 @@ export async function GET(
     }
 
     const photoData = getCampPhotoBase64()
-    const qrData = await QRCode.toDataURL(member.badgeId, {
-      margin: 1,
-      width: 400,
-      errorCorrectionLevel: "M",
-    })
 
     const TAG_W = 54
     const TAG_H = 85.6
@@ -57,18 +51,18 @@ export async function GET(
     })
 
     // ─────────────────────────────────────────────
-    // PAGE 1: FRONT
+    // SINGLE PAGE BADGE (FRONT)
     // ─────────────────────────────────────────────
-    // Background
+    // Dark Background
     doc.setFillColor(11, 15, 25)
     doc.rect(0, 0, TAG_W, TAG_H, "F")
 
-    // Top Flyer Image (62% ≈ 53mm)
+    // Top Camp Flyer Image (62% ≈ 53mm)
     if (photoData) {
       doc.addImage(photoData, "JPEG", 0, 0, TAG_W, 53, "", "FAST")
     }
 
-    // Divider Line (Cyan to Gold)
+    // Divider Line (Gold)
     doc.setDrawColor(251, 191, 36)
     doc.setLineWidth(0.6)
     doc.line(0, 53, TAG_W, 53)
@@ -135,55 +129,6 @@ export async function GET(
 
     // Card Outer Border (Blue #93C5FD)
     doc.setDrawColor(147, 197, 253)
-    doc.setLineWidth(1)
-    doc.rect(0.5, 0.5, TAG_W - 1, TAG_H - 1, "D")
-
-    // ─────────────────────────────────────────────
-    // PAGE 2: BACK
-    // ─────────────────────────────────────────────
-    doc.addPage([TAG_W, TAG_H], "portrait")
-
-    // Dark Background
-    doc.setFillColor(15, 23, 42)
-    doc.rect(0, 0, TAG_W, TAG_H, "F")
-
-    // Background Image
-    if (photoData) {
-      doc.addImage(photoData, "JPEG", 0, 0, TAG_W, TAG_H, "", "FAST")
-      // Semi-transparent overlay simulation
-      doc.setFillColor(15, 23, 42)
-      // Note: jsPDF dark overlay rectangle
-      doc.rect(0, 0, TAG_W, TAG_H, "F")
-    }
-
-    // Header Title
-    doc.setFont("Helvetica", "bold")
-    doc.setFontSize(8.5)
-    doc.setTextColor(251, 191, 36) // Gold
-    doc.text("SCAN FOR CHECK-IN", TAG_W / 2, 14, { align: "center" })
-
-    // QR Code Container Card
-    doc.setFillColor(255, 255, 255)
-    doc.roundedRect(TAG_W / 2 - 17, 20, 34, 34, 2.5, 2.5, "F")
-    doc.addImage(qrData, "PNG", TAG_W / 2 - 15, 22, 30, 30, "", "FAST")
-
-    // Badge ID
-    doc.setFontSize(10)
-    doc.setTextColor(255, 255, 255)
-    doc.text(member.badgeId, TAG_W / 2, 62, { align: "center" })
-
-    // Subtitle / Helpline
-    doc.setFontSize(5.5)
-    doc.setTextColor(148, 163, 184)
-    doc.text(
-      "Mercy Prayer Mountain • Helpline: +23276 824044",
-      TAG_W / 2,
-      68,
-      { align: "center" }
-    )
-
-    // Back Outer Border (White)
-    doc.setDrawColor(255, 255, 255)
     doc.setLineWidth(1)
     doc.rect(0.5, 0.5, TAG_W - 1, TAG_H - 1, "D")
 

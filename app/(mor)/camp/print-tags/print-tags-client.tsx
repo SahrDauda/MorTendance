@@ -13,7 +13,6 @@ import {
 import { Printer, Download, ArrowLeft, RefreshCw, Loader2 } from "lucide-react"
 import Link from "next/link"
 import MorTagFront from "@/components/camp/mor-tag-front"
-import MorTagBack from "@/components/camp/mor-tag-back"
 import { toast } from "sonner"
 
 interface Attendee {
@@ -37,10 +36,8 @@ export function PrintTagsClient() {
   const [dbBranches, setDbBranches] = useState<CampBranch[]>([])
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
-  const [paidOnly, setPaidOnly] = useState("ALL")
   const [groupFilter, setGroupFilter] = useState("ALL")
   const [branchFilter, setBranchFilter] = useState("ALL")
-  const [viewMode, setViewMode] = useState<"front" | "back" | "both">("both")
 
   const printAreaRef = useRef<HTMLDivElement>(null)
 
@@ -75,12 +72,11 @@ export function PrintTagsClient() {
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
-      if (paidOnly === "PAID" && !m.paid) return false
       if (groupFilter !== "ALL" && m.caregroup !== groupFilter) return false
       if (branchFilter !== "ALL" && m.branch !== branchFilter) return false
       return true
     })
-  }, [members, paidOnly, groupFilter, branchFilter])
+  }, [members, groupFilter, branchFilter])
 
   const handlePrint = () => {
     window.print()
@@ -165,27 +161,6 @@ export function PrintTagsClient() {
 
         {/* Filters */}
         <Card className="p-4 border shadow-sm flex flex-wrap gap-3 items-center">
-          <Select value={viewMode} onValueChange={(val: any) => setViewMode(val)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Side" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="both">Front & Back</SelectItem>
-              <SelectItem value="front">Front Only</SelectItem>
-              <SelectItem value="back">Back Only</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={paidOnly} onValueChange={setPaidOnly}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Payment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Attendees</SelectItem>
-              <SelectItem value="PAID">Paid Only</SelectItem>
-            </SelectContent>
-          </Select>
-
           <Select value={groupFilter} onValueChange={setGroupFilter}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Group" />
@@ -235,18 +210,9 @@ export function PrintTagsClient() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 print:grid-cols-2 print:gap-4 print:p-2">
             {filteredMembers.map((member) => (
-              <React.Fragment key={member.id}>
-                {(viewMode === "both" || viewMode === "front") && (
-                  <div className="flex flex-col items-center gap-1.5 break-inside-avoid">
-                    <MorTagFront member={member} width="54mm" height="85.6mm" compact={true} />
-                  </div>
-                )}
-                {(viewMode === "both" || viewMode === "back") && (
-                  <div className="flex flex-col items-center gap-1.5 break-inside-avoid">
-                    <MorTagBack badgeId={member.badgeId} width="54mm" height="85.6mm" compact={true} />
-                  </div>
-                )}
-              </React.Fragment>
+              <div key={member.id} className="flex flex-col items-center gap-1.5 break-inside-avoid">
+                <MorTagFront member={member} width="54mm" height="85.6mm" compact={true} />
+              </div>
             ))}
           </div>
         )}
