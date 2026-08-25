@@ -2,11 +2,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Users, BedDouble, Sparkles, QrCode, Printer } from "lucide-react"
+import { LayoutDashboard, Users, BedDouble, Sparkles, QrCode, Printer } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ROUTES } from "@/lib/constants"
 
 const mobileNavigation = [
+  { name: "Command", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { name: "Attendees", href: ROUTES.CAMP_MEMBERS, icon: Users },
   { name: "Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
   { name: "Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },

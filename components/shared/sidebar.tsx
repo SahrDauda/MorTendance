@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  LayoutDashboard,
   Users,
   BedDouble,
   QrCode,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 const campNavigation = [
+  { name: "Command Center", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
   { name: "Camp Attendees", href: ROUTES.CAMP_MEMBERS, icon: Users },
   { name: "Lodging Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
   { name: "Camp Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },
@@ -43,7 +45,10 @@ export function Sidebar() {
             </div>
             <nav className="flex flex-col gap-1.5 pt-1">
               {campNavigation.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href)
+                const isActive =
+                  item.href === ROUTES.DASHBOARD
+                    ? pathname === ROUTES.DASHBOARD || pathname === "/"
+                    : pathname === item.href || pathname.startsWith(item.href)
                 const IconComponent = item.icon
                 return (
                   <Link key={item.name} href={item.href}>
