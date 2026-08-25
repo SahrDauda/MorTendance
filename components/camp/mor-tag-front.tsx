@@ -210,14 +210,7 @@ export default function MorTagFront({
           compact={compact}
           valueColor="#d1d5db"
         />
-        {/* {member.room && (
-          <DarkFieldRow
-            label="Room"
-            value={member.room}
-            compact={compact}
-            valueColor="#38bdf8"
-          />
-        )} */}
+
 
         {!isGeneralMember(positionToShow) && (
           <div

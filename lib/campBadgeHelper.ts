@@ -121,17 +121,6 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
           </div>
         </div>
 
-        <!-- Room (Commented out) -->
-        <!--
-        ${room ? `
-        <div style="display: flex; align-items: flex-end; width: 100%; margin-bottom: 1.2mm;">
-          <span style="font-weight: 700; color: #9ca3af; font-size: 2.2mm; width: 11mm; flex-shrink: 0;">Room :</span>
-          <div style="flex: 1; border-bottom: 1.5px dotted rgba(255,255,255,0.4); margin-left: 2px; padding-bottom: 1px;">
-            <span style="font-weight: 800; color: #38bdf8; font-size: ${getFontSize(room)}; white-space: nowrap;">${room}</span>
-          </div>
-        </div>
-        ` : ""}
-        -->
 
         <!-- Position Badge (if Leader) -->
         ${!isLeader ? "" : `

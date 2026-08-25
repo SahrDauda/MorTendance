@@ -109,16 +109,12 @@ export async function GET(
     }
 
     drawField("Name", safeName, 58.5, [255, 255, 255])
-    drawField("Branch", branch, 63.5, [251, 191, 36]) // Gold
-    drawField("Group", group, 68.5, [209, 213, 219]) // Light Gray
-
-    if (room) {
-      drawField("Room", room, 73.5, [56, 189, 248]) // Cyan
-    }
+    drawField("Branch", branch, 64.0, [251, 191, 36]) // Gold
+    drawField("Group", group, 69.5, [209, 213, 219]) // Light Gray
 
     // Leader Badge
     if (isLeader) {
-      const leaderY = room ? 78 : 74
+      const leaderY = 75.5
       doc.setFillColor(250, 204, 21) // Amber
       doc.roundedRect(TAG_W / 2 - 11, leaderY, 22, 4.2, 2.1, 2.1, "F")
       doc.setFont("Helvetica", "bold")
