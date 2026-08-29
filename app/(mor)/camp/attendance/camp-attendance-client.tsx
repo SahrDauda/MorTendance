@@ -116,9 +116,7 @@ export function CampAttendanceClient() {
   const [filterBranch, setFilterBranch] = useState("ALL")
   const [filterGroup, setFilterGroup] = useState("ALL")
 
-  // Custom Session Modal
-  const [customSessionOpen, setCustomSessionOpen] = useState(false)
-  const [customSessionName, setCustomSessionName] = useState("")
+
 
   const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -505,11 +503,6 @@ export function CampAttendanceClient() {
                   ))}
                 </SelectGroup>
               ))}
-              <SelectGroup>
-                <SelectItem value="__CUSTOM__" className="text-xs font-bold text-amber-600">
-                  ➕ Add Custom Program Session...
-                </SelectItem>
-              </SelectGroup>
             </SelectContent>
           </Select>
 
@@ -1148,58 +1141,6 @@ export function CampAttendanceClient() {
           </Button>
         </div>
       )}
-
-      {/* Add Custom Session Dialog */}
-      <Dialog open={customSessionOpen} onOpenChange={setCustomSessionOpen}>
-        <DialogContent className="max-w-md bg-card p-4 sm:p-6 rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">Add Custom Program Session</DialogTitle>
-            <DialogDescription>
-              Create a new program or workshop check-in session for MOR Camp 2026.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!customSessionName.trim()) {
-                toast.error("Please enter session name")
-                return
-              }
-              switchSession(customSessionName.trim())
-              setCustomSessionOpen(false)
-              setCustomSessionName("")
-            }}
-            className="space-y-4 py-2"
-          >
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Session / Program Name *
-              </label>
-              <Input
-                placeholder="e.g. Wednesday — Choir Rehearsal, Leadership Summit"
-                value={customSessionName}
-                onChange={(e) => setCustomSessionName(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
-
-            <DialogFooter className="pt-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setCustomSessionOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="bg-primary text-white font-bold">
-                Set as Active Session
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -13,7 +13,7 @@ export interface CampSessionDef {
 
 export const CAMP_SCHEDULE: CampSessionDef[] = [
   // ==========================================
-  // DAY 1 — TUESDAY
+  // DAY 1 (TUESDAY)
   // ==========================================
   {
     id: "tue-bus-departure",
@@ -27,19 +27,8 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
     description: "Calling member names and checking in before entering departure buses.",
   },
   {
-    id: "tue-registration",
-    name: "Tuesday — Registration & Orientation (10:30 - 11:30 AM)",
-    shortLabel: "Tuesday Registration & Orientation",
-    day: "Tuesday",
-    category: "Special",
-    teachingStartTime: "10:30 AM",
-    endTime: "11:30 AM",
-    isTeachingSession: false,
-    description: "Campground arrival, room check-in, and camp orientation.",
-  },
-  {
     id: "tue-teaching-1",
-    name: "Tuesday — 1st Session of Teaching (Check-in 1:00 - 1:30 PM | Late after 1:30 PM)",
+    name: "Tuesday — First Session of Teaching (1:30 - 4:00 PM)",
     shortLabel: "Tuesday 1st Teaching",
     day: "Tuesday",
     category: "Teaching",
@@ -51,7 +40,7 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
   },
   {
     id: "tue-teaching-2",
-    name: "Tuesday — 2nd Session of Teaching (Check-in 6:00 - 6:20 PM | Late after 6:20 PM)",
+    name: "Tuesday — Second Session of Teaching (6:15 - 9:15 PM)",
     shortLabel: "Tuesday 2nd Teaching",
     day: "Tuesday",
     category: "Teaching",
@@ -63,22 +52,22 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
   },
 
   // ==========================================
-  // DAY 2 — WEDNESDAY
+  // DAY 2 (WEDNESDAY)
   // ==========================================
   {
     id: "wed-devotion",
-    name: "Wednesday — Morning Devotion (5:30 - 6:15 AM)",
+    name: "Wednesday — Morning’s Devotion (5:30 - 6:15 AM)",
     shortLabel: "Wednesday Morning Devotion",
     day: "Wednesday",
     category: "Devotion",
     teachingStartTime: "5:30 AM",
     endTime: "6:15 AM",
     isTeachingSession: false,
-    description: "Early morning prayer and devotion.",
+    description: "Early morning devotion. Check-in starts 5:30 AM.",
   },
   {
     id: "wed-teaching-1",
-    name: "Wednesday — 1st Teaching (Review 8:00 - 8:30 AM | Late after 8:30 AM)",
+    name: "Wednesday — First Session of Teaching (8:30 - 11:30 AM)",
     shortLabel: "Wednesday 1st Teaching",
     day: "Wednesday",
     category: "Teaching",
@@ -90,7 +79,7 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
   },
   {
     id: "wed-teaching-2",
-    name: "Wednesday — 2nd Teaching (Review 1:30 - 2:00 PM | Late after 2:00 PM)",
+    name: "Wednesday — Second Session of Teaching (2:00 - 5:00 PM)",
     shortLabel: "Wednesday 2nd Teaching",
     day: "Wednesday",
     category: "Teaching",
@@ -102,34 +91,34 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
   },
   {
     id: "wed-teaching-3",
-    name: "Wednesday — 3rd Teaching (Review 7:30 - 8:00 PM | Late after 8:00 PM)",
+    name: "Wednesday — Third Session of Teaching (8:00 - 10:00 PM)",
     shortLabel: "Wednesday 3rd Teaching",
     day: "Wednesday",
     category: "Teaching",
-    reviewStartTime: "7:30 PM",
+    reviewStartTime: "7:00 PM",
     teachingStartTime: "8:00 PM",
-    endTime: "10:30 PM",
+    endTime: "10:00 PM",
     isTeachingSession: true,
-    description: "Check-in during 30 mins review (7:30 to 8:00 PM). Anyone arriving after 8:00 PM is LATE.",
+    description: "Check-in during review (7:00 to 7:30 PM). Anyone arriving after 8:00 PM is LATE.",
   },
 
   // ==========================================
-  // DAY 3 — THURSDAY
+  // DAY 3 (THURSDAY)
   // ==========================================
   {
     id: "thu-devotion",
-    name: "Thursday — Morning Devotion (5:30 - 6:15 AM)",
+    name: "Thursday — Morning’s Devotion (5:30 - 6:15 AM)",
     shortLabel: "Thursday Morning Devotion",
     day: "Thursday",
     category: "Devotion",
     teachingStartTime: "5:30 AM",
     endTime: "6:15 AM",
     isTeachingSession: false,
-    description: "Early morning prayer and devotion.",
+    description: "Early morning devotion. Check-in starts 5:30 AM.",
   },
   {
     id: "thu-teaching-1",
-    name: "Thursday — 1st Teaching (Review 8:00 - 8:30 AM | Late after 8:30 AM)",
+    name: "Thursday — First Session of Teaching (8:30 - 11:30 AM)",
     shortLabel: "Thursday 1st Teaching",
     day: "Thursday",
     category: "Teaching",
@@ -141,7 +130,7 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
   },
   {
     id: "thu-teaching-2",
-    name: "Thursday — 2nd Teaching (Review 1:30 - 2:00 PM | Late after 2:00 PM)",
+    name: "Thursday — Second Session of Teaching (2:00 - 5:00 PM)",
     shortLabel: "Thursday 2nd Teaching",
     day: "Thursday",
     category: "Teaching",
@@ -153,68 +142,72 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
   },
   {
     id: "thu-teaching-3",
-    name: "Thursday — 3rd Teaching (Review 7:30 - 8:00 PM | Late after 8:00 PM)",
-    shortLabel: "Thursday 3rd Teaching",
+    name: "Thursday — Third Session (Exams, Bible Interaction, Prayer & Games) (7:00 - 10:00 PM)",
+    shortLabel: "Thursday 3rd Session",
     day: "Thursday",
-    category: "Teaching",
-    reviewStartTime: "7:30 PM",
-    teachingStartTime: "8:00 PM",
-    endTime: "10:30 PM",
-    isTeachingSession: true,
-    description: "Check-in during 30 mins review (7:30 to 8:00 PM). Anyone arriving after 8:00 PM is LATE.",
+    category: "Special",
+    teachingStartTime: "7:00 PM",
+    endTime: "10:00 PM",
+    isTeachingSession: false,
+    description: "Exams (1hr), Bible interaction, Prayer and Games (7:00 to 10:00 PM).",
   },
 
   // ==========================================
-  // DAY 4 — FRIDAY
+  // DAY 4 (FRIDAY)
   // ==========================================
   {
     id: "fri-devotion",
-    name: "Friday — Morning Devotion (5:30 - 6:15 AM)",
+    name: "Friday — Morning’s Devotion (5:30 - 6:15 AM)",
     shortLabel: "Friday Morning Devotion",
     day: "Friday",
     category: "Devotion",
     teachingStartTime: "5:30 AM",
     endTime: "6:15 AM",
     isTeachingSession: false,
-    description: "Early morning prayer and devotion on final day.",
+    description: "Final day early morning prayer and devotion.",
   },
   {
-    id: "fri-commissioning",
-    name: "Friday — Grand Impartation & Commissioning Service (9:00 - 12:00 PM)",
-    shortLabel: "Friday Commissioning Service",
+    id: "fri-grand-service",
+    name: "Friday — Grand Impartation Service (9:00 - 12:00 PM)",
+    shortLabel: "Friday Grand Service",
     day: "Friday",
     category: "Special",
-    reviewStartTime: "9:00 AM",
-    teachingStartTime: "9:30 AM",
+    teachingStartTime: "9:00 AM",
     endTime: "12:00 PM",
     isTeachingSession: true,
-    description: "Check-in during review 9:00 to 9:30 AM. Late after 9:30 AM.",
+    description: "Grand Impartation, Commissioning, and Anointing Service (9:00 AM to 12:00 PM).",
   },
   {
     id: "fri-departure",
-    name: "Friday — Camp Departure / Return Buses (3:00 PM Prompt)",
-    shortLabel: "Friday Departure Buses",
+    name: "Friday — Camp Departure (3:00 PM Prompt)",
+    shortLabel: "Friday Camp Departure",
     day: "Friday",
     category: "Departure",
     teachingStartTime: "3:00 PM",
     endTime: "5:00 PM",
     isTeachingSession: false,
-    description: "Boarding return buses back to Headquarters, Eastern, and Bo branches.",
+    description: "Camp departure and boarding buses back to branches.",
   },
 ]
 
 export function getSessionDef(nameOrId: string): CampSessionDef | undefined {
+  if (!nameOrId) return undefined
+  const clean = nameOrId.toLowerCase().trim()
   return (
     CAMP_SCHEDULE.find((s) => s.id === nameOrId) ||
     CAMP_SCHEDULE.find((s) => s.name === nameOrId) ||
-    CAMP_SCHEDULE.find((s) => s.name.startsWith(nameOrId) || nameOrId.startsWith(s.shortLabel))
+    CAMP_SCHEDULE.find((s) => s.name.toLowerCase() === clean) ||
+    CAMP_SCHEDULE.find((s) => s.shortLabel.toLowerCase() === clean) ||
+    CAMP_SCHEDULE.find(
+      (s) => s.name.toLowerCase().includes(clean) || clean.includes(s.shortLabel.toLowerCase())
+    )
   )
 }
 
 export function getNextSession(currentSessionName: string): CampSessionDef | null {
-  const index = CAMP_SCHEDULE.findIndex(
-    (s) => s.name === currentSessionName || s.id === currentSessionName || s.shortLabel === currentSessionName
-  )
+  const current = getSessionDef(currentSessionName)
+  if (!current) return null
+  const index = CAMP_SCHEDULE.findIndex((s) => s.id === current.id)
   if (index >= 0 && index < CAMP_SCHEDULE.length - 1) {
     return CAMP_SCHEDULE[index + 1]
   }
@@ -222,9 +215,9 @@ export function getNextSession(currentSessionName: string): CampSessionDef | nul
 }
 
 export function getPreviousSession(currentSessionName: string): CampSessionDef | null {
-  const index = CAMP_SCHEDULE.findIndex(
-    (s) => s.name === currentSessionName || s.id === currentSessionName || s.shortLabel === currentSessionName
-  )
+  const current = getSessionDef(currentSessionName)
+  if (!current) return null
+  const index = CAMP_SCHEDULE.findIndex((s) => s.id === current.id)
   if (index > 0) {
     return CAMP_SCHEDULE[index - 1]
   }
