@@ -471,13 +471,7 @@ export function CampAttendanceClient() {
           {/* Session Dropdown */}
           <Select
             value={currentSession}
-            onValueChange={(val) => {
-              if (val === "__CUSTOM__") {
-                setCustomSessionOpen(true)
-              } else {
-                switchSession(val)
-              }
-            }}
+            onValueChange={switchSession}
           >
             <SelectTrigger className="flex-1 sm:w-[280px] md:w-[320px] h-11 font-bold bg-background border-primary/40 text-xs sm:text-sm shadow-sm rounded-xl">
               <CalendarDays className="w-4 h-4 text-primary mr-2 flex-shrink-0" />
