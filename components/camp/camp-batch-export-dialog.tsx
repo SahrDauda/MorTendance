@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Printer, Download, Loader2 } from "lucide-react"
 import MorTagFront, { CampMemberTagInfo } from "./mor-tag-front"
-import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
+import { downloadAttendeeBadge, downloadAllBadgesZip } from "@/lib/campBadgeHelper"
 import { toast } from "sonner"
 
 interface CampBatchExportDialogProps {
@@ -38,6 +38,21 @@ export function CampBatchExportDialog({
 
   const handlePrint = () => {
     window.print()
+  }
+
+  const handleDownloadZip = async (format: "png" | "jpg") => {
+    if (members.length === 0) return
+    setExporting(true)
+    try {
+      toast.info(`Generating ${format.toUpperCase()} images for ${members.length} badges...`)
+      await downloadAllBadgesZip(members as any, format)
+      toast.success(`Downloaded all ${members.length} badges as ${format.toUpperCase()} ZIP`)
+    } catch (err: any) {
+      console.error("Batch ZIP error:", err)
+      toast.error(`Failed to download ${format.toUpperCase()} ZIP`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleDownloadPDF = async () => {
@@ -136,13 +151,13 @@ export function CampBatchExportDialog({
           </div>
 
           {/* Top Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               className="border-slate-700 bg-slate-900/60 text-slate-200 hover:bg-slate-800 hover:text-white gap-1.5 font-semibold text-xs rounded-xl h-10 px-3.5"
               onClick={handlePrint}
-              disabled={members.length === 0}
+              disabled={members.length === 0 || exporting}
             >
               <Printer className="w-3.5 h-3.5 text-sky-400" />
               Browser Print
@@ -150,21 +165,44 @@ export function CampBatchExportDialog({
 
             <Button
               size="sm"
-              className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-bold text-xs gap-1.5 rounded-xl h-10 px-4 shadow-lg shadow-teal-500/20"
+              className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-bold text-xs gap-1.5 rounded-xl h-10 px-3.5 shadow-md shadow-teal-500/20"
               onClick={handleDownloadPDF}
               disabled={exporting || members.length === 0}
             >
               {exporting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Generating PDF...
-                </>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <>
-                  <Download className="w-3.5 h-3.5" />
-                  Download All ({members.length}) as PDF
-                </>
+                <Download className="w-3.5 h-3.5" />
               )}
+              PDF (All)
+            </Button>
+
+            <Button
+              size="sm"
+              className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold text-xs gap-1.5 rounded-xl h-10 px-3.5 shadow-md shadow-sky-500/20"
+              onClick={() => handleDownloadZip("png")}
+              disabled={exporting || members.length === 0}
+            >
+              {exporting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              PNG (ZIP)
+            </Button>
+
+            <Button
+              size="sm"
+              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs gap-1.5 rounded-xl h-10 px-3.5 shadow-md shadow-amber-500/20"
+              onClick={() => handleDownloadZip("jpg")}
+              disabled={exporting || members.length === 0}
+            >
+              {exporting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              JPG (ZIP)
             </Button>
           </div>
         </DialogHeader>

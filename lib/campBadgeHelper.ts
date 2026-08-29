@@ -1,6 +1,5 @@
-"use client"
-
 import { resolveGroupTagImage, isGeneralMember } from "@/components/camp/mor-tag-front"
+import JSZip from "jszip"
 
 export interface BadgeAttendeeData {
   id?: string
@@ -210,4 +209,51 @@ export async function printAttendeeBadge(attendee: BadgeAttendeeData): Promise<v
       window.open(pdfUrl, "_blank")
     }
   }
+}
+
+/**
+ * Generates and downloads a ZIP archive containing PNG or JPG badges for all attendees.
+ */
+export async function downloadAllBadgesZip(
+  members: BadgeAttendeeData[],
+  format: "png" | "jpg" = "png",
+  onProgress?: (current: number, total: number) => void
+): Promise<void> {
+  if (members.length === 0) return
+
+  const zip = new JSZip()
+  const folder = zip.folder(`MOR_Badges_${format.toUpperCase()}`) || zip
+  const mimeType = format === "png" ? "image/png" : "image/jpeg"
+  const quality = format === "png" ? undefined : 0.98
+
+  for (let i = 0; i < members.length; i++) {
+    const member = members[i]
+    if (onProgress) onProgress(i + 1, members.length)
+
+    try {
+      const canvas = await renderBadgeToCanvas(member)
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), mimeType, quality)
+      )
+
+      if (blob) {
+        const safeName = (member.fullName || "Attendee").trim().replace(/\s+/g, "_")
+        const indexStr = String(i + 1).padStart(3, "0")
+        const filename = `${indexStr}_${safeName}_${member.badgeId}.${format}`
+        folder.file(filename, blob)
+      }
+    } catch (err) {
+      console.warn(`Failed to render badge for ${member.fullName}:`, err)
+    }
+  }
+
+  const zipBlob = await zip.generateAsync({ type: "blob" })
+  const url = window.URL.createObjectURL(zipBlob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `MOR_Camp_2026_Badges_${format.toUpperCase()}_${members.length}_Attendees.zip`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  window.URL.revokeObjectURL(url)
 }

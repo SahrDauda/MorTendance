@@ -69,7 +69,7 @@ import {
 import { MorTagDialog } from "@/components/camp/mor-tag-dialog"
 import { CampBulkImportDialog } from "@/components/camp/camp-bulk-import-dialog"
 import { CampBatchExportDialog } from "@/components/camp/camp-batch-export-dialog"
-import { downloadAttendeeBadge, printAttendeeBadge } from "@/lib/campBadgeHelper"
+import { downloadAttendeeBadge, printAttendeeBadge, downloadAllBadgesZip } from "@/lib/campBadgeHelper"
 import Link from "next/link"
 
 interface CampMember {
@@ -528,11 +528,12 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60 bg-slate-950 text-white border-slate-800 p-1.5 shadow-2xl rounded-2xl">
+            <DropdownMenuContent align="end" className="w-64 bg-slate-950 text-white border-slate-800 p-1.5 shadow-2xl rounded-2xl">
               <DropdownMenuLabel className="text-[10px] uppercase font-bold text-slate-400 px-2 py-1">
                 Batch Export ({filteredMembers.length} Attendees)
               </DropdownMenuLabel>
               
+              {/* PDF Batch */}
               <DropdownMenuItem
                 className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
                 onClick={async () => {
@@ -568,6 +569,50 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 <span>Download All as PDF</span>
               </DropdownMenuItem>
 
+              {/* PNG ZIP Batch */}
+              <DropdownMenuItem
+                className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
+                onClick={async () => {
+                  if (filteredMembers.length === 0) {
+                    toast.error("No attendees to export")
+                    return
+                  }
+                  toast.info(`Generating PNG images for ${filteredMembers.length} attendees...`)
+                  try {
+                    await downloadAllBadgesZip(filteredMembers as any, "png")
+                    toast.success("Downloaded all badges as PNG ZIP")
+                  } catch (e) {
+                    toast.error("Failed to download PNG ZIP")
+                  }
+                }}
+              >
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                <span>Download All as PNG (ZIP)</span>
+              </DropdownMenuItem>
+
+              {/* JPG ZIP Batch */}
+              <DropdownMenuItem
+                className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
+                onClick={async () => {
+                  if (filteredMembers.length === 0) {
+                    toast.error("No attendees to export")
+                    return
+                  }
+                  toast.info(`Generating JPG images for ${filteredMembers.length} attendees...`)
+                  try {
+                    await downloadAllBadgesZip(filteredMembers as any, "jpg")
+                    toast.success("Downloaded all badges as JPG ZIP")
+                  } catch (e) {
+                    toast.error("Failed to download JPG ZIP")
+                  }
+                }}
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>Download All as JPG (ZIP)</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="bg-slate-800 my-1" />
+
               <DropdownMenuItem
                 className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
                 onClick={() => setBatchExportOpen(true)}
@@ -575,8 +620,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 <Printer className="w-3.5 h-3.5 text-sky-400" />
                 <span>Print All (Filtered)</span>
               </DropdownMenuItem>
-
-              <DropdownMenuSeparator className="bg-slate-800 my-1" />
 
               <DropdownMenuItem
                 className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
