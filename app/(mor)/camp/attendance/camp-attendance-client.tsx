@@ -97,16 +97,54 @@ interface AttendanceSummary {
 export function CampAttendanceClient() {
   const [currentSession, setCurrentSession] = useState<string>(CAMP_SCHEDULE[0].name)
   const [members, setMembers] = useState<CampRosterMember[]>([])
-  const [summary, setSummary] = useState<AttendanceSummary>({
-    totalMembers: 0,
-    presentCount: 0,
-    onTimeCount: 0,
-    lateCount: 0,
-    absentCount: 0,
-    presentPercent: 0,
-    branchBreakdown: {},
-    groupBreakdown: {},
-  })
+  // Real-time Reactive Summary computed dynamically from members
+  const summary = useMemo<AttendanceSummary>(() => {
+    let presentCount = 0
+    let onTimeCount = 0
+    let lateCount = 0
+    const branchBreakdown: Record<string, { total: number; present: number; onTime: number; late: number }> = {}
+    const groupBreakdown: Record<string, { total: number; present: number; onTime: number; late: number }> = {}
+
+    members.forEach((m) => {
+      if (m.isPresent) {
+        presentCount++
+        if (m.isLate) lateCount++
+        else onTimeCount++
+      }
+      const bKey = (m.branch || "Unassigned").trim()
+      if (!branchBreakdown[bKey]) branchBreakdown[bKey] = { total: 0, present: 0, onTime: 0, late: 0 }
+      branchBreakdown[bKey].total++
+      if (m.isPresent) {
+        branchBreakdown[bKey].present++
+        if (m.isLate) branchBreakdown[bKey].late++
+        else branchBreakdown[bKey].onTime++
+      }
+
+      const gKey = (m.caregroup || "Unassigned").trim()
+      if (!groupBreakdown[gKey]) groupBreakdown[gKey] = { total: 0, present: 0, onTime: 0, late: 0 }
+      groupBreakdown[gKey].total++
+      if (m.isPresent) {
+        groupBreakdown[gKey].present++
+        if (m.isLate) groupBreakdown[gKey].late++
+        else groupBreakdown[gKey].onTime++
+      }
+    })
+
+    const totalMembers = members.length
+    const absentCount = totalMembers - presentCount
+    const presentPercent = totalMembers > 0 ? Math.round((presentCount / totalMembers) * 100) : 0
+
+    return {
+      totalMembers,
+      presentCount,
+      onTimeCount,
+      lateCount,
+      absentCount,
+      presentPercent,
+      branchBreakdown,
+      groupBreakdown,
+    }
+  }, [members])
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
@@ -163,7 +201,6 @@ export function CampAttendanceClient() {
       const json = await res.json()
       if (json.success) {
         setMembers(json.data.members)
-        setSummary(json.data.summary)
       } else {
         toast.error(json.error || "Failed to load attendance")
       }
@@ -215,11 +252,15 @@ export function CampAttendanceClient() {
 
       if (json.success) {
         if (willBePresent) {
-          const isLateResult = json.data?.isLate || willBeLate
-          if (isLateResult) {
-            toast.warning(`⚠️ ${member.fullName} checked in [LATE]`)
+          if (isBusSession) {
+            toast.success(`🚌 ${member.fullName} (${member.badgeId}) boarded bus successfully!`)
           } else {
-            toast.success(`✅ ${member.fullName} checked in [ON TIME]`)
+            const isLateResult = json.data?.isLate || willBeLate
+            if (isLateResult) {
+              toast.warning(`⚠️ ${member.fullName} checked in [LATE]`)
+            } else {
+              toast.success(`✅ ${member.fullName} checked in [ON TIME]`)
+            }
           }
         } else {
           toast.info(`↩️ Unchecked ${member.fullName} (Marked Absent)`)
