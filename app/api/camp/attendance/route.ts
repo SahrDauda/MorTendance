@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { getSessionDef } from "@/lib/campSchedule"
+import { getSessionDef, isCheckInLate } from "@/lib/campSchedule"
 
 export const dynamic = "force-dynamic"
 
@@ -210,8 +210,11 @@ export async function POST(request: Request) {
       },
     })
 
+    const serverNow = new Date()
     let willBePresent = true
-    let willBeLate = Boolean(isLate)
+    // Automatically calculate isLate based on standard Sierra Leone time (UTC+0) if not explicitly set
+    let willBeLate =
+      typeof isLate === "boolean" ? isLate : isCheckInLate(session, serverNow)
 
     if (typeof isPresent === "boolean") {
       willBePresent = isPresent
@@ -230,20 +233,20 @@ export async function POST(request: Request) {
         update: {
           isPresent: true,
           isLate: willBeLate,
-          scannedAt: new Date(),
+          scannedAt: serverNow,
         },
         create: {
           memberId: targetMember.id,
           session,
           isPresent: true,
           isLate: willBeLate,
-          scannedAt: new Date(),
+          scannedAt: serverNow,
         },
       })
 
       return NextResponse.json({
         success: true,
-        message: `Checked in ${targetMember.fullName} (${targetMember.badgeId})${willBeLate ? " [LATE]" : ""}`,
+        message: `Checked in ${targetMember.fullName} (${targetMember.badgeId})${willBeLate ? " [LATE]" : " [ON TIME]"}`,
         data: {
           ...record,
           member: targetMember,
@@ -261,7 +264,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: `Unchecked ${targetMember.fullName} (${targetMember.badgeId})`,
+        message: `Marked absent: ${targetMember.fullName} (${targetMember.badgeId})`,
         data: {
           member: targetMember,
           isPresent: false,
