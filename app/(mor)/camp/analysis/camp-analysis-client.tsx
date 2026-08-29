@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   UserX,
   AlertTriangle,
   Check,
@@ -45,6 +47,7 @@ import {
   getSessionDef,
   getNextSession,
   getPreviousSession,
+  isCheckInLate,
 } from "@/lib/campSchedule"
 import { ROUTES } from "@/lib/constants"
 
@@ -90,8 +93,19 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
     groupBreakdown: {},
   })
   const [loading, setLoading] = useState(true)
-  const [selectedGroupTab, setSelectedGroupTab] = useState<string>("ALL")
-  const [memberSearch, setMemberSearch] = useState("")
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  // Accordion state: which group is expanded and which category ("ABSENT" | "LATE" | "ON_TIME")
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    Dikaiosis: true, // Default first group open for immediate visibility
+  })
+  const [groupActiveCategory, setGroupActiveCategory] = useState<Record<string, "ABSENT" | "LATE" | "ON_TIME">>({
+    Dikaiosis: "ABSENT",
+    Doxasmus: "ABSENT",
+    Hagiasmos: "ABSENT",
+    Huiothesia: "ABSENT",
+    Paligenesia: "ABSENT",
+  })
 
   const currentSessionDef = useMemo(() => {
     return getSessionDef(currentSession)
@@ -146,6 +160,54 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
   useEffect(() => {
     fetchAttendance(currentSession)
   }, [currentSession])
+
+  // Direct 1-Tap Check-In from Analysis Page
+  const handleCheckInMember = async (member: CampMemberRecord) => {
+    setUpdatingId(member.id)
+    const willBeLate = isCheckInLate(currentSession, new Date())
+
+    // Optimistic UI update
+    setMembers((prev) =>
+      prev.map((m) =>
+        m.id === member.id
+          ? {
+              ...m,
+              isPresent: true,
+              isLate: willBeLate,
+              scannedAt: new Date().toISOString(),
+            }
+          : m
+      )
+    )
+
+    try {
+      const res = await fetch("/api/camp/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: member.id,
+          session: currentSession,
+          isPresent: true,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        if (willBeLate) {
+          toast.warning(`⚠️ ${member.fullName} checked in [LATE]`)
+        } else {
+          toast.success(`✅ ${member.fullName} checked in [ON TIME]`)
+        }
+      } else {
+        toast.error(json.error || "Check-in failed")
+        fetchAttendance()
+      }
+    } catch (err) {
+      toast.error("Error updating check-in")
+      fetchAttendance()
+    } finally {
+      setUpdatingId(null)
+    }
+  }
 
   // Group Analysis Data Computation
   const groupAnalysis = useMemo(() => {
@@ -241,6 +303,19 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
     return map
   }, [members])
 
+  // Toggle group accordion and select category
+  const toggleGroupAccordion = (groupName: string, category?: "ABSENT" | "LATE" | "ON_TIME") => {
+    setExpandedGroups((prev) => {
+      const isOpen = Boolean(prev[groupName])
+      // If clicking the same category and already open, toggle closed; otherwise open with that category
+      if (category) {
+        setGroupActiveCategory((catPrev) => ({ ...catPrev, [groupName]: category }))
+        return { ...prev, [groupName]: true }
+      }
+      return { ...prev, [groupName]: !isOpen }
+    })
+  }
+
   // Schedule by Day for selector
   const scheduleByDay = useMemo(() => {
     const days: Record<string, CampSessionDef[]> = {
@@ -316,10 +391,8 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
     toast.success("Downloaded Group Analysis PDF")
   }
 
-  const activeGroupKeys = Object.keys(groupAnalysis)
-
   return (
-    <div className="w-full max-w-full space-y-6 pb-24 sm:pb-16 overflow-x-hidden">
+    <div className="w-full max-w-full space-y-6 pb-28 sm:pb-16 overflow-x-hidden">
       {/* Header & Session Selector */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-card p-4 sm:p-6 rounded-2xl border shadow-sm">
         <div className="space-y-1">
@@ -329,14 +402,14 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
             </span>
             <span className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-              Per-Group Absent & Late Radar
+              Per-Group Absent & Late Accordion
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
             Group Attendance Analysis
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Real-time analytics per fellowship group showing absent, late, and on-time delegates with contact follow-up.
+            Tap <strong>Absent</strong>, <strong>Late</strong>, or <strong>On Time</strong> on any group card to expand the member list with contact follow-up.
           </p>
         </div>
 
@@ -454,281 +527,320 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
         </Card>
       </div>
 
-      {/* Groups Comparison Performance Grid */}
-      <div className="space-y-3">
+      {/* ======================================================== */}
+      {/* ACCORDION GROUP CARDS WITH DIRECT ABSENT / LATE EXPANSION */}
+      {/* ======================================================== */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Layers className="w-5 h-5 text-primary" />
-            Camp Groups Attendance Comparison
-          </h2>
-          <span className="text-xs text-muted-foreground font-semibold">
-            {currentSessionDef?.shortLabel || currentSession}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
-          {Object.values(groupAnalysis).map((group) => (
-            <Card
-              key={group.name}
-              className={`border-2 transition-all shadow-sm rounded-2xl flex flex-col justify-between cursor-pointer hover:shadow-md ${
-                selectedGroupTab === group.name
-                  ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                  : "border-border bg-card hover:border-primary/40"
-              }`}
-              onClick={() => setSelectedGroupTab(group.name)}
-            >
-              <CardHeader className="p-4 pb-2 space-y-1">
-                <div className="flex items-center justify-between gap-1">
-                  <CardTitle className="text-base font-black text-foreground truncate">
-                    {group.name}
-                  </CardTitle>
-                  <Badge className="bg-purple-500/15 text-purple-700 text-[10px] font-bold">
-                    {group.total} Total
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-0.5">
-                  <span>Attendance:</span>
-                  <strong className="text-emerald-600 font-bold">{group.presentRate}%</strong>
-                </div>
-                <Progress value={group.presentRate} className="h-1.5" />
-              </CardHeader>
-
-              <CardContent className="p-4 pt-2 space-y-2">
-                <div className="grid grid-cols-3 gap-1.5 text-center text-xs pt-1">
-                  <div className="bg-emerald-500/10 p-1.5 rounded-lg border border-emerald-500/20">
-                    <span className="text-[9px] text-emerald-700 font-bold block uppercase">On Time</span>
-                    <strong className="text-emerald-600 text-xs">{group.onTime}</strong>
-                  </div>
-                  <div className="bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20">
-                    <span className="text-[9px] text-amber-700 font-bold block uppercase">Late</span>
-                    <strong className="text-amber-600 text-xs">{group.late}</strong>
-                  </div>
-                  <div className="bg-red-500/10 p-1.5 rounded-lg border border-red-500/20">
-                    <span className="text-[9px] text-red-700 font-bold block uppercase">Absent</span>
-                    <strong className="text-red-600 text-xs">{group.absent}</strong>
-                  </div>
-                </div>
-
-                <Button
-                  size="sm"
-                  variant={selectedGroupTab === group.name ? "default" : "outline"}
-                  className="w-full text-xs font-bold h-8 rounded-xl mt-1"
-                >
-                  {selectedGroupTab === group.name ? "Viewing Group Roster" : "Inspect Group"}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Deep-Dive Per-Group Member Lists (Absent & Late) */}
-      <div className="space-y-4 pt-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border">
           <div>
-            <h3 className="text-base sm:text-lg font-black text-foreground flex items-center gap-2">
-              <UserX className="w-5 h-5 text-red-600" />
-              Detailed Group Roster & Follow-Up
-            </h3>
+            <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground flex items-center gap-2">
+              <Layers className="w-5 h-5 text-primary" />
+              Fellowship Groups Analysis & Accordion
+            </h2>
             <p className="text-xs text-muted-foreground">
-              Filter by group to see absent delegates to call and late attendees with check-in timestamps.
+              Select <strong>Absent ({summary.absentCount})</strong>, <strong>Late ({summary.lateCount})</strong>, or <strong>On Time</strong> to inspect names directly.
             </p>
           </div>
-
-          {/* Group Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Button
-              size="sm"
-              variant={selectedGroupTab === "ALL" ? "default" : "outline"}
-              className="text-xs font-bold h-8 px-2.5 rounded-xl"
-              onClick={() => setSelectedGroupTab("ALL")}
-            >
-              All Groups ({members.length})
-            </Button>
-            {activeGroupKeys.map((gKey) => (
-              <Button
-                key={gKey}
-                size="sm"
-                variant={selectedGroupTab === gKey ? "default" : "outline"}
-                className="text-xs font-bold h-8 px-2.5 rounded-xl"
-                onClick={() => setSelectedGroupTab(gKey)}
-              >
-                {gKey} ({groupAnalysis[gKey].total})
-              </Button>
-            ))}
-          </div>
         </div>
 
-        {/* Group Deep-Dive Display */}
-        {activeGroupKeys
-          .filter((gKey) => selectedGroupTab === "ALL" || selectedGroupTab === gKey)
-          .map((gKey) => {
-            const gData = groupAnalysis[gKey]
+        <div className="space-y-4">
+          {Object.values(groupAnalysis).map((group) => {
+            const isExpanded = Boolean(expandedGroups[group.name])
+            const activeCat = groupActiveCategory[group.name] || "ABSENT"
+
+            const activeList =
+              activeCat === "ABSENT"
+                ? group.absentList
+                : activeCat === "LATE"
+                ? group.lateList
+                : group.onTimeList
+
             return (
-              <Card key={gKey} className="border-2 shadow-sm rounded-2xl overflow-hidden">
-                <CardHeader className="bg-muted/30 p-4 sm:p-5 border-b">
+              <Card
+                key={group.name}
+                className={`border-2 transition-all shadow-md rounded-2xl overflow-hidden ${
+                  isExpanded
+                    ? "border-primary/80 ring-2 ring-primary/20 bg-card"
+                    : "border-border bg-card hover:border-primary/40"
+                }`}
+              >
+                {/* Group Card Header */}
+                <CardHeader className="p-4 sm:p-5 pb-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <CardTitle className="text-lg sm:text-xl font-black text-foreground">
-                          Group: {gData.name}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-xl sm:text-2xl font-black text-foreground">
+                          {group.name}
                         </CardTitle>
                         <Badge className="bg-purple-500/15 text-purple-700 font-bold text-xs">
-                          {gData.total} Members
+                          {group.total} Total Members
                         </Badge>
                       </div>
-                      <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                        Attendance: <strong>{gData.presentRate}%</strong> ({gData.present} Present • {gData.onTime} On-Time • {gData.late} Late • {gData.absent} Absent)
-                      </CardDescription>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Attendance:</span>
+                        <strong className="text-emerald-600 font-bold text-sm">
+                          {group.presentRate}%
+                        </strong>
+                        <span>({group.present} Present / {group.absent} Absent)</span>
+                      </div>
                     </div>
 
-                    <Link href={ROUTES.CAMP_ATTENDANCE}>
-                      <Button size="sm" variant="outline" className="text-xs font-bold h-8 rounded-xl gap-1">
-                        <span>Check In Desk</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </Button>
-                    </Link>
+                    {/* Progress Bar */}
+                    <div className="w-full sm:w-48 space-y-1">
+                      <Progress value={group.presentRate} className="h-2" />
+                    </div>
+                  </div>
+
+                  {/* 3 Interactive Accordion Selector Pills */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3">
+                    {/* On Time Pill */}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupAccordion(group.name, "ON_TIME")}
+                      className={`p-2.5 sm:p-3 rounded-xl border transition-all text-center flex flex-col items-center justify-center cursor-pointer ${
+                        isExpanded && activeCat === "ON_TIME"
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500/30 scale-[1.02]"
+                          : "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20"
+                      }`}
+                    >
+                      <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
+                        isExpanded && activeCat === "ON_TIME" ? "text-emerald-100" : "text-emerald-700 dark:text-emerald-400"
+                      }`}>
+                        On Time
+                      </span>
+                      <strong className="text-base sm:text-xl font-black mt-0.5">
+                        {group.onTime}
+                      </strong>
+                    </button>
+
+                    {/* Late Pill */}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupAccordion(group.name, "LATE")}
+                      className={`p-2.5 sm:p-3 rounded-xl border transition-all text-center flex flex-col items-center justify-center cursor-pointer ${
+                        isExpanded && activeCat === "LATE"
+                          ? "bg-amber-500 text-black border-amber-500 shadow-md ring-2 ring-amber-500/30 scale-[1.02]"
+                          : "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20"
+                      }`}
+                    >
+                      <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
+                        isExpanded && activeCat === "LATE" ? "text-slate-900" : "text-amber-700 dark:text-amber-400"
+                      }`}>
+                        Late
+                      </span>
+                      <strong className="text-base sm:text-xl font-black mt-0.5">
+                        {group.late}
+                      </strong>
+                    </button>
+
+                    {/* Absent Pill */}
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupAccordion(group.name, "ABSENT")}
+                      className={`p-2.5 sm:p-3 rounded-xl border transition-all text-center flex flex-col items-center justify-center cursor-pointer ${
+                        isExpanded && activeCat === "ABSENT"
+                          ? "bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-500/30 scale-[1.02]"
+                          : "bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300 hover:bg-red-500/20"
+                      }`}
+                    >
+                      <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
+                        isExpanded && activeCat === "ABSENT" ? "text-red-100" : "text-red-700 dark:text-red-400"
+                      }`}>
+                        Absent
+                      </span>
+                      <strong className="text-base sm:text-xl font-black mt-0.5">
+                        {group.absent}
+                      </strong>
+                    </button>
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-4 sm:p-5 space-y-4">
-                  <Tabs defaultValue="absent" className="space-y-4">
-                    <TabsList className="bg-muted/50 p-1 rounded-xl">
-                      <TabsTrigger value="absent" className="rounded-lg text-xs font-bold gap-1.5 text-red-600 data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                        🔴 Absent Members ({gData.absentList.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="late" className="rounded-lg text-xs font-bold gap-1.5 text-amber-600 data-[state=active]:bg-amber-500 data-[state=active]:text-black">
-                        🟡 Late Members ({gData.lateList.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="ontime" className="rounded-lg text-xs font-bold gap-1.5 text-emerald-600 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-                        🟢 On-Time Members ({gData.onTimeList.length})
-                      </TabsTrigger>
-                    </TabsList>
+                {/* Toggle Accordion Expand / Collapse Button */}
+                <div className="px-4 sm:px-5 pb-3">
+                  <Button
+                    variant={isExpanded ? "secondary" : "outline"}
+                    className="w-full text-xs font-bold h-9 rounded-xl flex items-center justify-center gap-2"
+                    onClick={() => toggleGroupAccordion(group.name)}
+                  >
+                    <span>
+                      {isExpanded
+                        ? `Hide ${activeCat === "ABSENT" ? "Absent" : activeCat === "LATE" ? "Late" : "On-Time"} List (${activeList.length})`
+                        : `View ${activeCat === "ABSENT" ? "Absent" : activeCat === "LATE" ? "Late" : "On-Time"} Members (${activeList.length})`}
+                    </span>
+                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </div>
 
-                    {/* Absent Tab Content */}
-                    <TabsContent value="absent" className="space-y-3">
-                      {gData.absentList.length === 0 ? (
-                        <div className="p-6 text-center bg-emerald-500/5 rounded-xl border border-emerald-500/20 text-xs font-bold text-emerald-600 flex items-center justify-center gap-2">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>100% Attendance! No absent members in {gData.name}.</span>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {gData.absentList.map((m) => (
-                            <div
-                              key={m.id}
-                              className="p-3 bg-red-500/5 border border-red-500/30 rounded-xl flex flex-col justify-between gap-2.5 hover:border-red-500/60 transition-all"
-                            >
-                              <div className="space-y-0.5 min-w-0">
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="font-mono font-bold text-xs text-primary">{m.badgeId}</span>
+                {/* =================================================== */}
+                {/* ACCORDION CONTENT DRAWER: EXPANDED MEMBER LIST */}
+                {/* =================================================== */}
+                {isExpanded && (
+                  <CardContent className="p-4 sm:p-5 pt-0 space-y-3 border-t bg-muted/20">
+                    <div className="flex items-center justify-between pt-3">
+                      <div className="flex items-center gap-2">
+                        {activeCat === "ABSENT" && (
+                          <Badge className="bg-red-600 text-white font-black text-xs px-2.5 py-0.5">
+                            🔴 ABSENT MEMBERS IN {group.name.toUpperCase()} ({activeList.length})
+                          </Badge>
+                        )}
+                        {activeCat === "LATE" && (
+                          <Badge className="bg-amber-500 text-black font-black text-xs px-2.5 py-0.5">
+                            🟡 LATE ARRIVALS IN {group.name.toUpperCase()} ({activeList.length})
+                          </Badge>
+                        )}
+                        {activeCat === "ON_TIME" && (
+                          <Badge className="bg-emerald-600 text-white font-black text-xs px-2.5 py-0.5">
+                            🟢 ON-TIME ATTENDEES IN {group.name.toUpperCase()} ({activeList.length})
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => toggleGroupAccordion(group.name, "ABSENT")}
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
+                            activeCat === "ABSENT" ? "bg-red-600 text-white border-red-600" : "bg-background text-red-600 border-red-500/30"
+                          }`}
+                        >
+                          Absent ({group.absent})
+                        </button>
+                        <button
+                          onClick={() => toggleGroupAccordion(group.name, "LATE")}
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
+                            activeCat === "LATE" ? "bg-amber-500 text-black border-amber-500" : "bg-background text-amber-600 border-amber-500/30"
+                          }`}
+                        >
+                          Late ({group.late})
+                        </button>
+                        <button
+                          onClick={() => toggleGroupAccordion(group.name, "ON_TIME")}
+                          className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border ${
+                            activeCat === "ON_TIME" ? "bg-emerald-600 text-white border-emerald-600" : "bg-background text-emerald-600 border-emerald-500/30"
+                          }`}
+                        >
+                          On Time ({group.onTime})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Member Cards Grid */}
+                    {activeList.length === 0 ? (
+                      <div className="p-8 text-center bg-background rounded-2xl border border-dashed text-xs font-semibold text-muted-foreground">
+                        {activeCat === "ABSENT" ? (
+                          <div className="space-y-1">
+                            <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500" />
+                            <div className="font-bold text-foreground">100% Attendance in {group.name}!</div>
+                            <div>No delegates are currently absent for this session.</div>
+                          </div>
+                        ) : activeCat === "LATE" ? (
+                          <div>No late check-ins recorded for {group.name}.</div>
+                        ) : (
+                          <div>No on-time check-ins recorded yet for {group.name}.</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {activeList.map((member) => (
+                          <div
+                            key={member.id}
+                            className={`p-3.5 rounded-xl border flex flex-col justify-between gap-2.5 transition-all shadow-sm ${
+                              activeCat === "ABSENT"
+                                ? "bg-red-500/5 border-red-500/30 hover:border-red-500/60"
+                                : activeCat === "LATE"
+                                ? "bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60"
+                                : "bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/60"
+                            }`}
+                          >
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-mono font-black text-xs text-primary">
+                                  {member.badgeId}
+                                </span>
+                                {activeCat === "ABSENT" ? (
                                   <span className="text-[10px] font-black uppercase text-red-600 bg-red-500/15 px-1.5 py-0.5 rounded">
                                     ABSENT
                                   </span>
-                                </div>
-                                <div className="font-bold text-sm text-foreground truncate">{m.fullName}</div>
-                                <div className="text-[11px] text-muted-foreground">{m.branch || "HQ"} • {m.position || "Member"}</div>
-                              </div>
-
-                              <div className="pt-2 border-t border-red-500/20 flex items-center justify-between gap-2">
-                                {m.phone ? (
-                                  <a
-                                    href={`tel:${m.phone}`}
-                                    className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg"
-                                  >
-                                    <Phone className="w-3.5 h-3.5" />
-                                    <span>Call {m.phone}</span>
-                                  </a>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground">No phone</span>
-                                )}
-
-                                <Link href={ROUTES.CAMP_ATTENDANCE}>
-                                  <span className="text-xs font-bold text-emerald-600 hover:underline">Check In ➔</span>
-                                </Link>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    {/* Late Tab Content */}
-                    <TabsContent value="late" className="space-y-3">
-                      {gData.lateList.length === 0 ? (
-                        <div className="p-6 text-center bg-muted/40 rounded-xl border text-xs text-muted-foreground">
-                          No late arrivals recorded for this session.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {gData.lateList.map((m) => (
-                            <div
-                              key={m.id}
-                              className="p-3 bg-amber-500/5 border border-amber-500/30 rounded-xl flex flex-col justify-between gap-2"
-                            >
-                              <div className="space-y-0.5 min-w-0">
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="font-mono font-bold text-xs text-primary">{m.badgeId}</span>
+                                ) : activeCat === "LATE" ? (
                                   <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
                                     <Clock className="w-3 h-3" /> LATE
                                   </span>
-                                </div>
-                                <div className="font-bold text-sm text-foreground truncate">{m.fullName}</div>
-                                <div className="text-[11px] text-muted-foreground">{m.branch || "HQ"}</div>
-                              </div>
-
-                              {m.scannedAt && (
-                                <div className="text-[11px] text-amber-700 font-semibold pt-1 border-t border-amber-500/20 flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  <span>Checked in at: {new Date(m.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    {/* On-Time Tab Content */}
-                    <TabsContent value="ontime" className="space-y-3">
-                      {gData.onTimeList.length === 0 ? (
-                        <div className="p-6 text-center bg-muted/40 rounded-xl border text-xs text-muted-foreground">
-                          No on-time check-ins recorded yet for this session.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {gData.onTimeList.map((m) => (
-                            <div
-                              key={m.id}
-                              className="p-3 bg-emerald-500/5 border border-emerald-500/30 rounded-xl flex flex-col justify-between gap-2"
-                            >
-                              <div className="space-y-0.5 min-w-0">
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="font-mono font-bold text-xs text-primary">{m.badgeId}</span>
+                                ) : (
                                   <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">
                                     <Check className="w-3 h-3" /> ON TIME
                                   </span>
-                                </div>
-                                <div className="font-bold text-sm text-foreground truncate">{m.fullName}</div>
-                                <div className="text-[11px] text-muted-foreground">{m.branch || "HQ"}</div>
+                                )}
                               </div>
 
-                              {m.scannedAt && (
-                                <div className="text-[11px] text-emerald-700 font-semibold pt-1 border-t border-emerald-500/20 flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  <span>Checked in at: {new Date(m.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                              <div className="font-black text-sm text-foreground truncate">
+                                {member.fullName}
+                              </div>
+
+                              <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                                <span>{member.branch || "HQ"}</span>
+                                <span>•</span>
+                                <span>{member.position || "Member"}</span>
+                              </div>
+
+                              {member.scannedAt && (
+                                <div className="text-[10px] text-muted-foreground flex items-center gap-1 pt-0.5">
+                                  <Clock className="w-3 h-3 text-muted-foreground" />
+                                  <span>
+                                    Scanned at:{" "}
+                                    {new Date(member.scannedAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
                                 </div>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
+
+                            {/* Action Footer */}
+                            <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
+                              {member.phone ? (
+                                <a
+                                  href={`tel:${member.phone}`}
+                                  className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg"
+                                >
+                                  <Phone className="w-3.5 h-3.5" />
+                                  <span>Call {member.phone}</span>
+                                </a>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">No phone</span>
+                              )}
+
+                              {!member.isPresent ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-8 px-2.5 rounded-lg shadow-sm gap-1"
+                                  onClick={() => handleCheckInMember(member)}
+                                  disabled={updatingId === member.id}
+                                >
+                                  {updatingId === member.id ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>Check IN</span>
+                                    </>
+                                  )}
+                                </Button>
+                              ) : (
+                                <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Verified
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                )}
               </Card>
             )
           })}
+        </div>
       </div>
     </div>
   )
