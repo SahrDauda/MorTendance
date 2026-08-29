@@ -13,30 +13,48 @@ export interface BadgeAttendeeData {
   position?: string | null
 }
 
-const imageElementCache: Record<string, HTMLImageElement> = {}
+const imagePromiseCache: Record<string, Promise<HTMLImageElement>> = {}
 
 /**
- * Loads an image into an HTMLImageElement safely via Blob URL and caches it.
+ * Safely downloads a Blob by retaining the object URL until the browser finishes saving.
  */
-async function loadImage(src: string): Promise<HTMLImageElement> {
-  if (imageElementCache[src]) return imageElementCache[src]
+function saveBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.style.display = "none"
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (_) {}
+  }, 20000)
+}
 
-  const res = await fetch(src)
-  const blob = await res.blob()
-  const objectUrl = URL.createObjectURL(blob)
+/**
+ * Loads an image into an HTMLImageElement safely via Blob URL and caches the promise.
+ */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  if (imagePromiseCache[src]) return imagePromiseCache[src]
 
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => {
-      imageElementCache[src] = img
-      resolve(img)
-    }
-    img.onerror = (err) => {
-      URL.revokeObjectURL(objectUrl)
-      reject(err)
-    }
-    img.src = objectUrl
-  })
+  imagePromiseCache[src] = (async () => {
+    const res = await fetch(src)
+    if (!res.ok) throw new Error(`Failed to load image asset: ${src}`)
+    const blob = await res.blob()
+    const objectUrl = URL.createObjectURL(blob)
+
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = (err) => reject(err)
+      img.src = objectUrl
+    })
+  })()
+
+  return imagePromiseCache[src]
 }
 
 /**
@@ -163,14 +181,7 @@ export async function downloadAttendeeBadge(
     const response = await fetch(`/api/camp/badge/${targetId}`)
     if (!response.ok) throw new Error("Failed to generate badge PDF")
     const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${baseFilename}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
+    saveBlob(blob, `${baseFilename}.pdf`)
     return
   }
 
@@ -181,11 +192,16 @@ export async function downloadAttendeeBadge(
 
   const dataUrl = canvas.toDataURL(mimeType, quality)
   const a = document.createElement("a")
+  a.style.display = "none"
   a.href = dataUrl
   a.download = `${baseFilename}.${format}`
   document.body.appendChild(a)
   a.click()
-  document.body.removeChild(a)
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a)
+    } catch (_) {}
+  }, 2000)
 }
 
 /**
@@ -267,7 +283,7 @@ export async function downloadAllBadgesZip(
       const base64Data = dataUrl.split(",")[1]
 
       if (base64Data) {
-        const safeName = (member.fullName || "Attendee").trim().replace(/\s+/g, "_")
+        const safeName = (member.fullName || "Attendee").trim().replace(/[^a-zA-Z0-9_-]/g, "_")
         const indexStr = String(i + 1).padStart(3, "0")
         const filename = `${indexStr}_${safeName}_${member.badgeId}.${format}`
         folder.file(filename, base64Data, { base64: true })
@@ -277,13 +293,12 @@ export async function downloadAllBadgesZip(
     }
   }
 
-  const zipBlob = await zip.generateAsync({ type: "blob" })
-  const url = window.URL.createObjectURL(zipBlob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `MOR_Camp_2026_Badges_${format.toUpperCase()}_${members.length}_Attendees.zip`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  window.URL.revokeObjectURL(url)
+  const zipBlob = await zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  })
+
+  const zipFilename = `MOR_Camp_2026_Badges_${format.toUpperCase()}_${members.length}_Attendees.zip`
+  saveBlob(zipBlob, zipFilename)
 }

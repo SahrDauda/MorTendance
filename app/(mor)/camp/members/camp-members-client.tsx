@@ -577,12 +577,17 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                     toast.error("No attendees to export")
                     return
                   }
-                  toast.info(`Generating PNG images for ${filteredMembers.length} attendees...`)
+                  const tId = toast.loading(`Compiling PNG ZIP for ${filteredMembers.length} attendees...`)
                   try {
-                    await downloadAllBadgesZip(filteredMembers as any, "png")
-                    toast.success("Downloaded all badges as PNG ZIP")
-                  } catch (e) {
-                    toast.error("Failed to download PNG ZIP")
+                    await downloadAllBadgesZip(filteredMembers as any, "png", (curr, total) => {
+                      if (curr % 25 === 0 || curr === total) {
+                        toast.loading(`Processing PNG badges: ${curr}/${total}...`, { id: tId })
+                      }
+                    })
+                    toast.success(`Downloaded all ${filteredMembers.length} badges as PNG ZIP`, { id: tId })
+                  } catch (e: any) {
+                    console.error("PNG ZIP error:", e)
+                    toast.error(`Failed to download PNG ZIP: ${e?.message || "Error"}`, { id: tId })
                   }
                 }}
               >
@@ -598,12 +603,17 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                     toast.error("No attendees to export")
                     return
                   }
-                  toast.info(`Generating JPG images for ${filteredMembers.length} attendees...`)
+                  const tId = toast.loading(`Compiling JPG ZIP for ${filteredMembers.length} attendees...`)
                   try {
-                    await downloadAllBadgesZip(filteredMembers as any, "jpg")
-                    toast.success("Downloaded all badges as JPG ZIP")
-                  } catch (e) {
-                    toast.error("Failed to download JPG ZIP")
+                    await downloadAllBadgesZip(filteredMembers as any, "jpg", (curr, total) => {
+                      if (curr % 25 === 0 || curr === total) {
+                        toast.loading(`Processing JPG badges: ${curr}/${total}...`, { id: tId })
+                      }
+                    })
+                    toast.success(`Downloaded all ${filteredMembers.length} badges as JPG ZIP`, { id: tId })
+                  } catch (e: any) {
+                    console.error("JPG ZIP error:", e)
+                    toast.error(`Failed to download JPG ZIP: ${e?.message || "Error"}`, { id: tId })
                   }
                 }}
               >

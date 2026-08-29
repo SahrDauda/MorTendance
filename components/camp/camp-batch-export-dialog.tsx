@@ -43,13 +43,17 @@ export function CampBatchExportDialog({
   const handleDownloadZip = async (format: "png" | "jpg") => {
     if (members.length === 0) return
     setExporting(true)
+    const tId = toast.loading(`Generating ${format.toUpperCase()} images for ${members.length} badges...`)
     try {
-      toast.info(`Generating ${format.toUpperCase()} images for ${members.length} badges...`)
-      await downloadAllBadgesZip(members as any, format)
-      toast.success(`Downloaded all ${members.length} badges as ${format.toUpperCase()} ZIP`)
+      await downloadAllBadgesZip(members as any, format, (curr, total) => {
+        if (curr % 25 === 0 || curr === total) {
+          toast.loading(`Rendering ${format.toUpperCase()} badges: ${curr}/${total}...`, { id: tId })
+        }
+      })
+      toast.success(`Downloaded all ${members.length} badges as ${format.toUpperCase()} ZIP`, { id: tId })
     } catch (err: any) {
       console.error("Batch ZIP error:", err)
-      toast.error(`Failed to download ${format.toUpperCase()} ZIP`)
+      toast.error(`Failed to download ${format.toUpperCase()} ZIP: ${err?.message || "Error"}`, { id: tId })
     } finally {
       setExporting(false)
     }
