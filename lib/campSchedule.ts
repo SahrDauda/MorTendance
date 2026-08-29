@@ -98,19 +98,19 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
     teachingStartTime: "2:00 PM",
     endTime: "5:00 PM",
     isTeachingSession: true,
-    description: "Marking starts at 1:30 PM (Review). Anyone arriving after 2:00 PM is LATE.",
+    description: "Afternoon teaching session. Review starts 1:30 PM; Late after 2:00 PM.",
   },
   {
     id: "wed-teaching-3",
-    name: "Wednesday — 3rd Teaching (Review 7:00 PM | Teaching 8:00 - 10:00 PM)",
+    name: "Wednesday — 3rd Teaching (Review 7:00 PM | Teaching 8:00 - 10:30 PM)",
     shortLabel: "Wednesday 3rd Teaching",
     day: "Wednesday",
     category: "Teaching",
     reviewStartTime: "7:00 PM",
     teachingStartTime: "8:00 PM",
-    endTime: "10:00 PM",
+    endTime: "10:30 PM",
     isTeachingSession: true,
-    description: "Marking starts at 7:00 PM (Review). Anyone arriving after 8:00 PM is LATE.",
+    description: "Evening teaching session. Review starts 7:00 PM; Late after 8:00 PM.",
   },
 
   // ==========================================
@@ -137,7 +137,7 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
     teachingStartTime: "8:30 AM",
     endTime: "11:30 AM",
     isTeachingSession: true,
-    description: "Marking starts at 8:00 AM (Review). Anyone arriving after 8:30 AM is LATE.",
+    description: "Morning teaching session. Review starts 8:00 AM; Late after 8:30 AM.",
   },
   {
     id: "thu-teaching-2",
@@ -149,19 +149,19 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
     teachingStartTime: "2:00 PM",
     endTime: "5:00 PM",
     isTeachingSession: true,
-    description: "Marking starts at 1:30 PM (Review). Anyone arriving after 2:00 PM is LATE.",
+    description: "Afternoon teaching session. Review starts 1:30 PM; Late after 2:00 PM.",
   },
   {
-    id: "thu-special-3",
-    name: "Thursday — 3rd Session (Exams, Bible Interaction & Prayer 7:00 - 10:00 PM)",
-    shortLabel: "Thursday Exams & Bible Interaction",
+    id: "thu-teaching-3",
+    name: "Thursday — 3rd Teaching (Review 7:00 PM | Teaching 8:00 - 10:30 PM)",
+    shortLabel: "Thursday 3rd Teaching",
     day: "Thursday",
-    category: "Special",
+    category: "Teaching",
     reviewStartTime: "7:00 PM",
-    teachingStartTime: "7:15 PM",
-    endTime: "10:00 PM",
+    teachingStartTime: "8:00 PM",
+    endTime: "10:30 PM",
     isTeachingSession: true,
-    description: "Exams (1hr), Bible interaction, prayer, and camp games.",
+    description: "Night teaching session. Review starts 7:00 PM; Late after 8:00 PM.",
   },
 
   // ==========================================
@@ -176,7 +176,7 @@ export const CAMP_SCHEDULE: CampSessionDef[] = [
     teachingStartTime: "5:30 AM",
     endTime: "6:15 AM",
     isTeachingSession: false,
-    description: "Early morning prayer and devotion.",
+    description: "Early morning prayer and devotion on final day.",
   },
   {
     id: "fri-commissioning",
@@ -208,4 +208,24 @@ export function getSessionDef(nameOrId: string): CampSessionDef | undefined {
     CAMP_SCHEDULE.find((s) => s.id === nameOrId) ||
     CAMP_SCHEDULE.find((s) => s.name === nameOrId)
   )
+}
+
+export function getNextSession(currentSessionName: string): CampSessionDef | null {
+  const index = CAMP_SCHEDULE.findIndex(
+    (s) => s.name === currentSessionName || s.id === currentSessionName
+  )
+  if (index >= 0 && index < CAMP_SCHEDULE.length - 1) {
+    return CAMP_SCHEDULE[index + 1]
+  }
+  return null
+}
+
+export function getPreviousSession(currentSessionName: string): CampSessionDef | null {
+  const index = CAMP_SCHEDULE.findIndex(
+    (s) => s.name === currentSessionName || s.id === currentSessionName
+  )
+  if (index > 0) {
+    return CAMP_SCHEDULE[index - 1]
+  }
+  return null
 }

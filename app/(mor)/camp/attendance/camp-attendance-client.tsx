@@ -59,10 +59,20 @@ import {
   Sunrise,
   ShieldCheck,
   ClipboardCheck,
+  ChevronLeft,
+  ChevronRight,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
-import { CAMP_SCHEDULE, CampSessionDef, getSessionDef } from "@/lib/campSchedule"
+import {
+  CAMP_SCHEDULE,
+  CampSessionDef,
+  getSessionDef,
+  getNextSession,
+  getPreviousSession,
+} from "@/lib/campSchedule"
 
 interface CampRosterMember {
   id: string
@@ -129,6 +139,44 @@ export function CampAttendanceClient() {
   const currentSessionDef = useMemo(() => {
     return getSessionDef(currentSession)
   }, [currentSession])
+
+  const nextSession = useMemo(() => {
+    return getNextSession(currentSession)
+  }, [currentSession])
+
+  const prevSession = useMemo(() => {
+    return getPreviousSession(currentSession)
+  }, [currentSession])
+
+  // Restore saved session from localStorage on initial mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mor_active_session")
+      if (saved && (CAMP_SCHEDULE.some((s) => s.name === saved) || saved.length > 0)) {
+        setCurrentSession(saved)
+        if (saved.includes("Bus")) {
+          setActiveTab("bus")
+        } else {
+          setActiveTab("program")
+        }
+      }
+    }
+  }, [])
+
+  // Switch session helper
+  const switchSession = (sessionName: string) => {
+    setCurrentSession(sessionName)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mor_active_session", sessionName)
+    }
+    if (sessionName.includes("Bus")) {
+      setActiveTab("bus")
+    } else {
+      setActiveTab("program")
+    }
+    const def = getSessionDef(sessionName)
+    toast.success(`Switched to ${def?.shortLabel || sessionName}`)
+  }
 
   // Load records
   const fetchAttendance = async (sessionName = currentSession) => {
@@ -457,22 +505,32 @@ export function CampAttendanceClient() {
           </p>
         </div>
 
-        {/* Schedule Selector */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        {/* Schedule Selector & Sequence Navigation */}
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+          {/* Previous Session Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-10 rounded-xl border-border hover:bg-muted/60 flex-shrink-0"
+            disabled={!prevSession}
+            onClick={() => prevSession && switchSession(prevSession.name)}
+            title={prevSession ? `Previous: ${prevSession.shortLabel}` : "No previous session"}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+
+          {/* Session Dropdown */}
           <Select
             value={currentSession}
             onValueChange={(val) => {
               if (val === "__CUSTOM__") {
                 setCustomSessionOpen(true)
               } else {
-                setCurrentSession(val)
-                if (val.includes("Bus")) {
-                  setActiveTab("bus")
-                }
+                switchSession(val)
               }
             }}
           >
-            <SelectTrigger className="flex-1 sm:w-[320px] h-11 font-bold bg-background border-primary/40 text-xs sm:text-sm shadow-sm rounded-xl">
+            <SelectTrigger className="flex-1 sm:w-[280px] md:w-[320px] h-11 font-bold bg-background border-primary/40 text-xs sm:text-sm shadow-sm rounded-xl">
               <CalendarDays className="w-4 h-4 text-primary mr-2 flex-shrink-0" />
               <SelectValue />
             </SelectTrigger>
@@ -504,6 +562,19 @@ export function CampAttendanceClient() {
             </SelectContent>
           </Select>
 
+          {/* Next Session Button */}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-10 rounded-xl border-border hover:bg-muted/60 flex-shrink-0"
+            disabled={!nextSession}
+            onClick={() => nextSession && switchSession(nextSession.name)}
+            title={nextSession ? `Next: ${nextSession.shortLabel}` : "Last session reached"}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+
+          {/* Refresh Button */}
           <Button
             variant="outline"
             className="h-11 px-3.5 rounded-xl border-border hover:bg-muted/50 flex-shrink-0"
@@ -1032,6 +1103,31 @@ export function CampAttendanceClient() {
               ))}
             </div>
           </div>
+
+          {/* Advance to Next Session Banner */}
+          {nextSession && (
+            <div className="w-full bg-gradient-to-r from-card via-primary/5 to-card border-2 border-primary/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md mt-6">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  Up Next in Camp Schedule
+                </span>
+                <h4 className="text-sm sm:text-base font-black text-foreground">
+                  {nextSession.name}
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Done checking in for departure bus? Click to advance and automatically select {nextSession.shortLabel}.
+                </p>
+              </div>
+
+              <Button
+                onClick={() => switchSession(nextSession.name)}
+                className="bg-primary hover:bg-primary/90 text-white font-black text-xs sm:text-sm h-11 px-5 rounded-xl shadow-lg gap-2 self-stretch sm:self-auto flex-shrink-0"
+              >
+                <span>Advance to {nextSession.shortLabel}</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* ======================================================== */}
@@ -1423,6 +1519,31 @@ export function CampAttendanceClient() {
               </Table>
             </div>
           </Card>
+
+          {/* Advance to Next Session Banner */}
+          {nextSession && (
+            <div className="w-full bg-gradient-to-r from-card via-primary/5 to-card border-2 border-primary/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md mt-6">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  Up Next in Camp Schedule
+                </span>
+                <h4 className="text-sm sm:text-base font-black text-foreground">
+                  {nextSession.name}
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Finished taking attendance for {currentSessionDef?.shortLabel || "this session"}? Click to automatically proceed to the next attendance roll.
+                </p>
+              </div>
+
+              <Button
+                onClick={() => switchSession(nextSession.name)}
+                className="bg-primary hover:bg-primary/90 text-white font-black text-xs sm:text-sm h-11 px-5 rounded-xl shadow-lg gap-2 self-stretch sm:self-auto flex-shrink-0"
+              >
+                <span>Advance to {nextSession.shortLabel}</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -1443,10 +1564,9 @@ export function CampAttendanceClient() {
                 toast.error("Please enter session name")
                 return
               }
-              setCurrentSession(customSessionName.trim())
+              switchSession(customSessionName.trim())
               setCustomSessionOpen(false)
               setCustomSessionName("")
-              toast.success(`Active session switched to "${customSessionName.trim()}"`)
             }}
             className="space-y-4 py-2"
           >
