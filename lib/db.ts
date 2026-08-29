@@ -19,12 +19,15 @@ function createPrismaClient(): PrismaClient {
   }) as PrismaClient
 }
 
-// In development, ensure we have a client with all latest models
 const getPrisma = (): PrismaClient => {
   if (process.env.NODE_ENV === "production") {
-    return createPrismaClient()
+    if (!globalForPrisma.prisma) {
+      globalForPrisma.prisma = createPrismaClient()
+    }
+    return globalForPrisma.prisma
   }
-  if (!globalForPrisma.prisma || !(globalForPrisma.prisma as any).campRoom) {
+  
+  if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createPrismaClient()
   }
   return globalForPrisma.prisma

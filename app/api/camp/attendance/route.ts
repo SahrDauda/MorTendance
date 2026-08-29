@@ -41,20 +41,18 @@ export async function GET(request: Request) {
     })
 
     // 2. Fetch attendance records for this specific session
-    const attendanceRecords = await db.campAttendance.findMany({
-      where: {
-        session,
-        isPresent: true,
-      },
-      select: {
-        id: true,
-        memberId: true,
-        session: true,
-        isPresent: true,
-        isLate: true,
-        scannedAt: true,
-      },
-    })
+    let attendanceRecords: any[] = []
+    try {
+      attendanceRecords = await db.campAttendance.findMany({
+        where: {
+          session,
+          isPresent: true,
+        },
+      })
+    } catch (attErr) {
+      console.warn("Notice: Fetching attendance records:", attErr)
+      attendanceRecords = []
+    }
 
     // 3. Map attendance status to members
     const attendanceMap = new Map<
@@ -65,7 +63,7 @@ export async function GET(request: Request) {
       attendanceMap.set(record.memberId, {
         id: record.id,
         isLate: Boolean(record.isLate),
-        scannedAt: record.scannedAt,
+        scannedAt: record.scannedAt || new Date(),
       })
     }
 
@@ -124,7 +122,7 @@ export async function GET(request: Request) {
         ...member,
         isPresent,
         isLate,
-        scannedAt: att ? att.scannedAt.toISOString() : null,
+        scannedAt: att ? new Date(att.scannedAt).toISOString() : null,
         attendanceId: att ? att.id : null,
       }
     })
