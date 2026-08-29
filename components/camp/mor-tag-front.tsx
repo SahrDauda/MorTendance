@@ -1,6 +1,7 @@
 import React from "react"
 
 export type CampMemberTagInfo = {
+  id?: string
   fullName: string
   branch?: string | null
   caregroup?: string | null
