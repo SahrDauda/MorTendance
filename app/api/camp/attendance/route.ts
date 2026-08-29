@@ -4,6 +4,19 @@ import { getSessionDef } from "@/lib/campSchedule"
 
 export const dynamic = "force-dynamic"
 
+interface MemberSelect {
+  id: string
+  badgeId: string
+  fullName: string
+  phone: string | null
+  gender: string
+  branch: string | null
+  caregroup: string | null
+  room: string | null
+  position: string
+  paid: boolean
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,7 +24,7 @@ export async function GET(request: Request) {
       searchParams.get("session") || "Tuesday — Bus Boarding (Departure Check-In)"
 
     // 1. Fetch all registered camp members
-    const members = await db.campMember.findMany({
+    const members: MemberSelect[] = await db.campMember.findMany({
       orderBy: [{ branch: "asc" }, { fullName: "asc" }],
       select: {
         id: true,
@@ -69,7 +82,7 @@ export async function GET(request: Request) {
       { total: number; present: number; onTime: number; late: number }
     > = {}
 
-    const roster = members.map((member) => {
+    const roster = members.map((member: MemberSelect) => {
       const att = attendanceMap.get(member.id)
       const isPresent = Boolean(att)
       const isLate = att ? att.isLate : false

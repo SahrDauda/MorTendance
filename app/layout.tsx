@@ -9,38 +9,52 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
-    default: "MOR",
-    template: "%s | MOR",
+    default: "MOR Camp 2026",
+    template: "%s | MOR Camp",
   },
   description:
-    "Ministry of Reconciliation (MOR) Attendance System - Tracking growth, consistency, and discipleship.",
-  keywords: ["ministry", "attendance", "growth", "discipleship", "fellowship", "MOR"],
+    "Ministry of Reconciliation (MOR) Camp Attendance & Check-In System",
+  keywords: ["ministry", "attendance", "camp", "MOR", "check-in", "reconciliation"],
   authors: [{ name: "MOR Team" }],
   creator: "MOR",
   generator: "MOR System",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "MOR Camp",
+  },
+  formatDetection: {
+    telephone: true,
+  },
+  icons: {
+    icon: "/icons/icon-192x192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "MOR",
-    title: "MOR - Tracking Ministry Growth",
-    description: "Ministry of Reconciliation (MOR) Attendance System - Tracking growth, consistency, and discipleship.",
+    siteName: "MOR Camp",
+    title: "MOR Camp Attendance System",
+    description: "Ministry of Reconciliation (MOR) Camp Attendance & Check-In System",
   },
   twitter: {
-    card: "summary_large_image",
-    title: "MOR - Tracking Ministry Growth",
-    description: "Ministry of Reconciliation (MOR) Attendance System - Tracking growth, consistency, and discipleship.",
+    card: "summary",
+    title: "MOR Camp Attendance System",
+    description: "Ministry of Reconciliation (MOR) Camp Attendance & Check-In System",
   },
 }
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1f2e" },
+    { media: "(prefers-color-scheme: light)", color: "#0F172A" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F172A" },
   ],
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({
@@ -49,8 +63,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" suppressHydrationWarning className="touch-manipulation">
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
+      <body className={`${inter.className} antialiased min-h-screen bg-background selection:bg-primary/20 overflow-x-hidden`}>
         <SessionProvider>
           {children}
         </SessionProvider>
