@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { SessionProvider } from "@/components/providers/session-provider"
+import { PwaRegister } from "@/components/providers/pwa-register"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -71,6 +72,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} antialiased min-h-screen bg-background selection:bg-primary/20 overflow-x-hidden`}>
         <SessionProvider>
+          <PwaRegister />
           {children}
         </SessionProvider>
         <Analytics />

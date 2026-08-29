@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       })
     }
 
-    const updates = members.map((m) =>
+    const updates = members.map((m: { id: string }) =>
       db.campAttendance.upsert({
         where: {
           memberId_session: {
