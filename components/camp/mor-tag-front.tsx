@@ -65,6 +65,10 @@ export default function MorTagFront({
 
   const textParams = getSvgTextParams(safeName)
 
+  const rawBranch = (member.branch || "HQ").trim()
+  const displayBranch =
+    rawBranch.toLowerCase() === "headquarters" ? "HQ" : rawBranch.toUpperCase()
+
   return (
     <div
       id={id}
