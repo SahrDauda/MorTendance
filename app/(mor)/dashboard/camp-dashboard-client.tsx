@@ -192,26 +192,46 @@ export function CampDashboardClient({
       </div>
 
       {/* ======================================================== */}
-      {/* SPECIAL PLACE FOR ABSENT MEMBERS (FLAGGED AT THE FRONT) */}
+      {/* REALISTIC CAMP STATUS & BOARDING READINESS / ABSENT RADAR */}
       {/* ======================================================== */}
-      <Card className="w-full border-2 border-red-500/40 shadow-lg bg-gradient-to-br from-red-500/5 via-card to-card rounded-2xl overflow-hidden">
-        <CardHeader className="p-4 sm:p-6 pb-3 border-b border-red-500/20 bg-red-500/10">
+      <Card className={`w-full border-2 shadow-lg rounded-2xl overflow-hidden ${
+        data.stats.totalCheckins === 0
+          ? "border-primary/40 bg-gradient-to-br from-primary/5 via-card to-card"
+          : "border-red-500/40 bg-gradient-to-br from-red-500/5 via-card to-card"
+      }`}>
+        <CardHeader className={`p-4 sm:p-6 pb-3 border-b ${
+          data.stats.totalCheckins === 0
+            ? "border-primary/20 bg-primary/10"
+            : "border-red-500/20 bg-red-500/10"
+        }`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-red-500/20 text-red-600 rounded-xl flex-shrink-0">
-                <UserX className="w-6 h-6" />
+              <div className={`p-2.5 rounded-xl flex-shrink-0 ${
+                data.stats.totalCheckins === 0
+                  ? "bg-primary/20 text-primary"
+                  : "bg-red-500/20 text-red-600"
+              }`}>
+                {data.stats.totalCheckins === 0 ? <Users className="w-6 h-6" /> : <UserX className="w-6 h-6" />}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <CardTitle className="text-lg sm:text-xl font-black text-foreground">
-                    Flagged Absent Members ({flaggedAbsentMembers.length})
+                    {data.stats.totalCheckins === 0
+                      ? `Pre-Boarding Delegate Roster (${data.stats.totalAttendees} Registered)`
+                      : `Flagged Absent Members (${flaggedAbsentMembers.length})`}
                   </CardTitle>
-                  <Badge className="bg-red-600 text-white font-black text-[10px] uppercase">
-                    Requires Immediate Follow-up
+                  <Badge className={`font-black text-[10px] uppercase ${
+                    data.stats.totalCheckins === 0
+                      ? "bg-primary text-white"
+                      : "bg-red-600 text-white"
+                  }`}>
+                    {data.stats.totalCheckins === 0 ? "Awaiting Tuesday Departure" : "Requires Immediate Follow-up"}
                   </Badge>
                 </div>
                 <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                  Delegates currently marked absent for the active camp session. Tap call to follow up.
+                  {data.stats.totalCheckins === 0
+                    ? "All pre-registered delegates from the database ready for Tuesday Bus Boarding check-in."
+                    : "Delegates currently marked absent for the active session. Tap call to follow up."}
                 </CardDescription>
               </div>
             </div>
@@ -219,9 +239,13 @@ export function CampDashboardClient({
             <Link href={ROUTES.CAMP_ATTENDANCE}>
               <Button
                 size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-9 rounded-xl shadow gap-1.5"
+                className={`font-bold text-xs h-9 rounded-xl shadow gap-1.5 ${
+                  data.stats.totalCheckins === 0
+                    ? "bg-primary hover:bg-primary/90 text-white"
+                    : "bg-red-600 hover:bg-red-700 text-white"
+                }`}
               >
-                <span>Go to Check-In Desk</span>
+                <span>{data.stats.totalCheckins === 0 ? "Open Live Check-In Desk" : "Go to Check-In Desk"}</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </Button>
             </Link>
@@ -275,16 +299,26 @@ export function CampDashboardClient({
               {filteredAbsent.map((m) => (
                 <div
                   key={m.id}
-                  className="p-3 bg-background border border-red-500/30 rounded-xl flex flex-col justify-between gap-2.5 hover:border-red-500/60 transition-all shadow-sm"
+                  className={`p-3 bg-background rounded-xl flex flex-col justify-between gap-2.5 transition-all shadow-sm border ${
+                    data.stats.totalCheckins === 0
+                      ? "border-border hover:border-primary/50"
+                      : "border-red-500/30 hover:border-red-500/60"
+                  }`}
                 >
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono font-black text-xs text-primary">
                         {m.badgeId}
                       </span>
-                      <span className="text-[10px] font-black uppercase text-red-600 bg-red-500/10 px-1.5 py-0.5 rounded">
-                        ABSENT
-                      </span>
+                      {data.stats.totalCheckins === 0 ? (
+                        <span className="text-[10px] font-black uppercase text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                          REGISTERED
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-black uppercase text-red-600 bg-red-500/10 px-1.5 py-0.5 rounded">
+                          ABSENT
+                        </span>
+                      )}
                     </div>
                     <div className="font-black text-sm text-foreground truncate">
                       {m.fullName}
