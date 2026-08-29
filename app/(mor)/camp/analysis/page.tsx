@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { CampAnalysisClient } from "./camp-analysis-client"
+import CampAnalysisClient from "./camp-analysis-client"
 
 export const dynamic = "force-dynamic"
 

@@ -845,3 +845,5 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
     </div>
   )
 }
+
+export default CampAnalysisClient
