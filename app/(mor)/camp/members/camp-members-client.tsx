@@ -33,6 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -55,11 +63,13 @@ import {
   ShieldCheck,
   FileSpreadsheet,
   UploadCloud,
+  ChevronDown,
+  Eye,
 } from "lucide-react"
 import { MorTagDialog } from "@/components/camp/mor-tag-dialog"
 import { CampBulkImportDialog } from "@/components/camp/camp-bulk-import-dialog"
 import { CampBatchExportDialog } from "@/components/camp/camp-batch-export-dialog"
-import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
+import { downloadAttendeeBadge, printAttendeeBadge } from "@/lib/campBadgeHelper"
 import Link from "next/link"
 
 interface CampMember {
@@ -832,20 +842,81 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                     </TableCell>
 
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        {/* Direct Print Button */}
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 px-3 bg-slate-900 border-slate-700 text-slate-100 hover:bg-primary/20 hover:border-primary/40 hover:text-primary gap-1.5 shadow-sm transition-all text-xs font-semibold"
-                          title={`Download badge PDF for ${member.fullName}`}
+                          className="h-8 px-2.5 bg-slate-900 border-slate-700 text-slate-100 hover:bg-sky-500/20 hover:border-sky-500/40 hover:text-sky-400 gap-1.5 shadow-sm transition-all text-xs font-semibold"
+                          title={`Print badge directly for ${member.fullName}`}
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleDirectDownloadTag(member)
+                            toast.info(`Sending ${member.fullName}'s badge to printer...`)
+                            printAttendeeBadge(member)
                           }}
                         >
-                          <Download className="w-3.5 h-3.5 text-teal-400" />
-                          <span>Tag</span>
+                          <Printer className="w-3.5 h-3.5 text-sky-400" />
+                          <span className="hidden sm:inline">Print</span>
                         </Button>
+
+                        {/* Format Download Dropdown (PDF, PNG, JPG) */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2.5 bg-slate-900 border-slate-700 text-slate-100 hover:bg-teal-500/20 hover:border-teal-500/40 hover:text-teal-300 gap-1 shadow-sm transition-all text-xs font-semibold"
+                              title="Download Badge Tag (PDF, PNG, JPG)"
+                            >
+                              <Download className="w-3.5 h-3.5 text-teal-400" />
+                              <span>Tag</span>
+                              <ChevronDown className="w-3 h-3 text-slate-400" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48 bg-slate-950 text-white border-slate-800 p-1.5 shadow-2xl">
+                            <DropdownMenuLabel className="text-[10px] uppercase font-bold text-slate-400 px-2 py-1">
+                              Download Tag
+                            </DropdownMenuLabel>
+                            <DropdownMenuItem
+                              className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200"
+                              onClick={() => {
+                                toast.info(`Downloading PDF for ${member.fullName}...`)
+                                downloadAttendeeBadge(member, "pdf")
+                              }}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-teal-400" />
+                              <span>Download PDF</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200"
+                              onClick={() => {
+                                toast.info(`Downloading PNG for ${member.fullName}...`)
+                                downloadAttendeeBadge(member, "png")
+                              }}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-sky-400" />
+                              <span>Download PNG</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200"
+                              onClick={() => {
+                                toast.info(`Downloading JPG for ${member.fullName}...`)
+                                downloadAttendeeBadge(member, "jpg")
+                              }}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-amber-400" />
+                              <span>Download JPG</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-slate-800 my-1" />
+                            <DropdownMenuItem
+                              className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200"
+                              onClick={() => openTag(member)}
+                            >
+                              <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Preview Details</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>

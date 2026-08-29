@@ -1,39 +1,9 @@
 "use client"
 
-import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
 import { resolveGroupTagImage, isGeneralMember } from "@/components/camp/mor-tag-front"
 
-// In-memory cache for base64 group tag images
-const groupImageBase64Cache: Record<string, string> = {}
-
-export async function getGroupTagBase64(
-  caregroup?: string | null,
-  position?: string | null
-): Promise<string> {
-  const relativePath = resolveGroupTagImage(caregroup, position)
-  if (groupImageBase64Cache[relativePath]) {
-    return groupImageBase64Cache[relativePath]
-  }
-
-  try {
-    const res = await fetch(relativePath)
-    const blob = await res.blob()
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-    groupImageBase64Cache[relativePath] = base64
-    return base64
-  } catch (e) {
-    console.warn(`Could not load ${relativePath} as base64, falling back to path`, e)
-    return relativePath
-  }
-}
-
 export interface BadgeAttendeeData {
+  id?: string
   fullName: string
   badgeId: string
   branch?: string | null
@@ -43,237 +13,201 @@ export interface BadgeAttendeeData {
 }
 
 /**
+ * Loads an image into an HTMLImageElement with CORS enabled.
+ */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => resolve(img)
+    img.onerror = (err) => reject(err)
+    img.src = src
+  })
+}
+
+/**
+ * Draws the high-resolution badge to an HTML5 Canvas using pure 2D canvas methods.
+ * Eliminates all external dependencies and CSS color parsing bugs (e.g. lab() / oklch()).
+ */
+async function renderBadgeToCanvas(attendee: BadgeAttendeeData): Promise<HTMLCanvasElement> {
+  const relativePath = resolveGroupTagImage(attendee.caregroup, attendee.position)
+  const bgImg = await loadImage(relativePath)
+
+  // Standard high-res dimensions (scaled to 1275x1798px @ 600 DPI)
+  const W = 1275
+  const H = 1798
+
+  const canvas = document.createElement("canvas")
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("Could not get 2D canvas context")
+
+  // 1. Draw Background Artwork
+  ctx.drawImage(bgImg, 0, 0, W, H)
+
+  // 2. Draw Location Pill (HEADQUARTERS / EASTERN / BO)
+  const rawBranch = (attendee.branch || "HQ").trim()
+  const displayBranch =
+    rawBranch.toLowerCase() === "hq" || rawBranch.toLowerCase() === "headquarters"
+      ? "HEADQUARTERS"
+      : rawBranch.toUpperCase()
+
+  ctx.font = "bold 38px Arial, Helvetica, sans-serif"
+  const branchTextWidth = ctx.measureText(displayBranch).width
+  const pillW = branchTextWidth + 80
+  const pillH = 65
+  const branchY = H * 0.598
+
+  // Draw Dark Slate Pill
+  ctx.fillStyle = "#0F172A"
+  ctx.beginPath()
+  if (ctx.roundRect) {
+    ctx.roundRect(W / 2 - pillW / 2, branchY, pillW, pillH, 32)
+  } else {
+    ctx.rect(W / 2 - pillW / 2, branchY, pillW, pillH)
+  }
+  ctx.fill()
+
+  // Draw White Location Text
+  ctx.fillStyle = "#FFFFFF"
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  ctx.fillText(displayBranch, W / 2, branchY + pillH / 2)
+
+  // 3. Draw White Name Box (Y: 80.09% - 90.37%, X: 5.08% - 94.90%)
+  const boxX = W * 0.0508
+  const boxY = H * 0.8009
+  const boxW = W * 0.8984
+  const boxH = H * 0.1028
+
+  ctx.fillStyle = "#FFFFFF"
+  ctx.fillRect(boxX, boxY, boxW, boxH)
+
+  // 4. Auto-scaled Attendee Name
+  const safeName = (attendee.fullName || "Attendee").trim().toUpperCase()
+  const maxNameWidth = boxW - 80
+  let fontSize = 95
+  ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`
+  while (ctx.measureText(safeName).width > maxNameWidth && fontSize > 36) {
+    fontSize -= 3
+    ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`
+  }
+
+  ctx.fillStyle = "#0F172A"
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  ctx.fillText(safeName, W / 2, boxY + boxH / 2)
+
+  // 5. Draw Leader Ribbon (if leader and not supervisor)
+  const pos = (attendee.position || "").trim().toUpperCase()
+  const isSupervisor = pos.includes("SUPERVIS") || pos.includes("HEAD SHEPHERD")
+  const isLeader = !isGeneralMember(attendee.position) && !isSupervisor
+
+  if (isLeader) {
+    const isEmmanuel = safeName.includes("EMMANUEL") && safeName.includes("DAUDA")
+    const leaderText = isEmmanuel ? "★ LEADER • COMMITTED CHRISTIAN ★" : "★ LEADER ★"
+    const leaderFontSize = isEmmanuel ? 36 : 46
+    ctx.font = `bold ${leaderFontSize}px Arial, Helvetica, sans-serif`
+    const leaderTextWidth = ctx.measureText(leaderText).width
+    const leaderPillW = Math.min(W * 0.88, leaderTextWidth + 80)
+    const leaderPillH = 75
+    const leaderY = H * 0.918
+
+    // Amber Gold Pill
+    ctx.fillStyle = "#FACC15"
+    ctx.beginPath()
+    if (ctx.roundRect) {
+      ctx.roundRect(W / 2 - leaderPillW / 2, leaderY, leaderPillW, leaderPillH, 37)
+    } else {
+      ctx.rect(W / 2 - leaderPillW / 2, leaderY, leaderPillW, leaderPillH)
+    }
+    ctx.fill()
+
+    ctx.fillStyle = "#000000"
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText(leaderText, W / 2, leaderY + leaderPillH / 2)
+  }
+
+  return canvas
+}
+
+/**
  * Directly downloads a single high-res Front badge in PDF, JPG, or PNG format.
  */
 export async function downloadAttendeeBadge(
   attendee: BadgeAttendeeData,
   format: "pdf" | "jpg" | "png" = "pdf"
 ): Promise<void> {
-  const photoBase64 = await getGroupTagBase64(attendee.caregroup, attendee.position)
-
-  const container = document.createElement("div")
-  container.style.position = "fixed"
-  container.style.top = "-99999px"
-  container.style.left = "-99999px"
-  container.style.width = "54mm"
-  container.style.zIndex = "-9999"
-  container.style.pointerEvents = "none"
-
   const safeName = (attendee.fullName || "Attendee").trim().toUpperCase()
-  const pos = (attendee.position || "").trim().toUpperCase()
-  const isSupervisor = pos.includes("SUPERVIS") || pos.includes("HEAD SHEPHERD")
-  const isLeader = !isGeneralMember(attendee.position) && !isSupervisor
-  const isEmmanuel = safeName.includes("EMMANUEL") && safeName.includes("DAUDA")
+  const baseFilename = `${safeName.replace(/\s+/g, "_")}_MOR_Badge_${attendee.badgeId}`
+  const targetId = attendee.id || attendee.badgeId
 
-  const getSvgTextParams = (name: string) => {
-    const len = name.length
-    if (len > 22) return { fontSize: "68", textLength: 'textLength="820" lengthAdjust="spacingAndGlyphs"', letterSpacing: "-1" }
-    if (len > 18) return { fontSize: "76", textLength: 'textLength="820" lengthAdjust="spacingAndGlyphs"', letterSpacing: "-0.5" }
-    if (len > 14) return { fontSize: "84", textLength: 'textLength="820" lengthAdjust="spacingAndGlyphs"', letterSpacing: "0" }
-    if (len > 10) return { fontSize: "92", textLength: 'textLength="820" lengthAdjust="spacingAndGlyphs"', letterSpacing: "0.5" }
-    if (len > 7) return { fontSize: "98", textLength: 'textLength="800" lengthAdjust="spacingAndGlyphs"', letterSpacing: "1" }
-    return { fontSize: "106", textLength: "", letterSpacing: "1.5" }
+  // 1. PDF Download -> Uses ultra-fast server vector PDF stream
+  if (format === "pdf") {
+    const response = await fetch(`/api/camp/badge/${targetId}`)
+    if (!response.ok) throw new Error("Failed to generate badge PDF")
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${baseFilename}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+    return
   }
 
-  const textParams = getSvgTextParams(safeName)
+  // 2. PNG / JPG Download -> Pure Canvas 2D (zero color parsing errors)
+  const canvas = await renderBadgeToCanvas(attendee)
+  const mimeType = format === "png" ? "image/png" : "image/jpeg"
+  const quality = format === "png" ? undefined : 0.98
 
-  container.innerHTML = `
-    <div id="mor-pdf-front" style="
-      width: 54mm;
-      height: 76.12mm;
-      position: relative;
-      overflow: hidden;
-      background: #0b0f19;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      font-family: Arial, Helvetica, sans-serif;
-    ">
-      <!-- Full Graphic Background -->
-      <img src="${photoBase64}" style="
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        object-position: center;
-        display: block;
-      " />
+  canvas.toBlob(
+    (blob) => {
+      if (!blob) return
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${baseFilename}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    },
+    mimeType,
+    quality
+  )
+}
 
-      <!-- Branch Indicator directly above Group Name (Y: ~59.8%) -->
-      <div style="
-        position: absolute;
-        top: 59.8%;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 4;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      ">
-        <div style="
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: #0f172a;
-          color: #ffffff;
-          font-weight: 800;
-          font-family: 'Barlow Condensed', 'Arial Black', 'Impact', Arial, sans-serif;
-          font-size: 1.6mm;
-          line-height: 1;
-          padding: 0.4mm 2.2mm;
-          border-radius: 999px;
-          letter-spacing: 0.6px;
-          text-transform: uppercase;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-          white-space: nowrap;
-        ">
-          ${(attendee.branch && (attendee.branch.toLowerCase() === "hq" || attendee.branch.toLowerCase() === "headquarters")) ? "HEADQUARTERS" : (attendee.branch ? attendee.branch.toUpperCase() : "HEADQUARTERS")}
-        </div>
-      </div>
+/**
+ * Native Print of Attendee Badge directly to the printer with zero color bugs.
+ */
+export async function printAttendeeBadge(attendee: BadgeAttendeeData): Promise<void> {
+  const targetId = attendee.id || attendee.badgeId
+  const pdfUrl = `/api/camp/badge/${targetId}`
 
-      <!-- White Name Replacement Box (Y: 80.09% - 90.37%, X: 5.08% - 94.90%) -->
-      <div style="
-        position: absolute;
-        top: 80.09%;
-        left: 5.08%;
-        width: 89.84%;
-        height: 10.28%;
-        background-color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 5;
-        overflow: hidden;
-      ">
-        <svg
-          viewBox="0 0 1000 160"
-          style="
-            width: 100%;
-            height: 100%;
-            display: block;
-          "
-        >
-          <text
-            x="500"
-            y="90"
-            text-anchor="middle"
-            dominant-baseline="central"
-            fill="#0f172a"
-            font-family="Arial, Helvetica, sans-serif"
-            font-size="${textParams.fontSize}"
-            font-weight="bold"
-            letter-spacing="${textParams.letterSpacing}"
-            ${textParams.textLength}
-          >
-            ${safeName}
-          </text>
-        </svg>
-      </div>
+  // Create invisible print iframe
+  const iframe = document.createElement("iframe")
+  iframe.style.position = "fixed"
+  iframe.style.right = "0"
+  iframe.style.bottom = "0"
+  iframe.style.width = "0"
+  iframe.style.height = "0"
+  iframe.style.border = "0"
+  iframe.src = pdfUrl
 
-      <!-- Leader Ribbon Overlay -->
-      ${
-        isLeader
-          ? `
-      <div style="
-        position: absolute;
-        top: 91.8%;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10;
-        width: 90%;
-      ">
-        <div style="
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: #facc15;
-          color: #000000;
-          font-weight: 900;
-          font-family: 'Barlow Condensed', Arial, sans-serif;
-          font-size: 1.8mm;
-          padding: 0.4mm 2.2mm;
-          border-radius: 999px;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-          white-space: nowrap;
-        ">
-          ★ LEADER${isEmmanuel ? " • COMMITTED CHRISTIAN" : ""} ★
-        </div>
-      </div>
-      `
-          : ""
-      }
-    </div>
-  `
+  document.body.appendChild(iframe)
 
-  document.body.appendChild(container)
-
-  try {
-    await new Promise((r) => setTimeout(r, 150))
-    const frontEl = container.querySelector("#mor-pdf-front") as HTMLElement
-
-    const opts = {
-      scale: 3.5,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+    } catch (e) {
+      // Fallback: Open in new print tab
+      window.open(pdfUrl, "_blank")
     }
-
-    const canvasFront = await html2canvas(frontEl, opts)
-    const baseFilename = `${safeName.replace(/\s+/g, "_")}_MOR_Badge_${attendee.badgeId}`
-
-    if (format === "png") {
-      const dataUrl = canvasFront.toDataURL("image/png")
-      const link = document.createElement("a")
-      link.href = dataUrl
-      link.download = `${baseFilename}.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      return
-    }
-
-    if (format === "jpg") {
-      const dataUrl = canvasFront.toDataURL("image/jpeg", 0.98)
-      const link = document.createElement("a")
-      link.href = dataUrl
-      link.download = `${baseFilename}.jpg`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      return
-    }
-
-    // Default: PDF
-    const TAG_W_MM = 54
-    const TAG_H_MM = 76.12
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: [TAG_W_MM, TAG_H_MM],
-      compress: true,
-    })
-
-    pdf.addImage(
-      canvasFront.toDataURL("image/jpeg", 0.98),
-      "JPEG",
-      0,
-      0,
-      TAG_W_MM,
-      TAG_H_MM,
-      "",
-      "FAST"
-    )
-
-    pdf.save(`${baseFilename}.pdf`)
-  } finally {
-    document.body.removeChild(container)
   }
 }
