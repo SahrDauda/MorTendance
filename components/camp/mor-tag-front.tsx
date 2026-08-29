@@ -133,42 +133,6 @@ export default function MorTagFront({
         }}
       />
 
-      {/* Branch Indicator directly above Group Name (Y: ~59.8%) */}
-      <div
-        style={{
-          position: "absolute",
-          top: "59.8%",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 4,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "#0f172a",
-            color: "#ffffff",
-            fontWeight: 800,
-            fontFamily:
-              "'Barlow Condensed', 'Arial Black', 'Impact', Arial, sans-serif",
-            fontSize: compact ? "1.6mm" : "8px",
-            padding: compact ? "0.3mm 2.2mm" : "1.5px 8px",
-            borderRadius: "999px",
-            letterSpacing: "0.8px",
-            textTransform: "uppercase",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {displayBranch}
-        </div>
-      </div>
-
       {/* Name Overlay Box (Coordinates calibrated to exact 4960x6992 white rectangle: Y 80.09%-90.37%, X 5.08%-94.90%) */}
       <div
         style={{

@@ -139,37 +139,6 @@ export async function POST(req: NextRequest) {
         doc.addImage(imgInfo.data, "JPEG", 0, 0, TAG_W, TAG_H, imgInfo.alias, "FAST")
       }
 
-      // 2. Location Indicator directly above Group Name (Y: ~59.8%)
-      const rawBranch = (member.branch || "HQ").trim()
-      const displayBranch =
-        rawBranch.toLowerCase() === "hq" || rawBranch.toLowerCase() === "headquarters"
-          ? "HEADQUARTERS"
-          : rawBranch.toUpperCase()
-      const branchText = displayBranch
-
-      doc.setFont("Helvetica", "bold")
-      doc.setFontSize(5.0)
-      const branchTextWidth = doc.getTextWidth(branchText)
-      const branchPillW = branchTextWidth + 5.0
-      const branchPillH = 3.0
-      const branchY = TAG_H * 0.598
-
-      doc.setFillColor(15, 23, 42) // Dark Slate #0F172A
-      doc.roundedRect(
-        TAG_W / 2 - branchPillW / 2,
-        branchY,
-        branchPillW,
-        branchPillH,
-        1.5,
-        1.5,
-        "F"
-      )
-      doc.setTextColor(255, 255, 255)
-      doc.text(branchText, TAG_W / 2, branchY + branchPillH / 2, {
-        align: "center",
-        baseline: "middle",
-      })
-
       const safeName = (member.fullName || "Attendee").trim().toUpperCase()
       const pos = (member.position || "").trim().toUpperCase()
       const isSupervisor = pos.includes("SUPERVIS") || pos.includes("HEAD SHEPHERD")

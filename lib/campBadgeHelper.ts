@@ -78,36 +78,7 @@ async function renderBadgeToCanvas(attendee: BadgeAttendeeData): Promise<HTMLCan
   // 1. Draw Background Artwork
   ctx.drawImage(bgImg, 0, 0, W, H)
 
-  // 2. Draw Location Pill (HEADQUARTERS / EASTERN / BO)
-  const rawBranch = (attendee.branch || "HQ").trim()
-  const displayBranch =
-    rawBranch.toLowerCase() === "hq" || rawBranch.toLowerCase() === "headquarters"
-      ? "HEADQUARTERS"
-      : rawBranch.toUpperCase()
-
-  ctx.font = "bold 38px Arial, Helvetica, sans-serif"
-  const branchTextWidth = ctx.measureText(displayBranch).width
-  const pillW = branchTextWidth + 80
-  const pillH = 65
-  const branchY = H * 0.598
-
-  // Draw Dark Slate Pill
-  ctx.fillStyle = "#0F172A"
-  ctx.beginPath()
-  if (ctx.roundRect) {
-    ctx.roundRect(W / 2 - pillW / 2, branchY, pillW, pillH, 32)
-  } else {
-    ctx.rect(W / 2 - pillW / 2, branchY, pillW, pillH)
-  }
-  ctx.fill()
-
-  // Draw White Location Text
-  ctx.fillStyle = "#FFFFFF"
-  ctx.textAlign = "center"
-  ctx.textBaseline = "middle"
-  ctx.fillText(displayBranch, W / 2, branchY + pillH / 2)
-
-  // 3. Draw White Name Box (Y: 80.09% - 90.37%, X: 5.08% - 94.90%)
+  // 2. Draw White Name Box (Y: 80.09% - 90.37%, X: 5.08% - 94.90%)
   const boxX = W * 0.0508
   const boxY = H * 0.8009
   const boxW = W * 0.8984
