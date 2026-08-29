@@ -148,13 +148,13 @@ export function CampDashboardClient({
               Bulk Import (Excel / PDF)
             </Button>
 
-            <Link href="/camp/print-tags">
+            <Link href="/camp/members">
               <Button
                 variant="outline"
                 className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-semibold gap-2 backdrop-blur-sm h-10"
               >
                 <Printer className="w-4 h-4 text-cyan-300" />
-                Print Badges
+                Attendees & Badges
               </Button>
             </Link>
           </div>
@@ -336,7 +336,7 @@ export function CampDashboardClient({
           </Link>
 
           {/* Print Badges Module */}
-          <Link href="/camp/print-tags" className="group">
+          <Link href="/camp/members" className="group">
             <Card className="h-full border shadow-sm bg-card hover:border-cyan-500 transition-all hover:shadow-md">
               <CardHeader className="pb-3">
                 <div className="p-3 bg-cyan-500/10 text-cyan-600 rounded-2xl w-fit group-hover:scale-110 transition-transform">

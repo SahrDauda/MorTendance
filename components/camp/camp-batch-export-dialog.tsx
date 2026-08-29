@@ -1,0 +1,206 @@
+"use client"
+
+import React, { useRef, useState } from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Printer, Download, Loader2 } from "lucide-react"
+import MorTagFront, { CampMemberTagInfo } from "./mor-tag-front"
+import { toast } from "sonner"
+
+interface CampBatchExportDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  members: CampMemberTagInfo[]
+  filterSummary?: {
+    group: string
+    branch: string
+    role: string
+    gender: string
+    search?: string
+  }
+}
+
+export function CampBatchExportDialog({
+  open,
+  onOpenChange,
+  members,
+  filterSummary,
+}: CampBatchExportDialogProps) {
+  const [exporting, setExporting] = useState(false)
+  const printAreaRef = useRef<HTMLDivElement>(null)
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!printAreaRef.current || members.length === 0) return
+    setExporting(true)
+
+    try {
+      const html2pdf = (await import("html2pdf.js")).default
+
+      const groupTag =
+        filterSummary?.group && filterSummary.group !== "ALL"
+          ? `_${filterSummary.group}`
+          : ""
+      const roleTag =
+        filterSummary?.role && filterSummary.role !== "ALL"
+          ? `_${filterSummary.role}`
+          : ""
+      const filename = `MOR_Camp_2026_Badges${groupTag}${roleTag}_${new Date().toISOString().slice(0, 10)}.pdf`
+
+      const opt = {
+        margin: 5,
+        filename,
+        image: { type: "jpeg" as const, quality: 0.98 },
+        html2canvas: { scale: 3, useCORS: true, logging: false },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
+      }
+
+      await html2pdf().from(printAreaRef.current).set(opt).save()
+      toast.success(`Exported ${members.length} badges successfully`)
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to export PDF")
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl w-[96vw] bg-slate-950/98 backdrop-blur-2xl text-white border-slate-800/80 p-6 overflow-hidden max-h-[92vh] shadow-2xl rounded-3xl flex flex-col">
+        {/* Modal Header */}
+        <DialogHeader className="pb-3 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-mono font-bold tracking-wider">
+                {members.length} BADGES
+              </span>
+              <DialogTitle className="text-xl font-black text-white tracking-tight">
+                Export & Print Badges
+              </DialogTitle>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Live preview of badges matching your current filters. Print directly or download as a high-resolution PDF.
+            </p>
+
+            {/* Active Filter Pills */}
+            {filterSummary && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-2">
+                {filterSummary.group !== "ALL" && (
+                  <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-[10px]">
+                    Group: {filterSummary.group}
+                  </Badge>
+                )}
+                {filterSummary.branch !== "ALL" && (
+                  <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/30 text-[10px]">
+                    Branch: {filterSummary.branch}
+                  </Badge>
+                )}
+                {filterSummary.role !== "ALL" && (
+                  <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px]">
+                    Role: {filterSummary.role}
+                  </Badge>
+                )}
+                {filterSummary.gender !== "ALL" && (
+                  <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">
+                    Gender: {filterSummary.gender}
+                  </Badge>
+                )}
+                {filterSummary.search && (
+                  <Badge className="bg-slate-800 text-slate-300 border-slate-700 text-[10px]">
+                    Search: &quot;{filterSummary.search}&quot;
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Top Actions */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-slate-700 bg-slate-900/60 text-slate-200 hover:bg-slate-800 hover:text-white gap-1.5 font-semibold text-xs rounded-xl h-10 px-3.5"
+              onClick={handlePrint}
+              disabled={members.length === 0}
+            >
+              <Printer className="w-3.5 h-3.5 text-sky-400" />
+              Browser Print
+            </Button>
+
+            <Button
+              size="sm"
+              className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-bold text-xs gap-1.5 rounded-xl h-10 px-4 shadow-lg shadow-teal-500/20"
+              onClick={handleDownloadPDF}
+              disabled={exporting || members.length === 0}
+            >
+              {exporting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  Download All ({members.length}) as PDF
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogHeader>
+
+        {/* Scrollable Badge Grid Area */}
+        <div className="flex-1 overflow-y-auto p-4 bg-slate-950/60 rounded-2xl border border-slate-800/40 my-2">
+          {members.length === 0 ? (
+            <div className="py-20 text-center text-slate-400 text-sm">
+              No attendees match the currently active filters.
+            </div>
+          ) : (
+            <div
+              ref={printAreaRef}
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 justify-items-center print:grid-cols-2 print:gap-4 print:p-2"
+            >
+              {members.map((member) => (
+                <div
+                  key={member.id || member.badgeId}
+                  className="flex flex-col items-center break-inside-avoid"
+                >
+                  <div className="rounded-xl overflow-hidden shadow-xl ring-1 ring-white/10 p-0.5 bg-gradient-to-b from-white/10 to-transparent">
+                    <MorTagFront
+                      member={member}
+                      width="54mm"
+                      height="76.12mm"
+                      compact={true}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="pt-2 flex items-center justify-between text-xs text-slate-400">
+          <span>Showing {members.length} delegates ready for print</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-slate-400 hover:text-white text-xs"
+            onClick={() => onOpenChange(false)}
+          >
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

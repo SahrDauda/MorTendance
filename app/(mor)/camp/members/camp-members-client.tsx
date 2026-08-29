@@ -58,6 +58,7 @@ import {
 } from "lucide-react"
 import { MorTagDialog } from "@/components/camp/mor-tag-dialog"
 import { CampBulkImportDialog } from "@/components/camp/camp-bulk-import-dialog"
+import { CampBatchExportDialog } from "@/components/camp/camp-batch-export-dialog"
 import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
 import Link from "next/link"
 
@@ -136,6 +137,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
   // Modals
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [bulkImportOpen, setBulkImportOpen] = useState(false)
+  const [batchExportOpen, setBatchExportOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [tagDialogOpen, setTagDialogOpen] = useState(false)
@@ -501,12 +503,14 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             Auto-Assign Rooms
           </Button> */}
 
-          <Link href="/camp/print-tags">
-            <Button variant="secondary" className="gap-2 font-medium">
-              <Printer className="w-4 h-4" />
-              Print All Tags
-            </Button>
-          </Link>
+          <Button
+            variant="secondary"
+            className="gap-2 font-semibold bg-secondary hover:bg-secondary/80 text-secondary-foreground shadow-sm"
+            onClick={() => setBatchExportOpen(true)}
+          >
+            <Printer className="w-4 h-4 text-primary" />
+            Export All ({filteredMembers.length})
+          </Button>
 
           <Button
             variant="outline"
@@ -1284,6 +1288,20 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
         open={bulkImportOpen}
         onOpenChange={setBulkImportOpen}
         onSuccess={fetchData}
+      />
+
+      {/* Batch Export & Print Modal (Filtered) */}
+      <CampBatchExportDialog
+        open={batchExportOpen}
+        onOpenChange={setBatchExportOpen}
+        members={filteredMembers}
+        filterSummary={{
+          group: groupFilter,
+          branch: branchFilter,
+          role: roleFilter,
+          gender: genderFilter,
+          search: search.trim(),
+        }}
       />
     </div>
   )

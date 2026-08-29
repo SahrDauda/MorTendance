@@ -23,7 +23,6 @@ const campNavigation = [
   // { name: "Lodging Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
   { name: "Camp Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },
   { name: "Check-in Desk", href: ROUTES.CAMP_ATTENDANCE, icon: QrCode },
-  { name: "Print Badges", href: ROUTES.CAMP_TAGS, icon: Printer },
 ]
 
 export function Sidebar() {

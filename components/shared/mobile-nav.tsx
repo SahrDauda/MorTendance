@@ -12,7 +12,6 @@ const mobileNavigation = [
   // { name: "Rooms", href: ROUTES.CAMP_ROOMS, icon: BedDouble },
   { name: "Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },
   { name: "Check-in", href: ROUTES.CAMP_ATTENDANCE, icon: QrCode },
-  { name: "Badges", href: ROUTES.CAMP_TAGS, icon: Printer },
 ]
 
 export function MobileNav() {
