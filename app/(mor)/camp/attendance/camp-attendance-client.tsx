@@ -60,10 +60,10 @@ import {
   Undo2,
   Plus,
   Flame,
-  Sunrise,
-  BookOpen,
-  UtensilsCrossed,
   ShieldCheck,
+  AlertTriangle,
+  UserPlus,
+  CreditCard,
 } from "lucide-react"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -150,12 +150,15 @@ export function CampAttendanceClient() {
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState("")
+  // Tuesday Bus Search & Name Lookup
+  const [nameQuery, setNameQuery] = useState("")
+  const [busFilter, setBusFilter] = useState<"ALL" | "UNBOARDED" | "BOARDED">("ALL")
+
+  // Program Table Search & Filters
+  const [programSearch, setProgramSearch] = useState("")
   const [filterBranch, setFilterBranch] = useState("ALL")
   const [filterGroup, setFilterGroup] = useState("ALL")
   const [filterStatus, setFilterStatus] = useState<"ALL" | "PRESENT" | "ABSENT">("ALL")
-  const [busFilter, setBusFilter] = useState<"ALL" | "UNBOARDED" | "BOARDED">("ALL")
 
   // Quick Barcode / Scanner
   const [scanQuery, setScanQuery] = useState("")
@@ -166,8 +169,19 @@ export function CampAttendanceClient() {
   const [customSessionOpen, setCustomSessionOpen] = useState(false)
   const [customSessionName, setCustomSessionName] = useState("")
 
+  // Quick On-The-Spot Registration Modal (for unregistered arrivals at the bus)
+  const [quickRegOpen, setQuickRegOpen] = useState(false)
+  const [quickRegForm, setQuickRegForm] = useState({
+    fullName: "",
+    phone: "",
+    gender: "Male",
+    branch: "Headquarters",
+    position: "Member",
+  })
+  const [quickRegSubmitting, setQuickRegSubmitting] = useState(false)
+
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
-  const busSearchInputRef = useRef<HTMLInputElement>(null)
 
   // Load records
   const fetchAttendance = async (sessionName = currentSession) => {
@@ -247,7 +261,6 @@ export function CampAttendanceClient() {
         }
       } else {
         toast.error(json.error || "Check-in failed")
-        // Revert on failure
         fetchAttendance()
       }
     } catch (err) {
@@ -292,26 +305,94 @@ export function CampAttendanceClient() {
     }
   }
 
-  // Filtered members for Bus Boarding
+  // Quick On-The-Spot Registration at the Bus Door
+  const handleQuickRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!quickRegForm.fullName.trim()) {
+      toast.error("Please enter attendee full name")
+      return
+    }
+
+    setQuickRegSubmitting(true)
+    try {
+      // 1. Create Member
+      const regRes = await fetch("/api/camp/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...quickRegForm,
+          paid: true,
+          paidAmount: 300,
+          paymentClaimed: true,
+        }),
+      })
+      const regData = await regRes.json()
+
+      if (!regData.success) {
+        toast.error(regData.error || "Registration failed")
+        return
+      }
+
+      const newMember = regData.data
+
+      // 2. Immediately Check them into the Bus
+      await fetch("/api/camp/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: newMember.id,
+          session: currentSession,
+          isPresent: true,
+        }),
+      })
+
+      toast.success(`🎉 Registered & Boarded: ${newMember.fullName} (${newMember.badgeId})`)
+      setQuickRegOpen(false)
+      setNameQuery(newMember.fullName)
+      setQuickRegForm({
+        fullName: "",
+        phone: "",
+        gender: "Male",
+        branch: "Headquarters",
+        position: "Member",
+      })
+      await fetchAttendance()
+    } catch (err) {
+      toast.error("An error occurred during quick registration")
+    } finally {
+      setQuickRegSubmitting(false)
+    }
+  }
+
+  // Search Results for Tuesday Name Lookup
+  const nameSearchResults = useMemo(() => {
+    if (!nameQuery.trim()) return []
+    const q = nameQuery.toLowerCase().trim()
+
+    return members.filter((m) => {
+      const matchName = m.fullName.toLowerCase().includes(q)
+      const matchBadge = m.badgeId.toLowerCase().includes(q)
+      const matchPhone = (m.phone || "").toLowerCase().includes(q)
+      return matchName || matchBadge || matchPhone
+    })
+  }, [members, nameQuery])
+
+  // Filtered members for Bus Boarding List
   const busFilteredMembers = useMemo(() => {
     return members.filter((m) => {
       if (busFilter === "UNBOARDED" && m.isPresent) return false
       if (busFilter === "BOARDED" && !m.isPresent) return false
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
+      if (nameQuery.trim()) {
+        const q = nameQuery.toLowerCase().trim()
         const matchName = m.fullName.toLowerCase().includes(q)
         const matchBadge = m.badgeId.toLowerCase().includes(q)
         const matchPhone = (m.phone || "").toLowerCase().includes(q)
-        const matchBranch = (m.branch || "").toLowerCase().includes(q)
-        const matchGroup = (m.caregroup || "").toLowerCase().includes(q)
-        if (!matchName && !matchBadge && !matchPhone && !matchBranch && !matchGroup) {
-          return false
-        }
+        if (!matchName && !matchBadge && !matchPhone) return false
       }
       return true
     })
-  }, [members, busFilter, searchQuery])
+  }, [members, busFilter, nameQuery])
 
   // Filtered members for Campground Program Table
   const programFilteredMembers = useMemo(() => {
@@ -321,8 +402,8 @@ export function CampAttendanceClient() {
       if (filterBranch !== "ALL" && (m.branch || "Unassigned") !== filterBranch) return false
       if (filterGroup !== "ALL" && (m.caregroup || "Unassigned") !== filterGroup) return false
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
+      if (programSearch.trim()) {
+        const q = programSearch.toLowerCase()
         const matchName = m.fullName.toLowerCase().includes(q)
         const matchBadge = m.badgeId.toLowerCase().includes(q)
         const matchPhone = (m.phone || "").toLowerCase().includes(q)
@@ -330,7 +411,7 @@ export function CampAttendanceClient() {
       }
       return true
     })
-  }, [members, filterStatus, filterBranch, filterGroup, searchQuery])
+  }, [members, filterStatus, filterBranch, filterGroup, programSearch])
 
   // Unique branches & groups from members
   const uniqueBranches = useMemo(() => {
@@ -459,7 +540,9 @@ export function CampAttendanceClient() {
       m.scannedAt ? new Date(m.scannedAt).toLocaleString() : "",
     ])
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
@@ -478,18 +561,18 @@ export function CampAttendanceClient() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="bg-primary/10 text-primary text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              MOR Camp 2026 Check-In & Attendance
+              MOR Camp 2026 Registration & Attendance
             </span>
             <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              Live Roster Synced
+              Live System Active
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-            Camp Attendance & Bus Boarding
+            Attendance & Bus Check-In Desk
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Call and search names for Tuesday bus departure check-in, and record program attendance across campground sessions.
+            Verify member registrations and board departure buses on Tuesday, and record attendance across all camp programs.
           </p>
         </div>
 
@@ -556,11 +639,11 @@ export function CampAttendanceClient() {
               value="bus"
               className="gap-2 px-4 rounded-xl text-xs sm:text-sm font-bold data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm"
               onClick={() => {
-                setTimeout(() => busSearchInputRef.current?.focus(), 100)
+                setTimeout(() => nameInputRef.current?.focus(), 100)
               }}
             >
               <Bus className="w-4 h-4" />
-              Tuesday Bus Boarding
+              Tuesday Bus Name Check-In
             </TabsTrigger>
             <TabsTrigger
               value="program"
@@ -594,7 +677,7 @@ export function CampAttendanceClient() {
         </div>
 
         {/* ======================================================== */}
-        {/* MODE 1: TUESDAY BUS BOARDING CHECK-IN */}
+        {/* MODE 1: TUESDAY BUS NAME CHECK-IN & REGISTRATION VERIFY */}
         {/* ======================================================== */}
         <TabsContent value="bus" className="space-y-6 m-0">
           {/* Boarding Counter Gauge Card */}
@@ -609,10 +692,10 @@ export function CampAttendanceClient() {
                   </div>
                   <div>
                     <div className="text-xs font-bold text-emerald-400 uppercase tracking-widest">
-                      Live Departure Status
+                      Tuesday Departure Gate
                     </div>
                     <div className="text-lg sm:text-xl font-black text-slate-100">
-                      Tuesday Bus Boarding Counter
+                      Member Name Registration & Boarding Check
                     </div>
                   </div>
                 </div>
@@ -639,214 +722,385 @@ export function CampAttendanceClient() {
                   />
                 </div>
                 <div className="flex justify-between text-[11px] text-slate-400 font-semibold px-1">
-                  <span>{summary.absentCount} Delegates remaining to board</span>
-                  <span>{summary.presentCount} On the bus</span>
+                  <span>{summary.absentCount} Delegates remaining to arrive</span>
+                  <span>{summary.presentCount} Verified & on the bus</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Fast Search & Calling Bar */}
-          <div className="space-y-4">
-            <div className="bg-card p-4 rounded-2xl border shadow-sm space-y-3">
-              <div className="relative">
-                <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" />
-                <Input
-                  ref={busSearchInputRef}
-                  placeholder="Call & search name (e.g. Israel, Sattu, Konima, Abdul)..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-11 pr-10 h-13 text-base sm:text-lg font-bold bg-background border-primary/40 rounded-xl shadow-inner"
-                  autoFocus
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs font-bold bg-muted px-2 py-1 rounded-md"
-                  >
-                    Clear
-                  </button>
-                )}
+          {/* Dedicated Name Verification Search Panel */}
+          <div className="bg-card p-6 rounded-2xl border-2 border-primary/30 shadow-lg space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <label className="text-sm sm:text-base font-black text-foreground flex items-center gap-2">
+                  <Search className="w-5 h-5 text-primary" />
+                  Enter Member Name to Check Registration
+                </label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When a delegate calls their name, type it here to verify if they are registered and paid in the system.
+                </p>
               </div>
 
-              {/* Boarding Filter Pills */}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Button
-                    size="sm"
-                    variant={busFilter === "ALL" ? "default" : "outline"}
-                    className="rounded-xl text-xs font-bold h-8"
-                    onClick={() => setBusFilter("ALL")}
-                  >
-                    All Delegates ({members.length})
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={busFilter === "UNBOARDED" ? "default" : "outline"}
-                    className={`rounded-xl text-xs font-bold h-8 ${
-                      busFilter === "UNBOARDED"
-                        ? "bg-amber-500 hover:bg-amber-600 text-black"
-                        : "border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
-                    }`}
-                    onClick={() => setBusFilter("UNBOARDED")}
-                  >
-                    ⏳ Not Boarded Yet ({summary.absentCount})
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={busFilter === "BOARDED" ? "default" : "outline"}
-                    className={`rounded-xl text-xs font-bold h-8 ${
-                      busFilter === "BOARDED"
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : "border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
-                    }`}
-                    onClick={() => setBusFilter("BOARDED")}
-                  >
-                    ✅ Boarded ({summary.presentCount})
-                  </Button>
-                </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="self-start sm:self-auto gap-1.5 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 font-bold text-xs rounded-xl"
+                onClick={() => {
+                  setQuickRegForm({
+                    ...quickRegForm,
+                    fullName: nameQuery.trim(),
+                  })
+                  setQuickRegOpen(true)
+                }}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Register New Attendee
+              </Button>
+            </div>
 
-                <div className="text-xs text-muted-foreground font-semibold">
-                  Showing {busFilteredMembers.length} matching delegates
-                </div>
+            <div className="relative">
+              <Input
+                ref={nameInputRef}
+                placeholder="Type member name (e.g. Israel Kai Kai, Sattu, Konima)..."
+                value={nameQuery}
+                onChange={(e) => setNameQuery(e.target.value)}
+                className="h-14 pl-4 pr-24 text-base sm:text-xl font-bold bg-background border-2 border-primary/50 rounded-2xl shadow-inner text-foreground placeholder:text-muted-foreground/60"
+                autoFocus
+              />
+              {nameQuery && (
+                <button
+                  onClick={() => {
+                    setNameQuery("")
+                    nameInputRef.current?.focus()
+                  }}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold bg-muted hover:bg-muted/80 text-foreground px-3 py-1.5 rounded-xl border"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Live Name Verification Feedback Cards */}
+            {nameQuery.trim().length > 0 && (
+              <div className="pt-2">
+                {nameSearchResults.length === 0 ? (
+                  /* NOT REGISTERED WARNING */
+                  <div className="bg-red-500/10 border-2 border-red-500/40 rounded-2xl p-5 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 bg-red-500/20 text-red-600 rounded-xl flex-shrink-0 mt-0.5">
+                        <XCircle className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-base sm:text-lg font-black text-red-600">
+                          NOT REGISTERED IN THE SYSTEM
+                        </div>
+                        <div className="text-xs sm:text-sm text-foreground">
+                          No registration record was found for{" "}
+                          <strong className="text-red-600 font-bold">&quot;{nameQuery}&quot;</strong>.
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Please verify spelling or register them immediately below so they can be assigned and boarded.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-red-500/20">
+                      <Button
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 rounded-xl shadow-md"
+                        onClick={() => {
+                          setQuickRegForm({
+                            ...quickRegForm,
+                            fullName: nameQuery.trim(),
+                          })
+                          setQuickRegOpen(true)
+                        }}
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        Register &quot;{nameQuery}&quot; Now
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-xl text-xs font-semibold"
+                        onClick={() => setNameQuery("")}
+                      >
+                        Try Another Name
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  /* REGISTERED MEMBER(S) FOUND */
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-600 px-1">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        {nameSearchResults.length} Registered Member{nameSearchResults.length > 1 ? "s" : ""} Found Matching &quot;{nameQuery}&quot;
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {nameSearchResults.map((member) => (
+                        <Card
+                          key={member.id}
+                          className={`border-2 transition-all shadow-md rounded-2xl overflow-hidden ${
+                            member.isPresent
+                              ? "bg-emerald-500/10 border-emerald-500/60"
+                              : "bg-emerald-500/[0.03] border-emerald-500/40 hover:border-emerald-500/80"
+                          }`}
+                        >
+                          <CardContent className="p-5 space-y-3.5">
+                            {/* Member Details */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <Badge className="bg-emerald-600 text-white font-mono text-xs font-bold">
+                                    {member.badgeId}
+                                  </Badge>
+                                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                                    ✅ REGISTERED
+                                  </span>
+                                </div>
+                                <h3 className="text-lg font-black text-foreground pt-1">
+                                  {member.fullName}
+                                </h3>
+                              </div>
+
+                              {member.isPresent ? (
+                                <Badge className="bg-emerald-500 text-white font-bold text-xs px-2.5 py-1 flex items-center gap-1 shadow-sm">
+                                  <Check className="w-3.5 h-3.5" /> ON BUS
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-amber-500/50 text-amber-600 font-bold text-xs px-2.5 py-1 bg-amber-500/10">
+                                  WAITING
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Info Grid */}
+                            <div className="grid grid-cols-2 gap-2 text-xs bg-background/80 p-3 rounded-xl border border-border/60">
+                              <div>
+                                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Branch</span>
+                                <strong className="text-foreground font-bold">{member.branch || "HQ"}</strong>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Fellowship Group</span>
+                                <strong className="text-purple-600 font-bold">{member.caregroup || "Unassigned"}</strong>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Role / Position</span>
+                                <span className="text-foreground font-semibold">{member.position || "Member"}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Payment</span>
+                                <span className="text-emerald-600 font-bold flex items-center gap-1">
+                                  <CreditCard className="w-3 h-3" /> Paid (300 NLE)
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* 1-Tap Boarding Action */}
+                            <div className="pt-1">
+                              {member.isPresent ? (
+                                <Button
+                                  variant="outline"
+                                  className="w-full bg-emerald-500/15 border-emerald-500/50 text-emerald-700 hover:bg-emerald-500/25 font-black text-xs sm:text-sm h-11 rounded-xl"
+                                  onClick={() => handleToggleCheckIn(member)}
+                                  disabled={updatingId === member.id}
+                                >
+                                  {updatingId === member.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-2" />
+                                      Already Boarded (Tap to Undo)
+                                    </>
+                                  )}
+                                </Button>
+                              ) : (
+                                <Button
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm h-12 rounded-xl shadow-lg gap-2"
+                                  onClick={() => handleToggleCheckIn(member)}
+                                  disabled={updatingId === member.id}
+                                >
+                                  {updatingId === member.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                                  ) : (
+                                    <>
+                                      <Bus className="w-5 h-5" />
+                                      Admit to Bus & Board 🚌
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Full Delegate Boarding List & Calling Roster */}
+          <div className="space-y-4">
+            <div className="bg-card p-4 rounded-2xl border shadow-sm flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={busFilter === "ALL" ? "default" : "outline"}
+                  className="rounded-xl text-xs font-bold h-9"
+                  onClick={() => setBusFilter("ALL")}
+                >
+                  All Registered Delegates ({members.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={busFilter === "UNBOARDED" ? "default" : "outline"}
+                  className={`rounded-xl text-xs font-bold h-9 ${
+                    busFilter === "UNBOARDED"
+                      ? "bg-amber-500 hover:bg-amber-600 text-black"
+                      : "border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
+                  }`}
+                  onClick={() => setBusFilter("UNBOARDED")}
+                >
+                  ⏳ Not Boarded Yet ({summary.absentCount})
+                </Button>
+                <Button
+                  size="sm"
+                  variant={busFilter === "BOARDED" ? "default" : "outline"}
+                  className={`rounded-xl text-xs font-bold h-9 ${
+                    busFilter === "BOARDED"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+                  }`}
+                  onClick={() => setBusFilter("BOARDED")}
+                >
+                  ✅ Boarded ({summary.presentCount})
+                </Button>
+              </div>
+
+              <div className="text-xs text-muted-foreground font-semibold">
+                Showing {busFilteredMembers.length} delegates
               </div>
             </div>
 
-            {/* Delegate Cards Grid */}
-            {busFilteredMembers.length === 0 ? (
-              <Card className="p-12 text-center border-dashed">
-                <Users className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-                <h3 className="text-base font-bold text-foreground">No attendees found</h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  No delegates match your current search &quot;{searchQuery}&quot; or filter.
-                </p>
-                {searchQuery && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4 text-xs font-semibold"
-                    onClick={() => setSearchQuery("")}
-                  >
-                    Clear Search
-                  </Button>
-                )}
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {busFilteredMembers.map((member) => (
-                  <Card
-                    key={member.id}
-                    className={`border transition-all duration-200 shadow-sm overflow-hidden flex flex-col justify-between ${
-                      member.isPresent
-                        ? "bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/60"
-                        : "bg-card hover:border-primary/40"
-                    }`}
-                  >
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="font-black text-base text-foreground truncate">
-                            {member.fullName}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
-                            <span className="font-mono font-bold text-primary">
-                              {member.badgeId}
-                            </span>
-                            <span>•</span>
-                            <span className="font-semibold text-foreground">
-                              {member.branch || "HQ"}
-                            </span>
-                            {member.caregroup && (
-                              <>
-                                <span>•</span>
-                                <span className="text-purple-600 font-semibold truncate">
-                                  {member.caregroup}
-                                </span>
-                              </>
-                            )}
-                          </div>
+            {/* Attendee Roster Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {busFilteredMembers.map((member) => (
+                <Card
+                  key={member.id}
+                  className={`border transition-all duration-200 shadow-sm overflow-hidden flex flex-col justify-between ${
+                    member.isPresent
+                      ? "bg-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/60"
+                      : "bg-card hover:border-primary/40"
+                  }`}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-black text-base text-foreground truncate">
+                          {member.fullName}
                         </div>
-
-                        {member.isPresent ? (
-                          <Badge className="bg-emerald-500 text-white font-bold text-[11px] px-2 py-0.5 flex-shrink-0 flex items-center gap-1">
-                            <Check className="w-3 h-3" /> On Bus
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-amber-500/40 text-amber-600 font-bold text-[11px] px-2 py-0.5 flex-shrink-0">
-                            Waiting
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Phone & Room details */}
-                      <div className="flex items-center justify-between text-xs pt-1 border-t border-border/60 text-muted-foreground">
-                        {member.phone ? (
-                          <a
-                            href={`tel:${member.phone}`}
-                            className="inline-flex items-center gap-1 text-primary hover:underline font-semibold"
-                          >
-                            <Phone className="w-3 h-3" />
-                            {member.phone}
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground/60">No phone</span>
-                        )}
-
-                        {member.scannedAt && (
-                          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(member.scannedAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                          <span className="font-mono font-bold text-primary">
+                            {member.badgeId}
                           </span>
-                        )}
+                          <span>•</span>
+                          <span className="font-semibold text-foreground">
+                            {member.branch || "HQ"}
+                          </span>
+                          {member.caregroup && (
+                            <>
+                              <span>•</span>
+                              <span className="text-purple-600 font-semibold truncate">
+                                {member.caregroup}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
 
-                      {/* 1-Tap Boarding Action Button */}
-                      <div className="pt-1">
-                        {member.isPresent ? (
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full bg-emerald-500/10 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/20 font-bold text-xs h-10 rounded-xl"
-                              onClick={() => handleToggleCheckIn(member)}
-                              disabled={updatingId === member.id}
-                            >
-                              {updatingId === member.id ? (
-                                <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-                              ) : (
-                                <>
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-1.5" />
-                                  Boarded (Tap to Undo)
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="w-full bg-primary hover:bg-primary/90 text-white font-black text-xs sm:text-sm h-10 rounded-xl shadow-md gap-2"
-                            onClick={() => handleToggleCheckIn(member)}
-                            disabled={updatingId === member.id}
-                          >
-                            {updatingId === member.id ? (
-                              <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                            ) : (
-                              <>
-                                <Bus className="w-4 h-4" />
-                                Board Bus Now
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                      {member.isPresent ? (
+                        <Badge className="bg-emerald-500 text-white font-bold text-[11px] px-2 py-0.5 flex-shrink-0 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> On Bus
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-amber-500/40 text-amber-600 font-bold text-[11px] px-2 py-0.5 flex-shrink-0">
+                          Waiting
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Phone & Check-in timestamp */}
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-border/60 text-muted-foreground">
+                      {member.phone ? (
+                        <a
+                          href={`tel:${member.phone}`}
+                          className="inline-flex items-center gap-1 text-primary hover:underline font-semibold"
+                        >
+                          <Phone className="w-3 h-3" />
+                          {member.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground/60">No phone</span>
+                      )}
+
+                      {member.scannedAt && (
+                        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(member.scannedAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 1-Tap Action Button */}
+                    <div className="pt-1">
+                      {member.isPresent ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full bg-emerald-500/10 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/20 font-bold text-xs h-10 rounded-xl"
+                          onClick={() => handleToggleCheckIn(member)}
+                          disabled={updatingId === member.id}
+                        >
+                          {updatingId === member.id ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 mr-1.5" />
+                              Boarded (Tap to Undo)
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="w-full bg-primary hover:bg-primary/90 text-white font-black text-xs sm:text-sm h-10 rounded-xl shadow-md gap-2"
+                          onClick={() => handleToggleCheckIn(member)}
+                          disabled={updatingId === member.id}
+                        >
+                          {updatingId === member.id ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                          ) : (
+                            <>
+                              <Bus className="w-4 h-4" />
+                              Board Bus Now
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         </TabsContent>
 
@@ -937,8 +1191,8 @@ export function CampAttendanceClient() {
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Filter by name, badge ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={programSearch}
+                  onChange={(e) => setProgramSearch(e.target.value)}
                   className="pl-9 h-9 text-xs rounded-xl"
                 />
               </div>
@@ -1103,6 +1357,134 @@ export function CampAttendanceClient() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Quick On-The-Spot Registration Dialog */}
+      <Dialog open={quickRegOpen} onOpenChange={setQuickRegOpen}>
+        <DialogContent className="max-w-md bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-primary" />
+              Quick Attendee Registration
+            </DialogTitle>
+            <DialogDescription>
+              Register an attendee on the spot and immediately admit them to the Tuesday departure bus.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleQuickRegister} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Full Name *
+              </label>
+              <Input
+                placeholder="e.g. John Doe"
+                value={quickRegForm.fullName}
+                onChange={(e) =>
+                  setQuickRegForm({ ...quickRegForm, fullName: e.target.value })
+                }
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Phone Number
+                </label>
+                <Input
+                  placeholder="+232..."
+                  value={quickRegForm.phone}
+                  onChange={(e) =>
+                    setQuickRegForm({ ...quickRegForm, phone: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Gender
+                </label>
+                <Select
+                  value={quickRegForm.gender}
+                  onValueChange={(val) =>
+                    setQuickRegForm({ ...quickRegForm, gender: val })
+                  }
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Sending Branch
+                </label>
+                <Select
+                  value={quickRegForm.branch}
+                  onValueChange={(val) =>
+                    setQuickRegForm({ ...quickRegForm, branch: val })
+                  }
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Headquarters">Headquarters</SelectItem>
+                    <SelectItem value="Eastern">Eastern</SelectItem>
+                    <SelectItem value="Bo">Bo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Role
+                </label>
+                <Select
+                  value={quickRegForm.position}
+                  onValueChange={(val) =>
+                    setQuickRegForm({ ...quickRegForm, position: val })
+                  }
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Member">Member</SelectItem>
+                    <SelectItem value="Leader">Leader</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setQuickRegOpen(false)}
+                disabled={quickRegSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
+                disabled={quickRegSubmitting}
+              >
+                {quickRegSubmitting ? "Registering..." : "Register & Board Bus"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Custom Session Dialog */}
       <Dialog open={customSessionOpen} onOpenChange={setCustomSessionOpen}>
