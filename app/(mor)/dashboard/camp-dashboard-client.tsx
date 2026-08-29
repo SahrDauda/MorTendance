@@ -165,6 +165,13 @@ export function CampDashboardClient({
               </Button>
             </Link>
 
+            <Link href={ROUTES.CAMP_ANALYSIS}>
+              <Button className="bg-purple-500 hover:bg-purple-400 text-white font-black gap-2 shadow-lg h-10 px-4">
+                <Sparkles className="w-4 h-4" />
+                Group Analysis Radar
+              </Button>
+            </Link>
+
             <Link href="/camp/members">
               <Button className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold gap-2 shadow-lg h-10">
                 <Plus className="w-4 h-4" />

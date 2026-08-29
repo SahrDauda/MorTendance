@@ -54,6 +54,7 @@ export const ROUTES = {
   CAMP_ROOMS: "/camp/rooms",
   CAMP_GROUPS: "/camp/groups",
   CAMP_ATTENDANCE: "/camp/attendance",
+  CAMP_ANALYSIS: "/camp/analysis",
   CAMP_TAGS: "/camp/print-tags",
 } as const
 

@@ -106,6 +106,9 @@ export function Header() {
                 <DropdownMenuItem asChild className="rounded-xl text-xs font-semibold py-2">
                   <Link href={ROUTES.CAMP_GROUPS}>Fellowship Groups</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild className="rounded-xl text-xs font-semibold py-2">
+                  <Link href={ROUTES.CAMP_ANALYSIS}>Group Analysis & Radar</Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleSignOut}
