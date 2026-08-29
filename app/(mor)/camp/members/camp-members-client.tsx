@@ -242,10 +242,13 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
 
       if (roleFilter !== "ALL") {
         const isLeader = m.position?.toLowerCase().includes("leader")
+        const isSupervisor = m.position?.toLowerCase().includes("supervisor")
         const isHeadShepherd = m.position === "Head Shepherd"
-        if (roleFilter === "LEADERS" && !isLeader && !isHeadShepherd) return false
-        if (roleFilter === "MEMBERS" && (isLeader || isHeadShepherd)) return false
+
+        if (roleFilter === "LEADERS" && !isLeader) return false
+        if (roleFilter === "SUPERVISORS" && !isSupervisor) return false
         if (roleFilter === "HEAD_SHEPHERD" && !isHeadShepherd) return false
+        if (roleFilter === "MEMBERS" && (isLeader || isSupervisor || isHeadShepherd)) return false
       }
 
       return true
@@ -705,13 +708,14 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
 
             {/* Role / Position Filter */}
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[130px] bg-background">
+              <SelectTrigger className="w-[140px] bg-background">
                 <SelectValue placeholder="Role" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Roles</SelectItem>
-                <SelectItem value="LEADERS">Leaders Only</SelectItem>
                 <SelectItem value="MEMBERS">Members Only</SelectItem>
+                <SelectItem value="LEADERS">Leaders Only</SelectItem>
+                <SelectItem value="SUPERVISORS">Supervisors</SelectItem>
                 <SelectItem value="HEAD_SHEPHERD">Head Shepherd</SelectItem>
               </SelectContent>
             </Select>
@@ -1027,14 +1031,22 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 </Label>
                 <Select
                   value={formData.position}
-                  onValueChange={(val) => setFormData({ ...formData, position: val })}
+                  onValueChange={(val) => {
+                    const updates: any = { position: val }
+                    if (val === "Supervisor" || val === "Head Shepherd") {
+                      updates.caregroup = ""
+                    }
+                    setFormData({ ...formData, ...updates })
+                  }}
                 >
                   <SelectTrigger id="position" className="h-10 w-full min-w-0 text-left">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Member">Member</SelectItem>
-                    <SelectItem value="Leader">Leader</SelectItem>
+                    <SelectItem value="Member">Member (Group Attendee)</SelectItem>
+                    <SelectItem value="Leader">Leader (Group Leader)</SelectItem>
+                    <SelectItem value="Supervisor">Supervisor (Camp Supervisor)</SelectItem>
+                    <SelectItem value="Head Shepherd">Head Shepherd</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1205,14 +1217,22 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 </Label>
                 <Select
                   value={formData.position}
-                  onValueChange={(val) => setFormData({ ...formData, position: val })}
+                  onValueChange={(val) => {
+                    const updates: any = { position: val }
+                    if (val === "Supervisor" || val === "Head Shepherd") {
+                      updates.caregroup = ""
+                    }
+                    setFormData({ ...formData, ...updates })
+                  }}
                 >
                   <SelectTrigger id="editPosition" className="h-10 w-full min-w-0 text-left">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Member">Member</SelectItem>
-                    <SelectItem value="Leader">Leader</SelectItem>
+                    <SelectItem value="Member">Member (Group Attendee)</SelectItem>
+                    <SelectItem value="Leader">Leader (Group Leader)</SelectItem>
+                    <SelectItem value="Supervisor">Supervisor (Camp Supervisor)</SelectItem>
+                    <SelectItem value="Head Shepherd">Head Shepherd</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

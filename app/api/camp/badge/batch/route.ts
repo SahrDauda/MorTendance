@@ -17,20 +17,28 @@ function getCachedTagImage(
   const cg = (caregroup || "").trim().toUpperCase()
 
   let filename = "DIKAIOSIS.jpeg"
-  if (
-    pos.includes("SUPERVIS") ||
-    pos.includes("HEAD SHEPHERD") ||
-    cg.includes("SUPERVIS") ||
-    !caregroup ||
-    caregroup === "Unassigned"
-  ) {
+
+  // 1. Head Shepherd has his own unique tag
+  if (pos.includes("HEAD SHEPHERD") || cg.includes("HEAD SHEPHERD")) {
+    filename = "HEAD_SHEPHERD.jpeg"
+  } else if (pos.includes("SUPERVIS") || cg.includes("SUPERVIS")) {
+    // 2. Supervisors have their unique tag (dynamic name from database)
     filename = "SUPERVISOR.jpeg"
-  } else if (cg.includes("DOX")) filename = "DOXASMOS.jpeg"
-  else if (cg.includes("HAG")) filename = "HAGIASMOS.jpeg"
-  else if (cg.includes("HUIO")) filename = "HUIOTHESIA.jpeg"
-  else if (cg.includes("PAL")) filename = "PALINGENESIA.jpeg"
-  else if (cg.includes("DIK")) filename = "DIKAIOSIS.jpeg"
-  else filename = "SUPERVISOR.jpeg"
+  } else if (cg.includes("DOX")) {
+    filename = "DOXASMOS.jpeg"
+  } else if (cg.includes("HAG")) {
+    filename = "HAGIASMOS.jpeg"
+  } else if (cg.includes("HUIO")) {
+    filename = "HUIOTHESIA.jpeg"
+  } else if (cg.includes("PAL")) {
+    filename = "PALINGENESIA.jpeg"
+  } else if (cg.includes("DIK")) {
+    filename = "DIKAIOSIS.jpeg"
+  } else if (!caregroup || caregroup === "Unassigned") {
+    filename = "SUPERVISOR.jpeg"
+  } else {
+    filename = "DIKAIOSIS.jpeg"
+  }
 
   if (!backgroundCache[filename]) {
     try {
@@ -85,17 +93,17 @@ export async function POST(req: NextRequest) {
       }
       if (role && role !== "ALL") {
         if (role === "LEADERS") {
-          where.OR = [
-            { position: { contains: "Leader", mode: "insensitive" } },
-            { position: "Head Shepherd" },
-          ]
+          where.position = { contains: "Leader", mode: "insensitive" }
+        } else if (role === "SUPERVISORS") {
+          where.position = { contains: "Supervisor", mode: "insensitive" }
+        } else if (role === "HEAD_SHEPHERD") {
+          where.position = "Head Shepherd"
         } else if (role === "MEMBERS") {
           where.AND = [
             { NOT: { position: { contains: "Leader", mode: "insensitive" } } },
+            { NOT: { position: { contains: "Supervisor", mode: "insensitive" } } },
             { NOT: { position: "Head Shepherd" } },
           ]
-        } else if (role === "HEAD_SHEPHERD") {
-          where.position = "Head Shepherd"
         }
       }
 

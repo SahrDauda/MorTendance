@@ -26,16 +26,17 @@ export function resolveGroupTagImage(
   const pos = (position || "").trim().toUpperCase()
   const norm = (caregroup || "").trim().toUpperCase()
 
-  if (
-    pos.includes("SUPERVIS") ||
-    pos.includes("HEAD SHEPHERD") ||
-    norm.includes("SUPERVIS") ||
-    !caregroup ||
-    caregroup === "Unassigned"
-  ) {
+  // 1. Head Shepherd has his own unique tag
+  if (pos.includes("HEAD SHEPHERD") || norm.includes("HEAD SHEPHERD")) {
+    return "/tags/HEAD_SHEPHERD.jpeg"
+  }
+
+  // 2. Supervisors have their unique tag (dynamic name from database)
+  if (pos.includes("SUPERVIS") || norm.includes("SUPERVIS")) {
     return "/tags/SUPERVISOR.jpeg"
   }
 
+  // 3. 5 Camp Delegate Groups
   if (norm.includes("DIKAIOSIS") || norm.includes("DIK")) return "/tags/DIKAIOSIS.jpeg"
   if (norm.includes("DOXASMOS") || norm.includes("DOX")) return "/tags/DOXASMOS.jpeg"
   if (norm.includes("HAGIASMOS") || norm.includes("HAG")) return "/tags/HAGIASMOS.jpeg"
@@ -43,7 +44,12 @@ export function resolveGroupTagImage(
   if (norm.includes("PALINGENESIA") || norm.includes("PALIGENESIA") || norm.includes("PAL"))
     return "/tags/PALINGENESIA.jpeg"
 
-  return "/tags/SUPERVISOR.jpeg"
+  // Unassigned / fallback
+  if (!caregroup || caregroup === "Unassigned") {
+    return "/tags/SUPERVISOR.jpeg"
+  }
+
+  return "/tags/DIKAIOSIS.jpeg"
 }
 
 export default function MorTagFront({

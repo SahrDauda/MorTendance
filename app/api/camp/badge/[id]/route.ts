@@ -15,16 +15,17 @@ function resolveGroupFilename(
   const pos = (position || "").trim().toUpperCase()
   const norm = (caregroup || "").trim().toUpperCase()
 
-  if (
-    pos.includes("SUPERVIS") ||
-    pos.includes("HEAD SHEPHERD") ||
-    norm.includes("SUPERVIS") ||
-    !caregroup ||
-    caregroup === "Unassigned"
-  ) {
+  // 1. Head Shepherd has his own unique tag
+  if (pos.includes("HEAD SHEPHERD") || norm.includes("HEAD SHEPHERD")) {
+    return "HEAD_SHEPHERD.jpeg"
+  }
+
+  // 2. Supervisors have their unique tag (dynamic name from database)
+  if (pos.includes("SUPERVIS") || norm.includes("SUPERVIS")) {
     return "SUPERVISOR.jpeg"
   }
 
+  // 3. 5 Camp Delegate Groups
   if (norm.includes("DIKAIOSIS") || norm.includes("DIK")) return "DIKAIOSIS.jpeg"
   if (norm.includes("DOXASMOS") || norm.includes("DOX")) return "DOXASMOS.jpeg"
   if (norm.includes("HAGIASMOS") || norm.includes("HAG")) return "HAGIASMOS.jpeg"
@@ -32,7 +33,12 @@ function resolveGroupFilename(
   if (norm.includes("PALINGENESIA") || norm.includes("PALIGENESIA") || norm.includes("PAL"))
     return "PALINGENESIA.jpeg"
 
-  return "SUPERVISOR.jpeg"
+  // Unassigned / fallback
+  if (!caregroup || caregroup === "Unassigned") {
+    return "SUPERVISOR.jpeg"
+  }
+
+  return "DIKAIOSIS.jpeg"
 }
 
 function getGroupPhotoBase64(
