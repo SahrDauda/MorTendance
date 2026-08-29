@@ -57,13 +57,14 @@ export async function GET(request: Request) {
     // 3. Map attendance status to members
     const attendanceMap = new Map<
       string,
-      { id: string; isLate: boolean; scannedAt: Date }
+      { id: string; isLate: boolean; scannedAt: Date; recordedBy?: string | null }
     >()
     for (const record of attendanceRecords) {
       attendanceMap.set(record.memberId, {
         id: record.id,
         isLate: Boolean(record.isLate),
         scannedAt: record.scannedAt || new Date(),
+        recordedBy: record.recordedBy || null,
       })
     }
 
@@ -123,6 +124,7 @@ export async function GET(request: Request) {
         isPresent,
         isLate,
         scannedAt: att ? new Date(att.scannedAt).toISOString() : null,
+        recordedBy: att ? att.recordedBy : null,
         attendanceId: att ? att.id : null,
       }
     })
@@ -170,6 +172,8 @@ export async function POST(request: Request) {
       session = "Tuesday — Bus Boarding (Departure Check-In)",
       isPresent,
       isLate,
+      recordedBy,
+      scannedAt,
       toggle = false,
     } = body
 
@@ -210,11 +214,11 @@ export async function POST(request: Request) {
       },
     })
 
-    const serverNow = new Date()
+    const recordTime = scannedAt ? new Date(scannedAt) : new Date()
     let willBePresent = true
     // Automatically calculate isLate based on standard Sierra Leone time (UTC+0) if not explicitly set
     let willBeLate =
-      typeof isLate === "boolean" ? isLate : isCheckInLate(session, serverNow)
+      typeof isLate === "boolean" ? isLate : isCheckInLate(session, recordTime)
 
     if (typeof isPresent === "boolean") {
       willBePresent = isPresent
@@ -233,14 +237,16 @@ export async function POST(request: Request) {
         update: {
           isPresent: true,
           isLate: willBeLate,
-          scannedAt: serverNow,
+          scannedAt: recordTime,
+          recordedBy: recordedBy || undefined,
         },
         create: {
           memberId: targetMember.id,
           session,
           isPresent: true,
           isLate: willBeLate,
-          scannedAt: serverNow,
+          scannedAt: recordTime,
+          recordedBy: recordedBy || null,
         },
       })
 

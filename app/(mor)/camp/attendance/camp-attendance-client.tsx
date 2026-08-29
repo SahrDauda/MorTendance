@@ -54,6 +54,9 @@ import {
   UserX,
   AlertCircle,
   Bus,
+  Wifi,
+  WifiOff,
+  CloudUpload,
 } from "lucide-react"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -65,6 +68,16 @@ import {
   getPreviousSession,
   isCheckInLate,
 } from "@/lib/campSchedule"
+import { useSession } from "@/lib/hooks/use-session"
+import {
+  saveCachedRoster,
+  getCachedRoster,
+  enqueueOfflineCheckIn,
+  getOfflineQueue,
+  clearSyncedItems,
+  applyOfflineQueueToMembers,
+  QueuedCheckIn,
+} from "@/lib/offline-store"
 
 interface CampRosterMember {
   id: string
@@ -80,6 +93,8 @@ interface CampRosterMember {
   isPresent: boolean
   isLate: boolean
   scannedAt: string | null
+  recordedBy?: string | null
+  isOfflinePending?: boolean
   attendanceId: string | null
 }
 
@@ -97,6 +112,14 @@ interface AttendanceSummary {
 export function CampAttendanceClient() {
   const [currentSession, setCurrentSession] = useState<string>(CAMP_SCHEDULE[0].name)
   const [members, setMembers] = useState<CampRosterMember[]>([])
+  const [isOnline, setIsOnline] = useState<boolean>(true)
+  const [pendingQueueCount, setPendingQueueCount] = useState<number>(0)
+  const [isSyncing, setIsSyncing] = useState<boolean>(false)
+
+  // Current Logged-in Leader
+  const { user } = useSession()
+  const currentLeaderName = user?.name || "Group Leader"
+
   // Real-time Reactive Summary computed dynamically from members
   const summary = useMemo<AttendanceSummary>(() => {
     let presentCount = 0
@@ -145,6 +168,7 @@ export function CampAttendanceClient() {
       groupBreakdown,
     }
   }, [members])
+
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
@@ -153,8 +177,6 @@ export function CampAttendanceClient() {
   const [filterStatus, setFilterStatus] = useState<"ALL" | "ABSENT" | "ON_TIME" | "LATE">("ABSENT")
   const [filterBranch, setFilterBranch] = useState("ALL")
   const [filterGroup, setFilterGroup] = useState("ALL")
-
-
 
   const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -170,6 +192,8 @@ export function CampAttendanceClient() {
     return getPreviousSession(currentSession)
   }, [currentSession])
 
+  const isBusSession = currentSession.includes("Bus Boarding")
+
   // Restore saved session from localStorage on initial mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -179,6 +203,53 @@ export function CampAttendanceClient() {
       }
     }
   }, [])
+
+  // Auto-Focus Group for the 5 Group Heads on initial login
+  useEffect(() => {
+    if (user?.name) {
+      const leaderNormalized = user.name.toLowerCase().trim()
+      const GROUP_HEAD_MAP: Record<string, string> = {
+        "judah tarawally": "Dikaiosis",
+        "emmanuel gbembo": "Doxasmus",
+        "elizabeth duncan": "Hagiasmos",
+        "lovicious marvelous": "Huiothesia",
+        "prince lewis": "Paligenesia",
+      }
+
+      const matchedGroup = GROUP_HEAD_MAP[leaderNormalized]
+      if (matchedGroup) {
+        setFilterGroup(matchedGroup)
+        toast.info(`✨ Welcome Group Head ${user.name} — viewing ${matchedGroup} members.`)
+      }
+    }
+  }, [user?.name])
+
+  // Track network connectivity & sync trigger
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsOnline(navigator.onLine)
+      setPendingQueueCount(getOfflineQueue().length)
+
+      const handleOnline = () => {
+        setIsOnline(true)
+        toast.success("📶 Connection restored. Synchronizing offline check-ins...")
+        syncOfflineQueue()
+      }
+
+      const handleOffline = () => {
+        setIsOnline(false)
+        toast.warning("📴 Working offline. Check-ins are queued and will auto-sync.")
+      }
+
+      window.addEventListener("online", handleOnline)
+      window.addEventListener("offline", handleOffline)
+
+      return () => {
+        window.removeEventListener("online", handleOnline)
+        window.removeEventListener("offline", handleOffline)
+      }
+    }
+  }, [currentSession])
 
   // Switch session helper
   const switchSession = (sessionName: string) => {
@@ -191,7 +262,7 @@ export function CampAttendanceClient() {
     toast.success(`Switched to ${def?.shortLabel || sessionName}`)
   }
 
-  // Load records
+  // Load records (with offline cache fallback)
   const fetchAttendance = async (sessionName = currentSession) => {
     try {
       setLoading(true)
@@ -199,14 +270,25 @@ export function CampAttendanceClient() {
         `/api/camp/attendance?session=${encodeURIComponent(sessionName)}`
       )
       const json = await res.json()
-      if (json.success) {
-        setMembers(json.data.members)
+      if (json.success && Array.isArray(json.data?.members)) {
+        saveCachedRoster(sessionName, json.data.members)
+        const { mergedMembers } = applyOfflineQueueToMembers(json.data.members, sessionName)
+        setMembers(mergedMembers)
+        setPendingQueueCount(getOfflineQueue().length)
       } else {
-        toast.error(json.error || "Failed to load attendance")
+        throw new Error(json.error || "Failed to load from server")
       }
     } catch (err) {
-      console.error(err)
-      toast.error("Failed to load attendance")
+      console.warn("Using offline cached roster:", err)
+      const cached = getCachedRoster(sessionName)
+      if (cached && cached.length > 0) {
+        const { mergedMembers } = applyOfflineQueueToMembers(cached, sessionName)
+        setMembers(mergedMembers)
+        setPendingQueueCount(getOfflineQueue().length)
+        toast.info("📴 Loaded roster from offline device cache.")
+      } else {
+        toast.error("Failed to load attendance")
+      }
     } finally {
       setLoading(false)
     }
@@ -216,15 +298,52 @@ export function CampAttendanceClient() {
     fetchAttendance(currentSession)
   }, [currentSession])
 
-  // Single Member 1-Tap Check-In (Automatic On-Time / Late Computation)
+  // Synchronize Offline Queue to Cloud
+  const syncOfflineQueue = async () => {
+    const queue = getOfflineQueue()
+    if (queue.length === 0) {
+      toast.info("✨ All records are up to date.")
+      return
+    }
+
+    try {
+      setIsSyncing(true)
+      const res = await fetch("/api/camp/attendance/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "SYNC_OFFLINE_QUEUE",
+          items: queue,
+          session: currentSession,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        clearSyncedItems(json.syncedIds || queue.map((q) => q.id))
+        setPendingQueueCount(getOfflineQueue().length)
+        toast.success(`✨ Synced ${json.syncedCount || queue.length} check-in(s) to central database!`)
+        fetchAttendance(currentSession)
+      } else {
+        toast.error(json.error || "Sync failed. Will retry.")
+      }
+    } catch (err) {
+      console.error("Sync error:", err)
+      toast.warning("Unable to sync right now. Check-ins remain safely saved on this device.")
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  // Single Member 1-Tap Check-In (Offline-First with Immediate Local Write)
   const handleToggleCheckIn = async (member: CampRosterMember) => {
     setUpdatingId(member.id)
 
-    // Toggle: if already present, mark absent; if absent, check-in with automatic lateness
     const willBePresent = !member.isPresent
-    const willBeLate = willBePresent ? isCheckInLate(currentSession, new Date()) : false
+    const now = new Date()
+    const willBeLate = willBePresent ? isCheckInLate(currentSession, now) : false
+    const scannedAtIso = willBePresent ? now.toISOString() : null
 
-    // Optimistic UI update
+    // 1. Optimistic UI update
     setMembers((prev) =>
       prev.map((m) =>
         m.id === member.id
@@ -232,12 +351,42 @@ export function CampAttendanceClient() {
               ...m,
               isPresent: willBePresent,
               isLate: willBeLate,
-              scannedAt: willBePresent ? new Date().toISOString() : null,
+              scannedAt: scannedAtIso,
+              recordedBy: currentLeaderName,
+              isOfflinePending: typeof navigator !== "undefined" && !navigator.onLine,
             }
           : m
       )
     )
 
+    // 2. Write to offline queue
+    const queueItem: QueuedCheckIn = {
+      id: `local_${Date.now()}_${member.id}`,
+      memberId: member.id,
+      badgeId: member.badgeId,
+      fullName: member.fullName,
+      session: currentSession,
+      isPresent: willBePresent,
+      isLate: willBeLate,
+      scannedAt: scannedAtIso || new Date().toISOString(),
+      recordedBy: currentLeaderName,
+      groupName: member.caregroup || undefined,
+      createdAt: Date.now(),
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      enqueueOfflineCheckIn(queueItem)
+      setPendingQueueCount(getOfflineQueue().length)
+      if (willBePresent) {
+        toast.success(`📴 Saved offline: ${member.fullName} (${member.badgeId})`)
+      } else {
+        toast.info(`📴 Unchecked ${member.fullName} (Offline)`)
+      }
+      setUpdatingId(null)
+      return
+    }
+
+    // 3. Online Server Write
     try {
       const res = await fetch("/api/camp/attendance", {
         method: "POST",
@@ -246,6 +395,9 @@ export function CampAttendanceClient() {
           memberId: member.id,
           session: currentSession,
           isPresent: willBePresent,
+          isLate: willBeLate,
+          scannedAt: scannedAtIso,
+          recordedBy: currentLeaderName,
         }),
       })
       const json = await res.json()
@@ -266,12 +418,14 @@ export function CampAttendanceClient() {
           toast.info(`↩️ Unchecked ${member.fullName} (Marked Absent)`)
         }
       } else {
-        toast.error(json.error || "Check-in failed")
-        fetchAttendance()
+        enqueueOfflineCheckIn(queueItem)
+        setPendingQueueCount(getOfflineQueue().length)
+        toast.warning(`📴 Saved on device — queued for cloud sync.`)
       }
     } catch (err) {
-      toast.error("Error updating attendance")
-      fetchAttendance()
+      enqueueOfflineCheckIn(queueItem)
+      setPendingQueueCount(getOfflineQueue().length)
+      toast.warning(`📴 Network timeout. Saved on device — queued for cloud sync.`)
     } finally {
       setUpdatingId(null)
     }
@@ -471,8 +625,6 @@ export function CampAttendanceClient() {
     toast.success("Downloaded Attendance CSV")
   }
 
-  const isBusSession = currentSession.toLowerCase().includes("bus")
-
   return (
     <div className="w-full max-w-full space-y-4 sm:space-y-6 pb-24 sm:pb-12 overflow-x-hidden">
       {/* Top Header Card with Schedule Selector and Quick Nav */}
@@ -563,6 +715,66 @@ export function CampAttendanceClient() {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-primary" : ""}`} />
           </Button>
         </div>
+      </div>
+
+      {/* Offline Status & Cloud Sync Banner */}
+      <div className={`p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border transition-all ${
+        !isOnline
+          ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200"
+          : pendingQueueCount > 0
+          ? "bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-200"
+          : "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className={`p-2 rounded-xl flex-shrink-0 ${
+            !isOnline
+              ? "bg-amber-500/20 text-amber-600"
+              : pendingQueueCount > 0
+              ? "bg-blue-500/20 text-blue-600"
+              : "bg-emerald-500/20 text-emerald-600"
+          }`}>
+            {!isOnline ? (
+              <WifiOff className="w-4 h-4" />
+            ) : pendingQueueCount > 0 ? (
+              <CloudUpload className="w-4 h-4" />
+            ) : (
+              <Wifi className="w-4 h-4" />
+            )}
+          </div>
+          <div>
+            <div className="text-xs font-black flex items-center gap-2">
+              <span>
+                {!isOnline
+                  ? "Offline Mode Active"
+                  : pendingQueueCount > 0
+                  ? `${pendingQueueCount} Check-In(s) Queued on Device`
+                  : "Connected to Central Cloud Database"}
+              </span>
+              <Badge variant="outline" className="text-[10px] font-bold py-0 h-5">
+                {currentLeaderName}
+              </Badge>
+            </div>
+            <p className="text-[11px] opacity-80 mt-0.5">
+              {!isOnline
+                ? "You can check in your group without internet. Records will sync automatically when online."
+                : pendingQueueCount > 0
+                ? "Tap 'Sync to Cloud' or continue check-in — background sync is standing by."
+                : "All check-ins are 100% synchronized with PostgreSQL cloud storage."}
+            </p>
+          </div>
+        </div>
+
+        {pendingQueueCount > 0 && (
+          <Button
+            size="sm"
+            onClick={syncOfflineQueue}
+            disabled={isSyncing || !isOnline}
+            className="h-8 px-3 text-xs font-bold bg-primary hover:bg-primary/90 text-white rounded-xl gap-1.5 shadow-sm self-start sm:self-auto"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            <span>{isSyncing ? "Syncing..." : `Sync to Cloud (${pendingQueueCount})`}</span>
+          </Button>
+        )}
       </div>
 
       {/* Teaching Session Timeline & Lateness Rule Banner */}
@@ -846,6 +1058,33 @@ export function CampAttendanceClient() {
                             </span>
                           </div>
                         </div>
+
+                        {/* Audit Verification Footer */}
+                        {member.isPresent && (
+                          <div className="flex items-center justify-between text-[11px] px-1 text-muted-foreground">
+                            <span className="flex items-center gap-1 font-semibold truncate">
+                              {member.isOfflinePending ? (
+                                <span className="text-amber-600 font-bold flex items-center gap-1 truncate">
+                                  <Clock className="w-3 h-3 flex-shrink-0" />
+                                  Queued locally: {member.recordedBy || "Leader"}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600 font-bold flex items-center gap-1 truncate">
+                                  <ShieldCheck className="w-3 h-3 flex-shrink-0" />
+                                  Verified by: {member.recordedBy || "Leader"}
+                                </span>
+                              )}
+                            </span>
+                            {member.scannedAt && (
+                              <span className="text-[10px] text-muted-foreground flex-shrink-0 font-medium">
+                                {new Date(member.scannedAt).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         {/* 1-Tap Check-In Action */}
                         <div className="pt-1">

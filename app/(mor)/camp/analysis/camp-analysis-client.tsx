@@ -51,6 +51,16 @@ import {
 } from "@/lib/campSchedule"
 import { ROUTES } from "@/lib/constants"
 
+import { useSession } from "@/lib/hooks/use-session"
+import {
+  saveCachedRoster,
+  getCachedRoster,
+  enqueueOfflineCheckIn,
+  getOfflineQueue,
+  applyOfflineQueueToMembers,
+  QueuedCheckIn,
+} from "@/lib/offline-store"
+
 interface CampMemberRecord {
   id: string
   badgeId: string
@@ -65,6 +75,8 @@ interface CampMemberRecord {
   isPresent: boolean
   isLate: boolean
   scannedAt: string | null
+  recordedBy?: string | null
+  isOfflinePending?: boolean
   attendanceId: string | null
 }
 
@@ -82,16 +94,57 @@ interface AttendanceSummary {
 export function CampAnalysisClient({ userRole }: { userRole: string }) {
   const [currentSession, setCurrentSession] = useState<string>(CAMP_SCHEDULE[0].name)
   const [members, setMembers] = useState<CampMemberRecord[]>([])
-  const [summary, setSummary] = useState<AttendanceSummary>({
-    totalMembers: 0,
-    presentCount: 0,
-    onTimeCount: 0,
-    lateCount: 0,
-    absentCount: 0,
-    presentPercent: 0,
-    branchBreakdown: {},
-    groupBreakdown: {},
-  })
+  const { user } = useSession()
+  const currentLeaderName = user?.name || "Group Leader"
+
+  // Real-time Reactive Summary computed dynamically from members
+  const summary = useMemo<AttendanceSummary>(() => {
+    let presentCount = 0
+    let onTimeCount = 0
+    let lateCount = 0
+    const branchBreakdown: Record<string, { total: number; present: number; onTime: number; late: number }> = {}
+    const groupBreakdown: Record<string, { total: number; present: number; onTime: number; late: number }> = {}
+
+    members.forEach((m) => {
+      if (m.isPresent) {
+        presentCount++
+        if (m.isLate) lateCount++
+        else onTimeCount++
+      }
+      const bKey = (m.branch || "Unassigned").trim()
+      if (!branchBreakdown[bKey]) branchBreakdown[bKey] = { total: 0, present: 0, onTime: 0, late: 0 }
+      branchBreakdown[bKey].total++
+      if (m.isPresent) {
+        branchBreakdown[bKey].present++
+        if (m.isLate) branchBreakdown[bKey].late++
+        else branchBreakdown[bKey].onTime++
+      }
+
+      const gKey = (m.caregroup || "Unassigned").trim()
+      if (!groupBreakdown[gKey]) groupBreakdown[gKey] = { total: 0, present: 0, onTime: 0, late: 0 }
+      groupBreakdown[gKey].total++
+      if (m.isPresent) {
+        groupBreakdown[gKey].present++
+        if (m.isLate) groupBreakdown[gKey].late++
+        else groupBreakdown[gKey].onTime++
+      }
+    })
+
+    const totalMembers = members.length
+    const absentCount = totalMembers - presentCount
+    const presentPercent = totalMembers > 0 ? Math.round((presentCount / totalMembers) * 100) : 0
+
+    return {
+      totalMembers,
+      presentCount,
+      onTimeCount,
+      lateCount,
+      absentCount,
+      presentPercent,
+      branchBreakdown,
+      groupBreakdown,
+    }
+  }, [members])
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
@@ -143,15 +196,23 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
       setLoading(true)
       const res = await fetch(`/api/camp/attendance?session=${encodeURIComponent(sessionName)}`)
       const json = await res.json()
-      if (json.success) {
-        setMembers(json.data.members)
-        setSummary(json.data.summary)
+      if (json.success && Array.isArray(json.data?.members)) {
+        saveCachedRoster(sessionName, json.data.members)
+        const { mergedMembers } = applyOfflineQueueToMembers(json.data.members, sessionName)
+        setMembers(mergedMembers)
       } else {
-        toast.error(json.error || "Failed to load attendance")
+        throw new Error(json.error || "Failed to load")
       }
     } catch (err) {
-      console.error(err)
-      toast.error("Failed to load analysis data")
+      console.warn("Analysis offline fallback:", err)
+      const cached = getCachedRoster(sessionName)
+      if (cached && cached.length > 0) {
+        const { mergedMembers } = applyOfflineQueueToMembers(cached, sessionName)
+        setMembers(mergedMembers)
+        toast.info("📴 Loaded analysis from offline cache.")
+      } else {
+        toast.error("Failed to load analysis data")
+      }
     } finally {
       setLoading(false)
     }
@@ -164,7 +225,9 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
   // Direct 1-Tap Check-In from Analysis Page
   const handleCheckInMember = async (member: CampMemberRecord) => {
     setUpdatingId(member.id)
-    const willBeLate = isCheckInLate(currentSession, new Date())
+    const now = new Date()
+    const willBeLate = isCheckInLate(currentSession, now)
+    const scannedAtIso = now.toISOString()
 
     // Optimistic UI update
     setMembers((prev) =>
@@ -174,11 +237,34 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
               ...m,
               isPresent: true,
               isLate: willBeLate,
-              scannedAt: new Date().toISOString(),
+              scannedAt: scannedAtIso,
+              recordedBy: currentLeaderName,
+              isOfflinePending: typeof navigator !== "undefined" && !navigator.onLine,
             }
           : m
       )
     )
+
+    const queueItem: QueuedCheckIn = {
+      id: `local_${Date.now()}_${member.id}`,
+      memberId: member.id,
+      badgeId: member.badgeId,
+      fullName: member.fullName,
+      session: currentSession,
+      isPresent: true,
+      isLate: willBeLate,
+      scannedAt: scannedAtIso,
+      recordedBy: currentLeaderName,
+      groupName: member.caregroup || undefined,
+      createdAt: Date.now(),
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      enqueueOfflineCheckIn(queueItem)
+      toast.success(`📴 Saved offline: ${member.fullName}`)
+      setUpdatingId(null)
+      return
+    }
 
     try {
       const res = await fetch("/api/camp/attendance", {
@@ -188,6 +274,9 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
           memberId: member.id,
           session: currentSession,
           isPresent: true,
+          isLate: willBeLate,
+          scannedAt: scannedAtIso,
+          recordedBy: currentLeaderName,
         }),
       })
       const json = await res.json()
@@ -198,12 +287,12 @@ export function CampAnalysisClient({ userRole }: { userRole: string }) {
           toast.success(`✅ ${member.fullName} checked in [ON TIME]`)
         }
       } else {
-        toast.error(json.error || "Check-in failed")
-        fetchAttendance()
+        enqueueOfflineCheckIn(queueItem)
+        toast.warning(`📴 Saved on device — queued for sync.`)
       }
     } catch (err) {
-      toast.error("Error updating check-in")
-      fetchAttendance()
+      enqueueOfflineCheckIn(queueItem)
+      toast.warning(`📴 Saved on device — queued for sync.`)
     } finally {
       setUpdatingId(null)
     }

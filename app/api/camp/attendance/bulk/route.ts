@@ -8,9 +8,48 @@ export async function POST(request: Request) {
     const body = await request.json()
     const {
       session = "Tuesday — Bus Boarding (Departure Check-In)",
-      action, // "MARK_ALL" | "RESET_ALL" | "MARK_GROUP" | "MARK_BRANCH"
+      action, // "MARK_ALL" | "RESET_ALL" | "MARK_GROUP" | "MARK_BRANCH" | "SYNC_OFFLINE_QUEUE"
       targetName,
+      items, // array of QueuedCheckIn
     } = body
+
+    // 1. Handle Offline Queue Batch Sync
+    if (action === "SYNC_OFFLINE_QUEUE" && Array.isArray(items) && items.length > 0) {
+      const updates = items.map((item: any) => {
+        const recordTime = item.scannedAt ? new Date(item.scannedAt) : new Date()
+        return db.campAttendance.upsert({
+          where: {
+            memberId_session: {
+              memberId: item.memberId,
+              session: item.session || session,
+            },
+          },
+          update: {
+            isPresent: item.isPresent !== false,
+            isLate: Boolean(item.isLate),
+            scannedAt: recordTime,
+            recordedBy: item.recordedBy || undefined,
+          },
+          create: {
+            memberId: item.memberId,
+            session: item.session || session,
+            isPresent: item.isPresent !== false,
+            isLate: Boolean(item.isLate),
+            scannedAt: recordTime,
+            recordedBy: item.recordedBy || null,
+          },
+        })
+      })
+
+      await db.$transaction(updates)
+
+      return NextResponse.json({
+        success: true,
+        message: `Successfully synchronized ${items.length} offline check-ins to database`,
+        syncedCount: items.length,
+        syncedIds: items.map((i: any) => i.id),
+      })
+    }
 
     if (!session) {
       return NextResponse.json(
