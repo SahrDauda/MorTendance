@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { getSessionDef } from "@/lib/campSchedule"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const session = searchParams.get("session") || "Tuesday — Bus Boarding (Departure Check-In)"
+    const session =
+      searchParams.get("session") || "Tuesday — Bus Boarding (Departure Check-In)"
 
     // 1. Fetch all registered camp members
     const members = await db.campMember.findMany({
@@ -36,47 +38,79 @@ export async function GET(request: Request) {
         memberId: true,
         session: true,
         isPresent: true,
+        isLate: true,
         scannedAt: true,
       },
     })
 
     // 3. Map attendance status to members
-    const attendanceMap = new Map<string, { id: string; scannedAt: Date }>()
+    const attendanceMap = new Map<
+      string,
+      { id: string; isLate: boolean; scannedAt: Date }
+    >()
     for (const record of attendanceRecords) {
       attendanceMap.set(record.memberId, {
         id: record.id,
+        isLate: Boolean(record.isLate),
         scannedAt: record.scannedAt,
       })
     }
 
     let presentCount = 0
-    const branchBreakdown: Record<string, { total: number; present: number }> = {}
-    const groupBreakdown: Record<string, { total: number; present: number }> = {}
+    let onTimeCount = 0
+    let lateCount = 0
+
+    const branchBreakdown: Record<
+      string,
+      { total: number; present: number; onTime: number; late: number }
+    > = {}
+    const groupBreakdown: Record<
+      string,
+      { total: number; present: number; onTime: number; late: number }
+    > = {}
 
     const roster = members.map((member) => {
       const att = attendanceMap.get(member.id)
       const isPresent = Boolean(att)
-      if (isPresent) presentCount++
+      const isLate = att ? att.isLate : false
+
+      if (isPresent) {
+        presentCount++
+        if (isLate) {
+          lateCount++
+        } else {
+          onTimeCount++
+        }
+      }
 
       // Branch stats
       const branchKey = (member.branch || "Unassigned").trim()
       if (!branchBreakdown[branchKey]) {
-        branchBreakdown[branchKey] = { total: 0, present: 0 }
+        branchBreakdown[branchKey] = { total: 0, present: 0, onTime: 0, late: 0 }
       }
       branchBreakdown[branchKey].total++
-      if (isPresent) branchBreakdown[branchKey].present++
+      if (isPresent) {
+        branchBreakdown[branchKey].present++
+        if (isLate) branchBreakdown[branchKey].late++
+        else branchBreakdown[branchKey].onTime++
+      }
 
       // Group stats
       const groupKey = (member.caregroup || "Unassigned").trim()
       if (!groupBreakdown[groupKey]) {
-        groupBreakdown[groupKey] = { total: 0, present: 0 }
+        groupBreakdown[groupKey] = { total: 0, present: 0, onTime: 0, late: 0 }
       }
       groupBreakdown[groupKey].total++
-      if (isPresent) groupBreakdown[groupKey].present++
+      if (isPresent) {
+        groupBreakdown[groupKey].present++
+        if (isLate) groupBreakdown[groupKey].late++
+        else groupBreakdown[groupKey].onTime++
+      }
 
       return {
         ...member,
         isPresent,
+        isLate,
         scannedAt: att ? att.scannedAt.toISOString() : null,
         attendanceId: att ? att.id : null,
       }
@@ -84,16 +118,22 @@ export async function GET(request: Request) {
 
     const totalMembers = members.length
     const absentCount = totalMembers - presentCount
-    const presentPercent = totalMembers > 0 ? Math.round((presentCount / totalMembers) * 100) : 0
+    const presentPercent =
+      totalMembers > 0 ? Math.round((presentCount / totalMembers) * 100) : 0
+
+    const sessionDef = getSessionDef(session)
 
     return NextResponse.json({
       success: true,
       data: {
         session,
+        sessionDef: sessionDef || null,
         members: roster,
         summary: {
           totalMembers,
           presentCount,
+          onTimeCount,
+          lateCount,
           absentCount,
           presentPercent,
           branchBreakdown,
@@ -118,6 +158,7 @@ export async function POST(request: Request) {
       badgeOrId,
       session = "Tuesday — Bus Boarding (Departure Check-In)",
       isPresent,
+      isLate,
       toggle = false,
     } = body
 
@@ -159,6 +200,7 @@ export async function POST(request: Request) {
     })
 
     let willBePresent = true
+    let willBeLate = Boolean(isLate)
 
     if (typeof isPresent === "boolean") {
       willBePresent = isPresent
@@ -176,23 +218,26 @@ export async function POST(request: Request) {
         },
         update: {
           isPresent: true,
+          isLate: willBeLate,
           scannedAt: new Date(),
         },
         create: {
           memberId: targetMember.id,
           session,
           isPresent: true,
+          isLate: willBeLate,
           scannedAt: new Date(),
         },
       })
 
       return NextResponse.json({
         success: true,
-        message: `Checked in ${targetMember.fullName} (${targetMember.badgeId})`,
+        message: `Checked in ${targetMember.fullName} (${targetMember.badgeId})${willBeLate ? " [LATE]" : ""}`,
         data: {
           ...record,
           member: targetMember,
           isPresent: true,
+          isLate: willBeLate,
         },
       })
     } else {
@@ -209,6 +254,7 @@ export async function POST(request: Request) {
         data: {
           member: targetMember,
           isPresent: false,
+          isLate: false,
         },
       })
     }

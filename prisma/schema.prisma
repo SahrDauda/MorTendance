@@ -267,6 +267,7 @@ model CampAttendance {
   memberId  String     @map("member_id")
   session   String
   isPresent Boolean    @default(true) @map("is_present")
+  isLate    Boolean    @default(false) @map("is_late")
   scannedAt DateTime   @default(now()) @map("scanned_at")
   member    CampMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 

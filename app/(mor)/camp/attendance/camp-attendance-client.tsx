@@ -38,6 +38,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import {
   QrCode,
@@ -64,9 +65,14 @@ import {
   AlertTriangle,
   UserPlus,
   CreditCard,
+  AlertCircle,
+  BookOpen,
+  Sunrise,
+  GraduationCap,
 } from "lucide-react"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
+import { CAMP_SCHEDULE, CampSessionDef, getSessionDef } from "@/lib/campSchedule"
 
 interface CampRosterMember {
   id: string
@@ -80,6 +86,7 @@ interface CampRosterMember {
   position: string
   paid: boolean
   isPresent: boolean
+  isLate: boolean
   scannedAt: string | null
   attendanceId: string | null
 }
@@ -87,61 +94,23 @@ interface CampRosterMember {
 interface AttendanceSummary {
   totalMembers: number
   presentCount: number
+  onTimeCount: number
+  lateCount: number
   absentCount: number
   presentPercent: number
-  branchBreakdown: Record<string, { total: number; present: number }>
-  groupBreakdown: Record<string, { total: number; present: number }>
+  branchBreakdown: Record<string, { total: number; present: number; onTime: number; late: number }>
+  groupBreakdown: Record<string, { total: number; present: number; onTime: number; late: number }>
 }
-
-const SCHEDULED_PROGRAMS = [
-  {
-    category: "Tuesday — Departure & Arrival",
-    sessions: [
-      "Tuesday — Bus Boarding (Departure Check-In)",
-      "Tuesday — Campground Arrival & Lodging Registration",
-    ],
-  },
-  {
-    category: "Day 1 — Tuesday Evening & Wednesday",
-    sessions: [
-      "Tuesday — Opening Night Rally (7:00 PM)",
-      "Wednesday — Morning Devotion & Prayer (6:00 AM)",
-      "Wednesday — Morning Word & Workshop (9:30 AM)",
-      "Wednesday — Afternoon Seminar (3:00 PM)",
-      "Wednesday — Evening Revival Session (7:00 PM)",
-    ],
-  },
-  {
-    category: "Day 2 — Thursday",
-    sessions: [
-      "Thursday — Morning Devotion & Prayer (6:00 AM)",
-      "Thursday — Leadership & Ministry Impartation (9:30 AM)",
-      "Thursday — Praise & Worship Celebration (7:00 PM)",
-    ],
-  },
-  {
-    category: "Day 3 — Friday (Final Day)",
-    sessions: [
-      "Friday — Morning Devotion (6:00 AM)",
-      "Friday — Anointing & Commissioning Service (9:30 AM)",
-      "Friday — Camp Departure / Return Buses (2:00 PM)",
-    ],
-  },
-  {
-    category: "Camp Dining & Meals",
-    sessions: ["Meal — Breakfast", "Meal — Lunch", "Meal — Dinner"],
-  },
-]
 
 export function CampAttendanceClient() {
   const [activeTab, setActiveTab] = useState<"bus" | "program">("bus")
-  const [currentSession, setCurrentSession] = useState<string>(
-    "Tuesday — Bus Boarding (Departure Check-In)"
-  )
+  const [currentSession, setCurrentSession] = useState<string>(CAMP_SCHEDULE[0].name)
   const [members, setMembers] = useState<CampRosterMember[]>([])
   const [summary, setSummary] = useState<AttendanceSummary>({
     totalMembers: 0,
     presentCount: 0,
+    onTimeCount: 0,
+    lateCount: 0,
     absentCount: 0,
     presentPercent: 0,
     branchBreakdown: {},
@@ -149,6 +118,9 @@ export function CampAttendanceClient() {
   })
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  // Auto-Mark Late switch for incoming scans
+  const [markAsLate, setMarkAsLate] = useState(false)
 
   // Tuesday Bus Search & Name Lookup
   const [nameQuery, setNameQuery] = useState("")
@@ -158,7 +130,7 @@ export function CampAttendanceClient() {
   const [programSearch, setProgramSearch] = useState("")
   const [filterBranch, setFilterBranch] = useState("ALL")
   const [filterGroup, setFilterGroup] = useState("ALL")
-  const [filterStatus, setFilterStatus] = useState<"ALL" | "PRESENT" | "ABSENT">("ALL")
+  const [filterStatus, setFilterStatus] = useState<"ALL" | "ON_TIME" | "LATE" | "ABSENT">("ALL")
 
   // Quick Barcode / Scanner
   const [scanQuery, setScanQuery] = useState("")
@@ -169,7 +141,7 @@ export function CampAttendanceClient() {
   const [customSessionOpen, setCustomSessionOpen] = useState(false)
   const [customSessionName, setCustomSessionName] = useState("")
 
-  // Quick On-The-Spot Registration Modal (for unregistered arrivals at the bus)
+  // Quick On-The-Spot Registration Modal
   const [quickRegOpen, setQuickRegOpen] = useState(false)
   const [quickRegForm, setQuickRegForm] = useState({
     fullName: "",
@@ -182,6 +154,10 @@ export function CampAttendanceClient() {
 
   const nameInputRef = useRef<HTMLInputElement>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
+
+  const currentSessionDef = useMemo(() => {
+    return getSessionDef(currentSession)
+  }, [currentSession])
 
   // Load records
   const fetchAttendance = async (sessionName = currentSession) => {
@@ -209,10 +185,15 @@ export function CampAttendanceClient() {
     fetchAttendance(currentSession)
   }, [currentSession])
 
-  // Single Member Toggle Check-In
-  const handleToggleCheckIn = async (member: CampRosterMember) => {
-    const nextPresent = !member.isPresent
+  // Single Member Check-In / Status Update
+  const handleSetStatus = async (
+    member: CampRosterMember,
+    status: "ON_TIME" | "LATE" | "ABSENT"
+  ) => {
     setUpdatingId(member.id)
+
+    const nextPresent = status !== "ABSENT"
+    const nextLate = status === "LATE"
 
     // Optimistic UI update
     setMembers((prev) =>
@@ -221,24 +202,12 @@ export function CampAttendanceClient() {
           ? {
               ...m,
               isPresent: nextPresent,
+              isLate: nextLate,
               scannedAt: nextPresent ? new Date().toISOString() : null,
             }
           : m
       )
     )
-
-    setSummary((prev) => {
-      const newPresent = prev.presentCount + (nextPresent ? 1 : -1)
-      const newAbsent = prev.totalMembers - newPresent
-      const newPercent =
-        prev.totalMembers > 0 ? Math.round((newPresent / prev.totalMembers) * 100) : 0
-      return {
-        ...prev,
-        presentCount: newPresent,
-        absentCount: newAbsent,
-        presentPercent: newPercent,
-      }
-    })
 
     try {
       const res = await fetch("/api/camp/attendance", {
@@ -248,23 +217,28 @@ export function CampAttendanceClient() {
           memberId: member.id,
           session: currentSession,
           isPresent: nextPresent,
+          isLate: nextLate,
         }),
       })
       const json = await res.json()
 
       if (json.success) {
         if (nextPresent) {
-          toast.success(`✅ ${member.fullName} checked in!`)
-          setLastScanned(member)
+          if (nextLate) {
+            toast.warning(`⚠️ ${member.fullName} marked as LATE`)
+          } else {
+            toast.success(`✅ ${member.fullName} marked ON TIME`)
+          }
+          setLastScanned({ ...member, isPresent: true, isLate: nextLate })
         } else {
-          toast.info(`↩️ ${member.fullName} check-in undone`)
+          toast.info(`↩️ ${member.fullName} marked ABSENT`)
         }
       } else {
         toast.error(json.error || "Check-in failed")
         fetchAttendance()
       }
     } catch (err) {
-      toast.error("Error updating check-in")
+      toast.error("Error updating attendance")
       fetchAttendance()
     } finally {
       setUpdatingId(null)
@@ -285,12 +259,17 @@ export function CampAttendanceClient() {
           badgeOrId: scanQuery.trim(),
           session: currentSession,
           isPresent: true,
+          isLate: markAsLate,
         }),
       })
       const json = await res.json()
 
       if (json.success) {
-        toast.success(`✅ ${json.data.member.fullName} checked in!`)
+        if (markAsLate) {
+          toast.warning(`⚠️ ${json.data.member.fullName} checked in as LATE`)
+        } else {
+          toast.success(`✅ ${json.data.member.fullName} checked in (ON TIME)!`)
+        }
         setLastScanned(json.data.member)
         setScanQuery("")
         fetchAttendance()
@@ -343,6 +322,7 @@ export function CampAttendanceClient() {
           memberId: newMember.id,
           session: currentSession,
           isPresent: true,
+          isLate: false,
         }),
       })
 
@@ -397,7 +377,8 @@ export function CampAttendanceClient() {
   // Filtered members for Campground Program Table
   const programFilteredMembers = useMemo(() => {
     return members.filter((m) => {
-      if (filterStatus === "PRESENT" && !m.isPresent) return false
+      if (filterStatus === "ON_TIME" && (!m.isPresent || m.isLate)) return false
+      if (filterStatus === "LATE" && (!m.isPresent || !m.isLate)) return false
       if (filterStatus === "ABSENT" && m.isPresent) return false
       if (filterBranch !== "ALL" && (m.branch || "Unassigned") !== filterBranch) return false
       if (filterGroup !== "ALL" && (m.caregroup || "Unassigned") !== filterGroup) return false
@@ -430,6 +411,20 @@ export function CampAttendanceClient() {
     return Array.from(set).sort()
   }, [members])
 
+  // Group by Day for schedule dropdown
+  const scheduleByDay = useMemo(() => {
+    const days: Record<string, CampSessionDef[]> = {
+      Tuesday: [],
+      Wednesday: [],
+      Thursday: [],
+      Friday: [],
+    }
+    CAMP_SCHEDULE.forEach((s) => {
+      if (days[s.day]) days[s.day].push(s)
+    })
+    return days
+  }, [])
+
   // Export PDF Attendance Sheet
   const handleExportPDF = () => {
     if (members.length === 0) {
@@ -456,9 +451,9 @@ export function CampAttendanceClient() {
     // Summary Box
     doc.setTextColor(15, 23, 42)
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(9)
+    doc.setFontSize(8.5)
     doc.text(
-      `Total: ${summary.totalMembers}  |  Present: ${summary.presentCount} (${summary.presentPercent}%)  |  Absent: ${summary.absentCount}`,
+      `Total: ${summary.totalMembers}  |  On-Time: ${summary.onTimeCount}  |  Late: ${summary.lateCount}  |  Absent: ${summary.absentCount}  |  Rate: ${summary.presentPercent}%`,
       14,
       33
     )
@@ -469,7 +464,7 @@ export function CampAttendanceClient() {
       m.fullName,
       m.branch || "—",
       m.caregroup || "—",
-      m.isPresent ? "PRESENT" : "ABSENT",
+      !m.isPresent ? "ABSENT" : m.isLate ? "LATE" : "ON TIME",
       m.scannedAt
         ? new Date(m.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         : "—",
@@ -498,8 +493,10 @@ export function CampAttendanceClient() {
       },
       didParseCell: function (data) {
         if (data.section === "body" && data.column.index === 5) {
-          if (data.cell.raw === "PRESENT") {
+          if (data.cell.raw === "ON TIME") {
             data.cell.styles.textColor = [16, 185, 129] // Emerald
+          } else if (data.cell.raw === "LATE") {
+            data.cell.styles.textColor = [217, 119, 6] // Amber
           } else {
             data.cell.styles.textColor = [239, 68, 68] // Red
           }
@@ -536,7 +533,7 @@ export function CampAttendanceClient() {
       m.caregroup || "",
       m.room || "",
       m.position || "",
-      m.isPresent ? "PRESENT" : "ABSENT",
+      !m.isPresent ? "ABSENT" : m.isLate ? "LATE" : "ON_TIME",
       m.scannedAt ? new Date(m.scannedAt).toLocaleString() : "",
     ])
 
@@ -561,22 +558,22 @@ export function CampAttendanceClient() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="bg-primary/10 text-primary text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              MOR Camp 2026 Registration & Attendance
+              MOR Camp 2026 Registration & Timetable
             </span>
             <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              Live System Active
+              Live Schedule Synced
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-            Attendance & Bus Check-In Desk
+            Camp Attendance & Session Timetable
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Verify member registrations and board departure buses on Tuesday, and record attendance across all camp programs.
+            Tuesday departure bus verification & scheduled teaching sessions with automatic review & lateness tracking.
           </p>
         </div>
 
-        {/* Session Selector */}
+        {/* Schedule Selector */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <Select
             value={currentSession}
@@ -591,19 +588,26 @@ export function CampAttendanceClient() {
               }
             }}
           >
-            <SelectTrigger className="w-full sm:w-[290px] h-11 font-bold bg-background border-primary/40 text-xs sm:text-sm shadow-sm rounded-xl">
+            <SelectTrigger className="w-full sm:w-[320px] h-11 font-bold bg-background border-primary/40 text-xs sm:text-sm shadow-sm rounded-xl">
               <CalendarDays className="w-4 h-4 text-primary mr-2 flex-shrink-0" />
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="max-h-[380px]">
-              {SCHEDULED_PROGRAMS.map((group) => (
-                <SelectGroup key={group.category}>
-                  <SelectLabel className="text-[11px] font-black text-primary uppercase tracking-wider px-2 py-1.5">
-                    {group.category}
+            <SelectContent className="max-h-[420px]">
+              {Object.entries(scheduleByDay).map(([day, sessions]) => (
+                <SelectGroup key={day}>
+                  <SelectLabel className="text-[11px] font-black text-primary uppercase tracking-wider px-2 py-1.5 bg-muted/40">
+                    DAY — {day.toUpperCase()}
                   </SelectLabel>
-                  {group.sessions.map((sess) => (
-                    <SelectItem key={sess} value={sess} className="text-xs font-semibold py-2">
-                      {sess}
+                  {sessions.map((sess) => (
+                    <SelectItem key={sess.name} value={sess.name} className="text-xs font-semibold py-2">
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span>{sess.shortLabel}</span>
+                        {sess.isTeachingSession && (
+                          <span className="text-[10px] text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded font-bold">
+                            Teaching
+                          </span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -626,6 +630,76 @@ export function CampAttendanceClient() {
           </Button>
         </div>
       </div>
+
+      {/* Teaching Session Timeline & Lateness Rule Banner */}
+      {currentSessionDef && (
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm ${
+          currentSessionDef.isTeachingSession
+            ? "bg-amber-500/10 border-amber-500/30"
+            : "bg-card border-border"
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2.5 rounded-xl mt-0.5 flex-shrink-0 ${
+              currentSessionDef.isTeachingSession
+                ? "bg-amber-500/20 text-amber-600"
+                : "bg-primary/10 text-primary"
+            }`}>
+              {currentSessionDef.isTeachingSession ? (
+                <BookOpen className="w-5 h-5" />
+              ) : currentSessionDef.category === "Devotion" ? (
+                <Sunrise className="w-5 h-5" />
+              ) : (
+                <CalendarDays className="w-5 h-5" />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm sm:text-base font-black text-foreground">
+                  {currentSessionDef.name}
+                </h2>
+                {currentSessionDef.isTeachingSession && (
+                  <Badge className="bg-amber-500 text-black font-black text-[10px] uppercase">
+                    ⭐ Core Teaching Session
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {currentSessionDef.description}
+              </p>
+            </div>
+          </div>
+
+          {/* Timetable Indicators */}
+          <div className="flex items-center gap-3 bg-background/80 p-2.5 rounded-xl border border-border/60 text-xs self-stretch sm:self-auto justify-around sm:justify-end">
+            {currentSessionDef.reviewStartTime && (
+              <div className="text-center px-2">
+                <span className="text-[10px] text-emerald-600 font-bold block uppercase">
+                  Marking Starts (Review)
+                </span>
+                <strong className="text-foreground font-black">
+                  {currentSessionDef.reviewStartTime}
+                </strong>
+              </div>
+            )}
+            <div className="text-center px-2 border-l border-border">
+              <span className="text-[10px] text-amber-600 font-bold block uppercase">
+                {currentSessionDef.isTeachingSession ? "Late After (Teaching Start)" : "Start Time"}
+              </span>
+              <strong className="text-amber-600 font-black">
+                {currentSessionDef.teachingStartTime}
+              </strong>
+            </div>
+            <div className="text-center px-2 border-l border-border">
+              <span className="text-[10px] text-muted-foreground font-bold block uppercase">
+                Session Ends
+              </span>
+              <strong className="text-foreground font-black">
+                {currentSessionDef.endTime}
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mode Switcher Tabs */}
       <Tabs
@@ -650,7 +724,7 @@ export function CampAttendanceClient() {
               className="gap-2 px-4 rounded-xl text-xs sm:text-sm font-bold data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm"
             >
               <CalendarDays className="w-4 h-4" />
-              Program Attendance Sheet
+              Session Attendance & Roll-Call
             </TabsTrigger>
           </TabsList>
 
@@ -906,7 +980,7 @@ export function CampAttendanceClient() {
                                 <Button
                                   variant="outline"
                                   className="w-full bg-emerald-500/15 border-emerald-500/50 text-emerald-700 hover:bg-emerald-500/25 font-black text-xs sm:text-sm h-11 rounded-xl"
-                                  onClick={() => handleToggleCheckIn(member)}
+                                  onClick={() => handleSetStatus(member, "ABSENT")}
                                   disabled={updatingId === member.id}
                                 >
                                   {updatingId === member.id ? (
@@ -921,7 +995,7 @@ export function CampAttendanceClient() {
                               ) : (
                                 <Button
                                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm h-12 rounded-xl shadow-lg gap-2"
-                                  onClick={() => handleToggleCheckIn(member)}
+                                  onClick={() => handleSetStatus(member, "ON_TIME")}
                                   disabled={updatingId === member.id}
                                 >
                                   {updatingId === member.id ? (
@@ -1067,7 +1141,7 @@ export function CampAttendanceClient() {
                           variant="outline"
                           size="sm"
                           className="w-full bg-emerald-500/10 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/20 font-bold text-xs h-10 rounded-xl"
-                          onClick={() => handleToggleCheckIn(member)}
+                          onClick={() => handleSetStatus(member, "ABSENT")}
                           disabled={updatingId === member.id}
                         >
                           {updatingId === member.id ? (
@@ -1083,7 +1157,7 @@ export function CampAttendanceClient() {
                         <Button
                           size="sm"
                           className="w-full bg-primary hover:bg-primary/90 text-white font-black text-xs sm:text-sm h-10 rounded-xl shadow-md gap-2"
-                          onClick={() => handleToggleCheckIn(member)}
+                          onClick={() => handleSetStatus(member, "ON_TIME")}
                           disabled={updatingId === member.id}
                         >
                           {updatingId === member.id ? (
@@ -1105,21 +1179,30 @@ export function CampAttendanceClient() {
         </TabsContent>
 
         {/* ======================================================== */}
-        {/* MODE 2: CAMPGROUND PROGRAM ATTENDANCE SHEET */}
+        {/* MODE 2: CAMPGROUND PROGRAM ATTENDANCE & ROLL-CALL */}
         {/* ======================================================== */}
         <TabsContent value="program" className="space-y-6 m-0">
-          {/* Quick Scanner & Stats Row */}
+          {/* Quick Scanner & Metric Stats */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Quick Barcode / Name Input Card */}
-            <Card className="lg:col-span-2 border shadow-sm p-5 bg-card">
+            <Card className="lg:col-span-2 border shadow-sm p-5 bg-card space-y-4">
               <form onSubmit={handleScanSubmit} className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Barcode Scan / Badge ID / Name Check-In
                   </label>
-                  <Badge variant="outline" className="text-[11px] font-semibold text-primary">
-                    Active: {currentSession}
-                  </Badge>
+
+                  {/* Lateness Toggle for Incoming Scans */}
+                  <div className="flex items-center gap-2 bg-amber-500/10 px-3 py-1 rounded-xl border border-amber-500/30">
+                    <span className="text-xs font-bold text-amber-700">
+                      Mark Scans as LATE:
+                    </span>
+                    <Switch
+                      checked={markAsLate}
+                      onCheckedChange={setMarkAsLate}
+                      className="data-[state=checked]:bg-amber-600"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -1135,20 +1218,25 @@ export function CampAttendanceClient() {
                   </div>
                   <Button
                     type="submit"
-                    className="h-12 px-6 bg-primary text-white font-bold text-xs sm:text-sm shadow-md rounded-xl"
+                    className={`h-12 px-6 font-black text-xs sm:text-sm shadow-md rounded-xl ${
+                      markAsLate
+                        ? "bg-amber-600 hover:bg-amber-700 text-white"
+                        : "bg-primary text-white"
+                    }`}
                     disabled={scanning || !scanQuery.trim()}
                   >
                     {scanning ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        Check In <ArrowRight className="w-4 h-4 ml-1.5" />
+                        {markAsLate ? "Check In as LATE" : "Check In (On Time)"}
+                        <ArrowRight className="w-4 h-4 ml-1.5" />
                       </>
                     )}
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Works seamlessly with Bluetooth barcode scanners, or type attendee names / badge IDs.
+                  Works seamlessly with Bluetooth barcode scanners or manual typing.
                 </p>
               </form>
             </Card>
@@ -1157,27 +1245,31 @@ export function CampAttendanceClient() {
             <Card className="border shadow-sm p-5 bg-gradient-to-br from-card to-muted/30 flex flex-col justify-between">
               <div className="space-y-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Session Attendance Rate
+                  Session Attendance Breakdown
                 </div>
                 <div className="flex items-baseline justify-between">
                   <span className="text-3xl font-black text-foreground">
                     {summary.presentCount}
                   </span>
                   <span className="text-xs font-bold text-muted-foreground">
-                    of {summary.totalMembers} delegates
+                    of {summary.totalMembers} delegates ({summary.presentPercent}%)
                   </span>
                 </div>
                 <Progress value={summary.presentPercent} className="h-2.5 bg-muted" />
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border/80 text-xs">
-                <div className="bg-emerald-500/10 p-2 rounded-xl text-center">
-                  <div className="text-emerald-600 font-bold">{summary.presentCount}</div>
-                  <div className="text-[10px] text-muted-foreground font-semibold">PRESENT</div>
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/80 text-xs text-center">
+                <div className="bg-emerald-500/10 p-2 rounded-xl">
+                  <div className="text-emerald-600 font-black text-sm">{summary.onTimeCount}</div>
+                  <div className="text-[10px] text-muted-foreground font-bold">ON TIME</div>
                 </div>
-                <div className="bg-red-500/10 p-2 rounded-xl text-center">
-                  <div className="text-red-600 font-bold">{summary.absentCount}</div>
-                  <div className="text-[10px] text-muted-foreground font-semibold">ABSENT</div>
+                <div className="bg-amber-500/10 p-2 rounded-xl">
+                  <div className="text-amber-600 font-black text-sm">{summary.lateCount}</div>
+                  <div className="text-[10px] text-muted-foreground font-bold">LATE</div>
+                </div>
+                <div className="bg-red-500/10 p-2 rounded-xl">
+                  <div className="text-red-600 font-black text-sm">{summary.absentCount}</div>
+                  <div className="text-[10px] text-muted-foreground font-bold">ABSENT</div>
                 </div>
               </div>
             </Card>
@@ -1231,13 +1323,14 @@ export function CampAttendanceClient() {
 
               {/* Status Filter */}
               <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val as any)}>
-                <SelectTrigger className="w-[130px] h-9 text-xs rounded-xl font-semibold">
+                <SelectTrigger className="w-[140px] h-9 text-xs rounded-xl font-semibold">
                   <Filter className="w-3.5 h-3.5 text-muted-foreground mr-1.5" />
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Status</SelectItem>
-                  <SelectItem value="PRESENT">🟢 Present</SelectItem>
+                  <SelectItem value="ON_TIME">🟢 On Time</SelectItem>
+                  <SelectItem value="LATE">🟡 Late</SelectItem>
                   <SelectItem value="ABSENT">🔴 Absent</SelectItem>
                 </SelectContent>
               </Select>
@@ -1258,10 +1351,10 @@ export function CampAttendanceClient() {
                     <TableHead className="text-xs font-bold">Attendee Name</TableHead>
                     <TableHead className="text-xs font-bold">Branch</TableHead>
                     <TableHead className="text-xs font-bold">Group</TableHead>
-                    <TableHead className="text-xs font-bold">Role</TableHead>
+                    <TableHead className="text-xs font-bold">Status</TableHead>
                     <TableHead className="text-xs font-bold">Time</TableHead>
-                    <TableHead className="text-right text-xs font-bold w-[140px]">
-                      Attendance Action
+                    <TableHead className="text-right text-xs font-bold w-[220px]">
+                      Quick Attendance Action
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1284,7 +1377,11 @@ export function CampAttendanceClient() {
                       <TableRow
                         key={member.id}
                         className={`hover:bg-muted/40 transition-colors ${
-                          member.isPresent ? "bg-emerald-500/[0.03]" : ""
+                          !member.isPresent
+                            ? ""
+                            : member.isLate
+                            ? "bg-amber-500/[0.04]"
+                            : "bg-emerald-500/[0.04]"
                         }`}
                       >
                         <TableCell className="font-mono font-bold text-xs text-primary">
@@ -1308,13 +1405,25 @@ export function CampAttendanceClient() {
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-xs font-medium text-muted-foreground">
-                          {member.position || "Member"}
+                        <TableCell>
+                          {!member.isPresent ? (
+                            <Badge variant="outline" className="text-[10px] font-bold border-red-500/40 text-red-600 bg-red-500/5">
+                              🔴 ABSENT
+                            </Badge>
+                          ) : member.isLate ? (
+                            <Badge className="text-[10px] font-bold bg-amber-500 text-black">
+                              🟡 LATE
+                            </Badge>
+                          ) : (
+                            <Badge className="text-[10px] font-bold bg-emerald-500 text-white">
+                              🟢 ON TIME
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {member.scannedAt ? (
-                            <span className="flex items-center gap-1 font-semibold text-emerald-600">
-                              <Clock className="w-3 h-3" />
+                            <span className="flex items-center gap-1 font-semibold text-foreground">
+                              <Clock className="w-3 h-3 text-muted-foreground" />
                               {new Date(member.scannedAt).toLocaleTimeString([], {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -1325,28 +1434,55 @@ export function CampAttendanceClient() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant={member.isPresent ? "outline" : "default"}
-                            className={`h-8 px-3 rounded-xl text-xs font-bold transition-all ${
-                              member.isPresent
-                                ? "border-emerald-500/40 text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20"
-                                : "bg-primary hover:bg-primary/90 text-white"
-                            }`}
-                            onClick={() => handleToggleCheckIn(member)}
-                            disabled={updatingId === member.id}
-                          >
-                            {updatingId === member.id ? (
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            ) : member.isPresent ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 mr-1" />
-                                Present
-                              </>
-                            ) : (
-                              "Mark Present"
-                            )}
-                          </Button>
+                          <div className="inline-flex items-center gap-1">
+                            {/* Mark On-Time Button */}
+                            <Button
+                              size="sm"
+                              variant={member.isPresent && !member.isLate ? "default" : "outline"}
+                              className={`h-7 px-2.5 rounded-lg text-[11px] font-bold ${
+                                member.isPresent && !member.isLate
+                                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                                  : "border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                              }`}
+                              onClick={() =>
+                                handleSetStatus(
+                                  member,
+                                  member.isPresent && !member.isLate ? "ABSENT" : "ON_TIME"
+                                )
+                              }
+                              disabled={updatingId === member.id}
+                            >
+                              {updatingId === member.id ? (
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "On Time"
+                              )}
+                            </Button>
+
+                            {/* Mark Late Button */}
+                            <Button
+                              size="sm"
+                              variant={member.isPresent && member.isLate ? "default" : "outline"}
+                              className={`h-7 px-2.5 rounded-lg text-[11px] font-bold ${
+                                member.isPresent && member.isLate
+                                  ? "bg-amber-500 hover:bg-amber-600 text-black shadow-sm"
+                                  : "border-amber-500/40 text-amber-700 hover:bg-amber-500/10"
+                              }`}
+                              onClick={() =>
+                                handleSetStatus(
+                                  member,
+                                  member.isPresent && member.isLate ? "ABSENT" : "LATE"
+                                )
+                              }
+                              disabled={updatingId === member.id}
+                            >
+                              {updatingId === member.id ? (
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "Late"
+                              )}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
