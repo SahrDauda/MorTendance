@@ -1,3 +1,5 @@
+"use client"
+
 import { resolveGroupTagImage, isGeneralMember } from "@/components/camp/mor-tag-front"
 import JSZip from "jszip"
 
@@ -11,16 +13,29 @@ export interface BadgeAttendeeData {
   position?: string | null
 }
 
+const imageElementCache: Record<string, HTMLImageElement> = {}
+
 /**
- * Loads an image into an HTMLImageElement with CORS enabled.
+ * Loads an image into an HTMLImageElement safely via Blob URL and caches it.
  */
-function loadImage(src: string): Promise<HTMLImageElement> {
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  if (imageElementCache[src]) return imageElementCache[src]
+
+  const res = await fetch(src)
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+
   return new Promise((resolve, reject) => {
     const img = new Image()
-    img.crossOrigin = "anonymous"
-    img.onload = () => resolve(img)
-    img.onerror = (err) => reject(err)
-    img.src = src
+    img.onload = () => {
+      imageElementCache[src] = img
+      resolve(img)
+    }
+    img.onerror = (err) => {
+      URL.revokeObjectURL(objectUrl)
+      reject(err)
+    }
+    img.src = objectUrl
   })
 }
 
@@ -159,56 +174,72 @@ export async function downloadAttendeeBadge(
     return
   }
 
-  // 2. PNG / JPG Download -> Pure Canvas 2D (zero color parsing errors)
+  // 2. PNG / JPG Download -> Pure Canvas 2D DataURL download
   const canvas = await renderBadgeToCanvas(attendee)
   const mimeType = format === "png" ? "image/png" : "image/jpeg"
   const quality = format === "png" ? undefined : 0.98
 
-  canvas.toBlob(
-    (blob) => {
-      if (!blob) return
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${baseFilename}.${format}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-    },
-    mimeType,
-    quality
-  )
+  const dataUrl = canvas.toDataURL(mimeType, quality)
+  const a = document.createElement("a")
+  a.href = dataUrl
+  a.download = `${baseFilename}.${format}`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 
 /**
  * Native Print of Attendee Badge directly to the printer with zero color bugs.
  */
 export async function printAttendeeBadge(attendee: BadgeAttendeeData): Promise<void> {
-  const targetId = attendee.id || attendee.badgeId
-  const pdfUrl = `/api/camp/badge/${targetId}`
+  const canvas = await renderBadgeToCanvas(attendee)
+  const dataUrl = canvas.toDataURL("image/png")
 
-  // Create invisible print iframe
-  const iframe = document.createElement("iframe")
-  iframe.style.position = "fixed"
-  iframe.style.right = "0"
-  iframe.style.bottom = "0"
-  iframe.style.width = "0"
-  iframe.style.height = "0"
-  iframe.style.border = "0"
-  iframe.src = pdfUrl
-
-  document.body.appendChild(iframe)
-
-  iframe.onload = () => {
-    try {
-      iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
-    } catch (e) {
-      // Fallback: Open in new print tab
-      window.open(pdfUrl, "_blank")
-    }
+  const printWindow = window.open("", "_blank", "width=800,height=1000")
+  if (!printWindow) {
+    // Fallback: direct PDF download
+    await downloadAttendeeBadge(attendee, "pdf")
+    return
   }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Print Tag - ${attendee.fullName}</title>
+        <style>
+          @page {
+            size: 54mm 76.12mm;
+            margin: 0;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            height: 100vh;
+          }
+          img {
+            width: 54mm;
+            height: 76.12mm;
+            display: block;
+            object-fit: cover;
+          }
+          @media print {
+            body {
+              height: auto;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <img src="${dataUrl}" onload="window.focus(); window.print();" />
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
 }
 
 /**
@@ -232,15 +263,14 @@ export async function downloadAllBadgesZip(
 
     try {
       const canvas = await renderBadgeToCanvas(member)
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((b) => resolve(b), mimeType, quality)
-      )
+      const dataUrl = canvas.toDataURL(mimeType, quality)
+      const base64Data = dataUrl.split(",")[1]
 
-      if (blob) {
+      if (base64Data) {
         const safeName = (member.fullName || "Attendee").trim().replace(/\s+/g, "_")
         const indexStr = String(i + 1).padStart(3, "0")
         const filename = `${indexStr}_${safeName}_${member.badgeId}.${format}`
-        folder.file(filename, blob)
+        folder.file(filename, base64Data, { base64: true })
       }
     } catch (err) {
       console.warn(`Failed to render badge for ${member.fullName}:`, err)
