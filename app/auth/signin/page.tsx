@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { Logo } from "@/components/shared/logo"
-import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react"
+import { Mail, Lock, ArrowRight, AlertCircle, UserCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 
@@ -123,15 +123,15 @@ export default function SignInPage() {
             )}
 
             <div className="space-y-2.5">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email Address
+              <Label htmlFor="email" className="text-sm font-semibold">
+                Username or Email
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="email"
-                  type="email"
-                  placeholder="you@example.com"
+                  type="text"
+                  placeholder="e.g. Sylvester Sesay or your email"
                   value={formData.email}
                   onChange={(e) => {
                     setFormData({ ...formData, email: e.target.value })
@@ -139,6 +139,7 @@ export default function SignInPage() {
                   }}
                   required
                   disabled={loading}
+                  autoComplete="username"
                   className={cn(
                     "pl-10 h-11 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/20",
                     error && "border-destructive focus-visible:ring-destructive"
