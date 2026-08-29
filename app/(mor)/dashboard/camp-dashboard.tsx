@@ -1,5 +1,8 @@
 import { db } from "@/lib/db"
 import { CampDashboardClient, CampDashboardData } from "./camp-dashboard-client"
+import { CAMP_SCHEDULE } from "@/lib/campSchedule"
+
+export const dynamic = "force-dynamic"
 
 export async function CampDashboard({ currentUserRole }: { currentUserRole: string }) {
   try {
@@ -23,7 +26,14 @@ export async function CampDashboard({ currentUserRole }: { currentUserRole: stri
         orderBy: { name: "asc" },
       }),
       db.campAttendance.findMany({
-        select: { id: true },
+        select: {
+          id: true,
+          memberId: true,
+          session: true,
+          isPresent: true,
+          isLate: true,
+          scannedAt: true,
+        },
       }),
     ])
 
@@ -40,8 +50,36 @@ export async function CampDashboard({ currentUserRole }: { currentUserRole: stri
     const totalGroups = campGroups.length
     const groupsWithLeaders = campGroups.filter((g: any) => Boolean(g.leader)).length
 
-    const totalCheckins = campAttendances.length
+    const totalCheckins = campAttendances.filter((a: any) => a.isPresent).length
     const totalBranches = campBranches.length
+
+    // Active session attendance calculation
+    const defaultSession = CAMP_SCHEDULE[0].name
+    const sessionAttendanceMap = new Map<string, Set<string>>()
+
+    for (const att of campAttendances) {
+      if (att.isPresent) {
+        if (!sessionAttendanceMap.has(att.session)) {
+          sessionAttendanceMap.set(att.session, new Set())
+        }
+        sessionAttendanceMap.get(att.session)!.add(att.memberId)
+      }
+    }
+
+    const presentInDefault = sessionAttendanceMap.get(defaultSession) || new Set<string>()
+
+    const flaggedAbsentMembers = campMembers
+      .filter((m: any) => !presentInDefault.has(m.id))
+      .map((m: any) => ({
+        id: m.id,
+        badgeId: m.badgeId,
+        fullName: m.fullName,
+        phone: m.phone,
+        branch: m.branch,
+        caregroup: m.caregroup,
+        position: m.position,
+        gender: m.gender,
+      }))
 
     // Branch Breakdown
     const branchCounts: { [key: string]: number } = {}
@@ -112,6 +150,7 @@ export async function CampDashboard({ currentUserRole }: { currentUserRole: stri
         totalCheckins,
         totalBranches,
       },
+      flaggedAbsentMembers,
       recentAttendees,
       branchBreakdown,
       groupBreakdown,
@@ -120,16 +159,13 @@ export async function CampDashboard({ currentUserRole }: { currentUserRole: stri
 
     return <CampDashboardClient data={data} currentUserRole={currentUserRole} />
   } catch (error) {
-    console.error("CampDashboard error:", error)
+    console.error("Error loading CampDashboard:", error)
     return (
-      <div className="flex flex-col items-center justify-center p-8 space-y-4">
-        <h1 className="text-2xl font-bold">Error Loading MOR Camp Dashboard</h1>
-        <p className="text-muted-foreground">
-          There was an error loading camp data. Please try refreshing.
+      <div className="p-8 text-center">
+        <h2 className="text-xl font-bold text-red-600">Failed to load dashboard</h2>
+        <p className="text-sm text-muted-foreground mt-2">
+          An error occurred while connecting to the camp database.
         </p>
-        {process.env.NODE_ENV === "development" && (
-          <pre className="text-xs bg-muted p-4 rounded max-w-xl overflow-auto">{String(error)}</pre>
-        )}
       </div>
     )
   }
