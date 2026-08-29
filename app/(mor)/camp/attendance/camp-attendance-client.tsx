@@ -63,7 +63,6 @@ import {
   Flame,
   ShieldCheck,
   AlertTriangle,
-  UserPlus,
   CreditCard,
   AlertCircle,
   BookOpen,
@@ -140,17 +139,6 @@ export function CampAttendanceClient() {
   // Custom Session Modal
   const [customSessionOpen, setCustomSessionOpen] = useState(false)
   const [customSessionName, setCustomSessionName] = useState("")
-
-  // Quick On-The-Spot Registration Modal
-  const [quickRegOpen, setQuickRegOpen] = useState(false)
-  const [quickRegForm, setQuickRegForm] = useState({
-    fullName: "",
-    phone: "",
-    gender: "Male",
-    branch: "Headquarters",
-    position: "Member",
-  })
-  const [quickRegSubmitting, setQuickRegSubmitting] = useState(false)
 
   const nameInputRef = useRef<HTMLInputElement>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
@@ -281,66 +269,6 @@ export function CampAttendanceClient() {
     } finally {
       setScanning(false)
       scanInputRef.current?.focus()
-    }
-  }
-
-  // Quick On-The-Spot Registration at the Bus Door
-  const handleQuickRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!quickRegForm.fullName.trim()) {
-      toast.error("Please enter attendee full name")
-      return
-    }
-
-    setQuickRegSubmitting(true)
-    try {
-      // 1. Create Member
-      const regRes = await fetch("/api/camp/members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...quickRegForm,
-          paid: true,
-          paidAmount: 300,
-          paymentClaimed: true,
-        }),
-      })
-      const regData = await regRes.json()
-
-      if (!regData.success) {
-        toast.error(regData.error || "Registration failed")
-        return
-      }
-
-      const newMember = regData.data
-
-      // 2. Immediately Check them into the Bus
-      await fetch("/api/camp/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          memberId: newMember.id,
-          session: currentSession,
-          isPresent: true,
-          isLate: false,
-        }),
-      })
-
-      toast.success(`🎉 Registered & Boarded: ${newMember.fullName} (${newMember.badgeId})`)
-      setQuickRegOpen(false)
-      setNameQuery(newMember.fullName)
-      setQuickRegForm({
-        fullName: "",
-        phone: "",
-        gender: "Male",
-        branch: "Headquarters",
-        position: "Member",
-      })
-      await fetchAttendance()
-    } catch (err) {
-      toast.error("An error occurred during quick registration")
-    } finally {
-      setQuickRegSubmitting(false)
     }
   }
 
@@ -558,18 +486,18 @@ export function CampAttendanceClient() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="bg-primary/10 text-primary text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              MOR Camp 2026 Registration & Timetable
+              MOR Camp 2026 Check-In & Timetable
             </span>
             <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              Live Schedule Synced
+              Pre-Registered Roster
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-            Camp Attendance & Session Timetable
+            Camp Attendance & Bus Check-In Desk
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Tuesday departure bus verification & scheduled teaching sessions with automatic review & lateness tracking.
+            Verify registered member names to board Tuesday departure buses, and record program attendance across campground sessions.
           </p>
         </div>
 
@@ -805,32 +733,14 @@ export function CampAttendanceClient() {
 
           {/* Dedicated Name Verification Search Panel */}
           <div className="bg-card p-6 rounded-2xl border-2 border-primary/30 shadow-lg space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <label className="text-sm sm:text-base font-black text-foreground flex items-center gap-2">
-                  <Search className="w-5 h-5 text-primary" />
-                  Enter Member Name to Check Registration
-                </label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  When a delegate calls their name, type it here to verify if they are registered and paid in the system.
-                </p>
-              </div>
-
-              <Button
-                size="sm"
-                variant="outline"
-                className="self-start sm:self-auto gap-1.5 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 font-bold text-xs rounded-xl"
-                onClick={() => {
-                  setQuickRegForm({
-                    ...quickRegForm,
-                    fullName: nameQuery.trim(),
-                  })
-                  setQuickRegOpen(true)
-                }}
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Register New Attendee
-              </Button>
+            <div>
+              <label className="text-sm sm:text-base font-black text-foreground flex items-center gap-2">
+                <Search className="w-5 h-5 text-primary" />
+                Enter Member Name to Check Registration
+              </label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                When a delegate arrives at the bus, enter their name here to verify their registration and admit them.
+              </p>
             </div>
 
             <div className="relative">
@@ -874,7 +784,7 @@ export function CampAttendanceClient() {
                           <strong className="text-red-600 font-bold">&quot;{nameQuery}&quot;</strong>.
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Please verify spelling or register them immediately below so they can be assigned and boarded.
+                          Only pre-registered delegates are permitted to board. Please check the spelling or verify their badge name.
                         </div>
                       </div>
                     </div>
@@ -882,25 +792,14 @@ export function CampAttendanceClient() {
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-red-500/20">
                       <Button
                         size="sm"
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 rounded-xl shadow-md"
+                        variant="outline"
+                        className="rounded-xl text-xs font-bold border-red-500/40 hover:bg-red-500/10"
                         onClick={() => {
-                          setQuickRegForm({
-                            ...quickRegForm,
-                            fullName: nameQuery.trim(),
-                          })
-                          setQuickRegOpen(true)
+                          setNameQuery("")
+                          nameInputRef.current?.focus()
                         }}
                       >
-                        <UserPlus className="w-4 h-4" />
-                        Register &quot;{nameQuery}&quot; Now
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="rounded-xl text-xs font-semibold"
-                        onClick={() => setNameQuery("")}
-                      >
-                        Try Another Name
+                        Clear & Try Another Name
                       </Button>
                     </div>
                   </div>
@@ -1493,134 +1392,6 @@ export function CampAttendanceClient() {
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Quick On-The-Spot Registration Dialog */}
-      <Dialog open={quickRegOpen} onOpenChange={setQuickRegOpen}>
-        <DialogContent className="max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-primary" />
-              Quick Attendee Registration
-            </DialogTitle>
-            <DialogDescription>
-              Register an attendee on the spot and immediately admit them to the Tuesday departure bus.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleQuickRegister} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Full Name *
-              </label>
-              <Input
-                placeholder="e.g. John Doe"
-                value={quickRegForm.fullName}
-                onChange={(e) =>
-                  setQuickRegForm({ ...quickRegForm, fullName: e.target.value })
-                }
-                required
-                autoFocus
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Phone Number
-                </label>
-                <Input
-                  placeholder="+232..."
-                  value={quickRegForm.phone}
-                  onChange={(e) =>
-                    setQuickRegForm({ ...quickRegForm, phone: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Gender
-                </label>
-                <Select
-                  value={quickRegForm.gender}
-                  onValueChange={(val) =>
-                    setQuickRegForm({ ...quickRegForm, gender: val })
-                  }
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Sending Branch
-                </label>
-                <Select
-                  value={quickRegForm.branch}
-                  onValueChange={(val) =>
-                    setQuickRegForm({ ...quickRegForm, branch: val })
-                  }
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Headquarters">Headquarters</SelectItem>
-                    <SelectItem value="Eastern">Eastern</SelectItem>
-                    <SelectItem value="Bo">Bo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Role
-                </label>
-                <Select
-                  value={quickRegForm.position}
-                  onValueChange={(val) =>
-                    setQuickRegForm({ ...quickRegForm, position: val })
-                  }
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Member">Member</SelectItem>
-                    <SelectItem value="Leader">Leader</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <DialogFooter className="pt-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setQuickRegOpen(false)}
-                disabled={quickRegSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
-                disabled={quickRegSubmitting}
-              >
-                {quickRegSubmitting ? "Registering..." : "Register & Board Bus"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Add Custom Session Dialog */}
       <Dialog open={customSessionOpen} onOpenChange={setCustomSessionOpen}>
