@@ -214,7 +214,7 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
     setFormData({
       ...formData,
       gender: newGender,
-      room: matchingRoom ? matchingRoom.name : "", // Default back to Random Auto-Assign
+      room: matchingRoom ? matchingRoom.name : "",
     })
   }
 
@@ -387,50 +387,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
     }
   }
 
-  // Auto assign groups
-  const handleAutoAssignGroups = async () => {
-    try {
-      toast.info("Distributing attendees across groups...")
-      const res = await fetch("/api/camp/auto-assign-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceAll: false }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchData()
-      } else {
-        toast.error(data.error || "Failed to distribute groups")
-      }
-    } catch (err) {
-      toast.error("Failed to auto-assign")
-    }
-  }
-
-  // Auto assign rooms randomly by gender
-  const handleAutoAssignRooms = async () => {
-    try {
-      toast.info("Randomly distributing attendees across gender-separated lodging rooms...")
-      const res = await fetch("/api/camp/auto-assign-rooms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceAll: false }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchData()
-      } else {
-        toast.error(data.error || "Failed to auto-assign rooms")
-      }
-    } catch (err) {
-      toast.error("Failed to auto-assign rooms")
-    }
-  }
-
   // Open Edit Modal
   const openEdit = (member: CampMember) => {
     setSelectedMember(member)
@@ -497,24 +453,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-
-          <Button
-            variant="outline"
-            className="gap-2 border-primary/30 text-primary hover:bg-primary/10 font-medium"
-            onClick={handleAutoAssignGroups}
-          >
-            <Shuffle className="w-4 h-4" />
-            Auto-Assign Groups
-          </Button>
-
-          {/* <Button
-            variant="outline"
-            className="gap-2 border-amber-500/30 text-amber-600 hover:bg-amber-500/10 font-medium"
-            onClick={handleAutoAssignRooms}
-          >
-            <BedDouble className="w-4 h-4" />
-            Auto-Assign Rooms
-          </Button> */}
 
           {/* Export All Dropdown (Styled matching Badge Tag) */}
           <DropdownMenu>
@@ -658,8 +596,8 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                 phone: "",
                 gender: "Male",
                 branch: branches.length > 0 ? branches[0].name : "",
-                caregroup: "AUTO",
-                room: "", // Defaults to Auto-Assign
+                caregroup: "",
+                room: "",
                 position: "Member",
               })
               setAddModalOpen(true)
@@ -1160,16 +1098,16 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                   Camp Group
                 </Label>
                 <Select
-                  value={formData.caregroup || "AUTO"}
-                  onValueChange={(val) => setFormData({ ...formData, caregroup: val })}
+                  value={formData.caregroup || "UNASSIGNED"}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, caregroup: val === "UNASSIGNED" ? "" : val })
+                  }
                 >
                   <SelectTrigger id="caregroup" className="h-10 w-full truncate">
-                    <SelectValue placeholder="Select group" />
+                    <SelectValue placeholder="Select group (Optional)" />
                   </SelectTrigger>
                   <SelectContent className="max-h-56">
-                    <SelectItem value="AUTO" className="text-primary font-semibold">
-                      ✨ Auto-Assign (Balanced)
-                    </SelectItem>
+                    <SelectItem value="UNASSIGNED">-- Unassigned (No Group) --</SelectItem>
                     {groups.map((g) => (
                       <SelectItem key={g.id} value={g.name}>
                         {g.name}
@@ -1182,35 +1120,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
 
             {/* Row 3: Position */}
             <div className="grid grid-cols-1 gap-3.5">
-              {/* <div className="space-y-1.5 min-w-0">
-                <Label htmlFor="room" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Lodging Room ({formData.gender})
-                </Label>
-                <Select
-                  value={formData.room || "AUTO"}
-                  onValueChange={(val) =>
-                    setFormData({ ...formData, room: val === "AUTO" ? "" : val })
-                  }
-                >
-                  <SelectTrigger id="room" className="h-10 w-full min-w-0 overflow-hidden text-left truncate">
-                    <SelectValue placeholder="Random / Select Room" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="AUTO" className="font-semibold text-primary">
-                      ✨ Auto-Assign (Random {formData.gender} Room)
-                    </SelectItem>
-                    {availableRoomsForGender.map((r) => (
-                      <SelectItem
-                        key={r.id}
-                        value={r.name}
-                        disabled={r.available <= 0}
-                      >
-                        {r.name} ({r.occupied}/{r.capacity}) {r.available <= 0 ? "— Full" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div> */}
 
               <div className="space-y-1.5 min-w-0">
                 <Label htmlFor="position" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -1354,13 +1263,16 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
                   Camp Group
                 </Label>
                 <Select
-                  value={formData.caregroup}
-                  onValueChange={(val) => setFormData({ ...formData, caregroup: val })}
+                  value={formData.caregroup || "UNASSIGNED"}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, caregroup: val === "UNASSIGNED" ? "" : val })
+                  }
                 >
                   <SelectTrigger id="editCaregroup" className="h-10 w-full truncate">
-                    <SelectValue placeholder="Select group" />
+                    <SelectValue placeholder="Select group (Optional)" />
                   </SelectTrigger>
                   <SelectContent className="max-h-56">
+                    <SelectItem value="UNASSIGNED">-- Unassigned (No Group) --</SelectItem>
                     {groups.map((g) => (
                       <SelectItem key={g.id} value={g.name}>
                         {g.name}
@@ -1373,30 +1285,6 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
 
             {/* Row 3: Position */}
             <div className="grid grid-cols-1 gap-3.5">
-              {/* <div className="space-y-1.5 min-w-0">
-                <Label htmlFor="editRoom" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Lodging Room ({formData.gender})
-                </Label>
-                <Select
-                  value={formData.room || "NONE"}
-                  onValueChange={(val) => setFormData({ ...formData, room: val })}
-                >
-                  <SelectTrigger id="editRoom" className="h-10 w-full min-w-0 overflow-hidden text-left truncate">
-                    <SelectValue placeholder="Assign room" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="NONE">-- Unassigned (No Room) --</SelectItem>
-                    <SelectItem value="AUTO" className="font-semibold text-primary">
-                      ✨ Auto-Assign (Random {formData.gender} Room)
-                    </SelectItem>
-                    {availableRoomsForGender.map((r) => (
-                      <SelectItem key={r.id} value={r.name}>
-                        {r.name} ({r.occupied}/{r.capacity})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div> */}
 
               <div className="space-y-1.5 min-w-0">
                 <Label htmlFor="editPosition" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

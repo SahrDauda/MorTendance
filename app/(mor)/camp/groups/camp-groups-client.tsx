@@ -41,7 +41,6 @@ import {
   RefreshCw,
   Edit2,
   Trash2,
-  Shuffle,
   Sparkles,
 } from "lucide-react"
 
@@ -229,28 +228,6 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
     }
   }
 
-  // Auto-Assign Groups
-  const handleAutoAssignGroups = async () => {
-    try {
-      toast.info("Distributing attendees across groups...")
-      const res = await fetch("/api/camp/auto-assign-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceAll: false }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        await fetchData()
-      } else {
-        toast.error(data.error || "Failed to auto-assign groups")
-      }
-    } catch (err) {
-      toast.error("Failed to distribute attendees")
-    }
-  }
-
   // Create Branch
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -380,17 +357,6 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
             </div>
 
             <div className="flex items-center gap-2">
-              {groups.length > 0 && (
-                <Button
-                  variant="outline"
-                  className="gap-2 border-primary/30 text-primary hover:bg-primary/10 font-medium text-xs sm:text-sm"
-                  onClick={handleAutoAssignGroups}
-                >
-                  <Shuffle className="w-4 h-4" />
-                  Auto-Assign Groups
-                </Button>
-              )}
-
               <Button
                 className="bg-primary text-white gap-2 font-semibold shadow-sm"
                 onClick={() => {

@@ -184,28 +184,6 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
     })
   }, [rooms, search, genderFilter])
 
-  // Auto assign rooms for unassigned attendees
-  const handleAutoAssignRooms = async (forceAll: boolean = false) => {
-    try {
-      toast.info("Auto-assigning attendees to gender-separated rooms...")
-      const res = await fetch("/api/camp/auto-assign-rooms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceAll }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchData()
-      } else {
-        toast.error(data.error || "Failed to auto-assign rooms")
-      }
-    } catch (err) {
-      toast.error("An error occurred while auto-assigning rooms")
-    }
-  }
-
   // Add Room
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -416,15 +394,6 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
           </Button>
 
           <Button
-            variant="outline"
-            className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10 gap-2 font-semibold"
-            onClick={() => handleAutoAssignRooms(false)}
-          >
-            <Shuffle className="w-4 h-4" />
-            Auto-Assign Rooms
-          </Button>
-
-          <Button
             variant="secondary"
             className="gap-2 font-medium"
             onClick={() => {
@@ -461,18 +430,10 @@ export function CampRoomsClient({ userRole }: { userRole: string }) {
                 {unassignedMembers.length} Attendees currently without lodging rooms
               </div>
               <div className="text-xs text-muted-foreground">
-                Automatically allocate delegates across available gender-separated rooms.
+                Assign delegates to rooms individually in the Attendees directory or room rosters.
               </div>
             </div>
           </div>
-          <Button
-            size="sm"
-            className="bg-amber-500 hover:bg-amber-600 text-black font-bold gap-1.5 shadow-sm"
-            onClick={() => handleAutoAssignRooms(false)}
-          >
-            <Sparkles className="w-4 h-4" />
-            Auto-Assign {unassignedMembers.length} Attendees
-          </Button>
         </div>
       )}
 

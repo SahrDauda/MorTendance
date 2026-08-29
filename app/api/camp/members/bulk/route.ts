@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { assignRandomCampRoom } from "@/lib/campRoomAssignment"
-import { assignRandomCampGroup } from "@/lib/campGroupAssignment"
 
 export const dynamic = "force-dynamic"
 
@@ -97,16 +95,14 @@ export async function POST(request: Request) {
         assignedGroup = null
       }
 
-      // Room assignment: auto-assign ONLY for Members. Leaders are assigned manually by Admin.
-      let assignedRoom = item.room && item.room !== "AUTO" && item.room !== "NONE" ? item.room.trim() : ""
-      if (!assignedRoom && position !== "Leader") {
-        assignedRoom =
-          (await assignRandomCampRoom({
-            gender: normGender,
-            branch,
-            position,
-          })) || ""
-      }
+      // Room assignment if explicitly provided
+      const assignedRoom =
+        item.room &&
+        item.room !== "AUTO" &&
+        item.room !== "NONE" &&
+        item.room !== "UNASSIGNED"
+          ? item.room.trim()
+          : null
 
       const badgeId = `MOR-${String(currentBadgeNumber).padStart(3, "0")}`
       currentBadgeNumber++
