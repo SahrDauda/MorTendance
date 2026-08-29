@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -95,9 +95,16 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
   const [rosterMembers, setRosterMembers] = useState<Attendee[]>([])
   const [submitting, setSubmitting] = useState(false)
 
-  // Forms
   const [groupForm, setGroupForm] = useState({ name: "", leader: "", color: "" })
   const [branchForm, setBranchForm] = useState({ name: "", leader: "" })
+
+  // Filter registered attendees to only those with "Leader" position
+  const availableLeaders = useMemo(() => {
+    return members.filter((m) => {
+      const pos = (m.position || "").trim().toLowerCase()
+      return pos.includes("leader")
+    })
+  }, [members])
 
   const fetchData = async () => {
     try {
@@ -592,16 +599,22 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   <SelectItem value="NONE">-- No Leader Assigned --</SelectItem>
-                  {groupForm.leader && !members.some((m) => m.fullName === groupForm.leader) && (
+                  {groupForm.leader && !availableLeaders.some((m) => m.fullName === groupForm.leader) && (
                     <SelectItem value={groupForm.leader}>
                       {groupForm.leader} (Current)
                     </SelectItem>
                   )}
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={m.fullName}>
-                      {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
-                    </SelectItem>
-                  ))}
+                  {availableLeaders.length === 0 ? (
+                    <div className="p-2.5 text-xs text-muted-foreground text-center">
+                      No attendees with role &quot;Leader&quot; found.
+                    </div>
+                  ) : (
+                    availableLeaders.map((m) => (
+                      <SelectItem key={m.id} value={m.fullName}>
+                        ⭐ {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -657,16 +670,22 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   <SelectItem value="NONE">-- No Leader Assigned --</SelectItem>
-                  {groupForm.leader && !members.some((m) => m.fullName === groupForm.leader) && (
+                  {groupForm.leader && !availableLeaders.some((m) => m.fullName === groupForm.leader) && (
                     <SelectItem value={groupForm.leader}>
                       {groupForm.leader} (Current)
                     </SelectItem>
                   )}
-                  {members.map((m) => (
-                    <SelectItem key={m.id} value={m.fullName}>
-                      {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
-                    </SelectItem>
-                  ))}
+                  {availableLeaders.length === 0 ? (
+                    <div className="p-2.5 text-xs text-muted-foreground text-center">
+                      No attendees with role &quot;Leader&quot; found.
+                    </div>
+                  ) : (
+                    availableLeaders.map((m) => (
+                      <SelectItem key={m.id} value={m.fullName}>
+                        ⭐ {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
