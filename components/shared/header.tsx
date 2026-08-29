@@ -19,7 +19,6 @@ import { Logo } from "./logo"
 import { ROUTES } from "@/lib/constants"
 import { useSession } from "@/lib/hooks/use-session"
 import { signOut } from "next-auth/react"
-import { PwaInstallButton } from "./pwa-install-button"
 
 export function Header() {
   const router = useRouter()
@@ -68,9 +67,6 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* PWA Install Button */}
-          <PwaInstallButton />
-
           {mounted ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
