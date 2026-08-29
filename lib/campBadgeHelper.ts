@@ -13,7 +13,7 @@ export interface BadgeAttendeeData {
   position?: string | null
 }
 
-const imagePromiseCache: Record<string, Promise<HTMLImageElement>> = {}
+const imagePromiseCache: Record<string, Promise<HTMLImageElement> | undefined> = {}
 
 /**
  * Safely downloads a Blob by retaining the object URL until the browser finishes saving.
@@ -38,9 +38,10 @@ function saveBlob(blob: Blob, filename: string) {
  * Loads an image into an HTMLImageElement safely via Blob URL and caches the promise.
  */
 function loadImage(src: string): Promise<HTMLImageElement> {
-  if (imagePromiseCache[src]) return imagePromiseCache[src]
+  const cached = imagePromiseCache[src]
+  if (cached) return cached
 
-  imagePromiseCache[src] = (async () => {
+  const promise = (async () => {
     const res = await fetch(src)
     if (!res.ok) throw new Error(`Failed to load image asset: ${src}`)
     const blob = await res.blob()
@@ -54,7 +55,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     })
   })()
 
-  return imagePromiseCache[src]
+  imagePromiseCache[src] = promise
+  return promise
 }
 
 /**
