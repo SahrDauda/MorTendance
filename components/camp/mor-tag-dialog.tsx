@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { CampMemberTagInfo } from "./mor-tag-front"
 import MorTagFront from "./mor-tag-front"
+import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
 import { toast } from "sonner"
 
 export interface FullCampMemberInfo extends CampMemberTagInfo {
@@ -59,27 +60,34 @@ export function MorTagDialog({
   const isLeader =
     member.position?.toLowerCase().includes("leader") ||
     member.position === "Head Shepherd"
+  const isSupervisor =
+    member.position?.toLowerCase().includes("supervisor") ||
+    member.position === "Head Shepherd"
   const isEmmanuel =
     member.fullName?.trim().toLowerCase().includes("emmanuel") &&
     member.fullName?.trim().toLowerCase().includes("dauda")
 
-  const handleDownload = async () => {
+  const handleDownloadFormat = async (format: "pdf" | "jpg" | "png") => {
     try {
       setDownloading(true)
-      toast.success(`Preparing badge for ${member.fullName}...`)
-      const target = member.id || member.badgeId
-      const downloadUrl = `/api/camp/badge/${target}`
-
-      const link = document.createElement("a")
-      link.href = downloadUrl
-      link.download = `${(member.fullName || "Attendee").replace(/\s+/g, "_")}_MOR_Badge_${member.badgeId}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      toast.info(`Preparing ${format.toUpperCase()} badge for ${member.fullName}...`)
+      await downloadAttendeeBadge(
+        {
+          fullName: member.fullName,
+          badgeId: member.badgeId,
+          branch: member.branch,
+          caregroup: member.caregroup,
+          room: member.room,
+          position: member.position,
+        },
+        format
+      )
+      toast.success(`Downloaded ${format.toUpperCase()} badge successfully`)
     } catch (e) {
-      toast.error("Failed to download badge")
+      console.error(e)
+      toast.error(`Failed to download ${format.toUpperCase()} badge`)
     } finally {
-      setTimeout(() => setDownloading(false), 800)
+      setDownloading(false)
     }
   }
 
@@ -93,12 +101,19 @@ export function MorTagDialog({
               <span className="text-[11px] bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-mono font-bold tracking-wider">
                 {member.badgeId}
               </span>
-              {isLeader && (
-                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] font-black uppercase tracking-wider gap-1 py-0.5">
-                  <Sparkles className="w-3 h-3" />
+              {isSupervisor ? (
+                <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-[10px] font-bold uppercase tracking-wider">
+                  {member.position === "Head Shepherd" ? "Head Shepherd" : "Supervisor"}
+                </Badge>
+              ) : isLeader ? (
+                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px] font-bold uppercase tracking-wider">
                   {isEmmanuel
                     ? "Leader • Committed Christian"
                     : member.position || "Leader"}
+                </Badge>
+              ) : (
+                <Badge className="bg-slate-800 text-slate-300 border-slate-700 text-[10px] font-bold uppercase tracking-wider">
+                  Delegate Member
                 </Badge>
               )}
             </div>
@@ -179,11 +194,11 @@ export function MorTagDialog({
           {/* Position Card */}
           <div className="bg-slate-900/70 border border-slate-800/80 rounded-xl p-3 space-y-1">
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-medium">
-              <User className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Role / Position</span>
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span>Position</span>
             </div>
             <div className="text-sm font-bold text-slate-100 truncate">
-              {member.position || "General Member"}
+              {member.position || "Member"}
             </div>
           </div>
 
@@ -211,21 +226,41 @@ export function MorTagDialog({
 
         {/* Action Controls */}
         <div className="space-y-3 pt-3 border-t border-slate-800/80">
-          <Button
-            className="w-full bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-black h-12 text-sm shadow-lg shadow-teal-500/20 tracking-wide rounded-xl gap-2 transition-all active:scale-[0.99]"
-            onClick={handleDownload}
-            disabled={downloading}
-          >
-            {downloading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Generating Badge...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" /> Download Official Tag (PDF)
-              </>
-            )}
-          </Button>
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+              <span>Download Badge</span>
+              <span className="text-[10px] text-teal-400 font-mono font-bold">600 DPI VECTOR READY</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                className="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-bold h-11 text-xs shadow-md shadow-teal-500/20 rounded-xl gap-1.5 transition-all active:scale-[0.98]"
+                onClick={() => handleDownloadFormat("pdf")}
+                disabled={downloading}
+              >
+                {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                PDF
+              </Button>
+
+              <Button
+                className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold h-11 text-xs shadow-md shadow-sky-500/20 rounded-xl gap-1.5 transition-all active:scale-[0.98]"
+                onClick={() => handleDownloadFormat("png")}
+                disabled={downloading}
+              >
+                {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                PNG
+              </Button>
+
+              <Button
+                className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold h-11 text-xs shadow-md shadow-amber-500/20 rounded-xl gap-1.5 transition-all active:scale-[0.98]"
+                onClick={() => handleDownloadFormat("jpg")}
+                disabled={downloading}
+              >
+                {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                JPG
+              </Button>
+            </div>
+          </div>
 
           <div className="flex items-center justify-between gap-2 pt-1">
             <div className="flex items-center gap-2">
@@ -271,4 +306,3 @@ export function MorTagDialog({
     </Dialog>
   )
 }
-

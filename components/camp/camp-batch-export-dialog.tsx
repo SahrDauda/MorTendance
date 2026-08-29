@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Printer, Download, Loader2 } from "lucide-react"
 import MorTagFront, { CampMemberTagInfo } from "./mor-tag-front"
+import { downloadAttendeeBadge } from "@/lib/campBadgeHelper"
 import { toast } from "sonner"
 
 interface CampBatchExportDialogProps {
@@ -182,7 +183,7 @@ export function CampBatchExportDialog({
               {members.map((member) => (
                 <div
                   key={member.id || member.badgeId}
-                  className="flex flex-col items-center break-inside-avoid"
+                  className="flex flex-col items-center break-inside-avoid group/card space-y-1.5"
                 >
                   <div className="rounded-xl overflow-hidden shadow-xl ring-1 ring-white/10 p-0.5 bg-gradient-to-b from-white/10 to-transparent">
                     <MorTagFront
@@ -191,6 +192,29 @@ export function CampBatchExportDialog({
                       height="76.12mm"
                       compact={true}
                     />
+                  </div>
+                  <div className="flex items-center gap-1 opacity-70 group-hover/card:opacity-100 transition-opacity print:hidden">
+                    <button
+                      onClick={() => downloadAttendeeBadge(member as any, "pdf")}
+                      className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 hover:bg-teal-600 text-slate-300 hover:text-white transition-colors"
+                      title="Download PDF"
+                    >
+                      PDF
+                    </button>
+                    <button
+                      onClick={() => downloadAttendeeBadge(member as any, "png")}
+                      className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 hover:bg-sky-600 text-slate-300 hover:text-white transition-colors"
+                      title="Download PNG"
+                    >
+                      PNG
+                    </button>
+                    <button
+                      onClick={() => downloadAttendeeBadge(member as any, "jpg")}
+                      className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 hover:bg-amber-600 text-slate-300 hover:text-white transition-colors"
+                      title="Download JPG"
+                    >
+                      JPG
+                    </button>
                   </div>
                 </div>
               ))}

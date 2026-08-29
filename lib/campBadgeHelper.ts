@@ -43,9 +43,12 @@ export interface BadgeAttendeeData {
 }
 
 /**
- * Directly downloads a single-page high-res Front badge PDF for an attendee using their group's artwork.
+ * Directly downloads a single high-res Front badge in PDF, JPG, or PNG format.
  */
-export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promise<void> {
+export async function downloadAttendeeBadge(
+  attendee: BadgeAttendeeData,
+  format: "pdf" | "jpg" | "png" = "pdf"
+): Promise<void> {
   const photoBase64 = await getGroupTagBase64(attendee.caregroup, attendee.position)
 
   const container = document.createElement("div")
@@ -118,46 +121,49 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
           font-weight: 800;
           font-family: 'Barlow Condensed', 'Arial Black', 'Impact', Arial, sans-serif;
           font-size: 1.6mm;
-          padding: 0.3mm 2.2mm;
+          line-height: 1;
+          padding: 0.4mm 2.2mm;
           border-radius: 999px;
-          letter-spacing: 0.8px;
+          letter-spacing: 0.6px;
           text-transform: uppercase;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+          box-shadow: 0 1px 3px rgba(0,0,0,0.4);
           white-space: nowrap;
         ">
-          ${(attendee.branch || "HQ").toLowerCase() === "hq" || (attendee.branch || "HQ").toLowerCase() === "headquarters" ? "HEADQUARTERS" : (attendee.branch || "HQ").toUpperCase()}
+          ${(attendee.branch && (attendee.branch.toLowerCase() === "hq" || attendee.branch.toLowerCase() === "headquarters")) ? "HEADQUARTERS" : (attendee.branch ? attendee.branch.toUpperCase() : "HEADQUARTERS")}
         </div>
       </div>
 
-      <!-- White Name Replacement Box (Overlays sample text in graphic: Y 80.09%-90.37%, X 5.08%-94.90%) -->
+      <!-- White Name Replacement Box (Y: 80.09% - 90.37%, X: 5.08% - 94.90%) -->
       <div style="
         position: absolute;
         top: 80.09%;
         left: 5.08%;
         width: 89.84%;
         height: 10.28%;
-        background: #FFFFFF;
+        background-color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2px 8px;
-        box-sizing: border-box;
-        overflow: hidden;
         z-index: 5;
+        overflow: hidden;
       ">
         <svg
           viewBox="0 0 1000 160"
-          style="width: 100%; height: 100%; display: block; overflow: hidden;"
-          preserveAspectRatio="xMidYMid meet"
+          style="
+            width: 100%;
+            height: 100%;
+            display: block;
+          "
         >
           <text
             x="500"
             y="90"
             text-anchor="middle"
-            dominant-baseline="middle"
+            dominant-baseline="central"
             fill="#0f172a"
-            style="font-family: 'Barlow Condensed', 'Arial Black', 'Impact', 'Trebuchet MS', Arial, sans-serif; font-weight: 900; text-transform: uppercase;"
+            font-family="Arial, Helvetica, sans-serif"
             font-size="${textParams.fontSize}"
+            font-weight="bold"
             letter-spacing="${textParams.letterSpacing}"
             ${textParams.textLength}
           >
@@ -172,11 +178,10 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
           ? `
       <div style="
         position: absolute;
-        top: 91.2%;
+        top: 91.8%;
         left: 50%;
         transform: translateX(-50%);
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
         z-index: 10;
@@ -221,7 +226,31 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
     }
 
     const canvasFront = await html2canvas(frontEl, opts)
+    const baseFilename = `${safeName.replace(/\s+/g, "_")}_MOR_Badge_${attendee.badgeId}`
 
+    if (format === "png") {
+      const dataUrl = canvasFront.toDataURL("image/png")
+      const link = document.createElement("a")
+      link.href = dataUrl
+      link.download = `${baseFilename}.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      return
+    }
+
+    if (format === "jpg") {
+      const dataUrl = canvasFront.toDataURL("image/jpeg", 0.98)
+      const link = document.createElement("a")
+      link.href = dataUrl
+      link.download = `${baseFilename}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      return
+    }
+
+    // Default: PDF
     const TAG_W_MM = 54
     const TAG_H_MM = 76.12
 
@@ -243,8 +272,7 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
       "FAST"
     )
 
-    const filename = `${safeName.replace(/\s+/g, "_")}_MOR_Badge_${attendee.badgeId}.pdf`
-    pdf.save(filename)
+    pdf.save(`${baseFilename}.pdf`)
   } finally {
     document.body.removeChild(container)
   }
