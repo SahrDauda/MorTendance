@@ -40,12 +40,27 @@ export function CampBatchExportDialog({
   }
 
   const handleDownloadPDF = async () => {
-    if (!printAreaRef.current || members.length === 0) return
+    if (members.length === 0) return
     setExporting(true)
 
     try {
-      const html2pdf = (await import("html2pdf.js")).default
+      toast.info(`Preparing ${members.length} high-resolution vector badges...`)
+      const ids = members.map((m) => m.id).filter(Boolean)
 
+      const response = await fetch("/api/camp/badge/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Server failed to generate batch PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
       const groupTag =
         filterSummary?.group && filterSummary.group !== "ALL"
           ? `_${filterSummary.group}`
@@ -54,21 +69,16 @@ export function CampBatchExportDialog({
         filterSummary?.role && filterSummary.role !== "ALL"
           ? `_${filterSummary.role}`
           : ""
-      const filename = `MOR_Camp_2026_Badges${groupTag}${roleTag}_${new Date().toISOString().slice(0, 10)}.pdf`
+      a.download = `MOR_Camp_2026_Badges${groupTag}${roleTag}_${members.length}_Delegates.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
 
-      const opt = {
-        margin: 5,
-        filename,
-        image: { type: "jpeg" as const, quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
-      }
-
-      await html2pdf().from(printAreaRef.current).set(opt).save()
-      toast.success(`Exported ${members.length} badges successfully`)
-    } catch (err) {
-      console.error(err)
-      toast.error("Failed to export PDF")
+      toast.success(`Downloaded ${members.length} badges successfully`)
+    } catch (err: any) {
+      console.error("Batch download error:", err)
+      toast.error("Failed to download batch PDF")
     } finally {
       setExporting(false)
     }
