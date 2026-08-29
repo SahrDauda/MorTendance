@@ -98,16 +98,19 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild className="rounded-xl text-xs font-semibold py-2">
-                  <Link href={ROUTES.CAMP_ATTENDANCE}>Check-in Portal</Link>
+                  <Link href={ROUTES.DASHBOARD}>Home</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="rounded-xl text-xs font-semibold py-2">
-                  <Link href={ROUTES.CAMP_MEMBERS}>Camp Attendees</Link>
+                  <Link href={ROUTES.CAMP_MEMBERS}>Members</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="rounded-xl text-xs font-semibold py-2">
-                  <Link href={ROUTES.CAMP_GROUPS}>Fellowship Groups</Link>
+                  <Link href={ROUTES.CAMP_ATTENDANCE}>Check In</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="rounded-xl text-xs font-semibold py-2">
-                  <Link href={ROUTES.CAMP_ANALYSIS}>Group Analysis & Radar</Link>
+                  <Link href={ROUTES.CAMP_GROUPS}>Groups</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="rounded-xl text-xs font-semibold py-2">
+                  <Link href={ROUTES.CAMP_ANALYSIS}>Analysis</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

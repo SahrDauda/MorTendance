@@ -3,12 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  LayoutDashboard,
+  Home,
   Users,
-  BedDouble,
-  QrCode,
-  Printer,
+  ClipboardCheck,
   Sparkles,
+  BarChart3,
   UserCircle,
   Settings,
 } from "lucide-react"
@@ -18,11 +17,11 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 const campNavigation = [
-  { name: "Command Center", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
-  { name: "Camp Attendees", href: ROUTES.CAMP_MEMBERS, icon: Users },
-  { name: "Camp Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },
-  { name: "Check-in Desk", href: ROUTES.CAMP_ATTENDANCE, icon: QrCode },
-  { name: "Group Analysis", href: ROUTES.CAMP_ANALYSIS, icon: Printer },
+  { name: "Home", href: ROUTES.DASHBOARD, icon: Home },
+  { name: "Members", href: ROUTES.CAMP_MEMBERS, icon: Users },
+  { name: "Check In", href: ROUTES.CAMP_ATTENDANCE, icon: ClipboardCheck },
+  { name: "Groups", href: ROUTES.CAMP_GROUPS, icon: Sparkles },
+  { name: "Analysis", href: ROUTES.CAMP_ANALYSIS, icon: BarChart3 },
 ]
 
 export function Sidebar() {
@@ -62,13 +61,11 @@ export function Sidebar() {
                     >
                       <IconComponent
                         className={cn(
-                          "h-4 w-4 transition-all",
-                          isActive
-                            ? "text-primary"
-                            : "group-hover:scale-110 text-muted-foreground group-hover:text-primary"
+                          "h-4 w-4 transition-transform group-hover:scale-110",
+                          isActive ? "text-primary font-bold" : "text-muted-foreground"
                         )}
                       />
-                      {item.name}
+                      <span className="font-bold">{item.name}</span>
                     </Button>
                   </Link>
                 )
@@ -77,33 +74,6 @@ export function Sidebar() {
           </div>
         </div>
       </ScrollArea>
-
-      <div className="border-t border-border p-3 bg-muted/30 space-y-1">
-        <Link href={ROUTES.PROFILE}>
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-start gap-3 h-9 text-xs",
-              pathname === ROUTES.PROFILE && "bg-primary/10 text-primary font-semibold"
-            )}
-          >
-            <UserCircle className="h-4 w-4" />
-            My Profile
-          </Button>
-        </Link>
-        <Link href={ROUTES.SETTINGS}>
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-start gap-3 h-9 text-xs",
-              pathname === ROUTES.SETTINGS && "bg-primary/10 text-primary font-semibold"
-            )}
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </Button>
-        </Link>
-      </div>
     </aside>
   )
 }
