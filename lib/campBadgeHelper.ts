@@ -7,8 +7,11 @@ import { resolveGroupTagImage, isGeneralMember } from "@/components/camp/mor-tag
 // In-memory cache for base64 group tag images
 const groupImageBase64Cache: Record<string, string> = {}
 
-export async function getGroupTagBase64(caregroup?: string | null): Promise<string> {
-  const relativePath = resolveGroupTagImage(caregroup)
+export async function getGroupTagBase64(
+  caregroup?: string | null,
+  position?: string | null
+): Promise<string> {
+  const relativePath = resolveGroupTagImage(caregroup, position)
   if (groupImageBase64Cache[relativePath]) {
     return groupImageBase64Cache[relativePath]
   }
@@ -43,7 +46,7 @@ export interface BadgeAttendeeData {
  * Directly downloads a single-page high-res Front badge PDF for an attendee using their group's artwork.
  */
 export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promise<void> {
-  const photoBase64 = await getGroupTagBase64(attendee.caregroup)
+  const photoBase64 = await getGroupTagBase64(attendee.caregroup, attendee.position)
 
   const container = document.createElement("div")
   container.style.position = "fixed"
@@ -54,7 +57,9 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
   container.style.pointerEvents = "none"
 
   const safeName = (attendee.fullName || "Attendee").trim().toUpperCase()
-  const isLeader = !isGeneralMember(attendee.position)
+  const pos = (attendee.position || "").trim().toUpperCase()
+  const isSupervisor = pos.includes("SUPERVIS") || pos.includes("HEAD SHEPHERD")
+  const isLeader = !isGeneralMember(attendee.position) && !isSupervisor
   const isEmmanuel = safeName.includes("EMMANUEL") && safeName.includes("DAUDA")
 
   const getSvgTextParams = (name: string) => {

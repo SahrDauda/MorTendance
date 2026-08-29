@@ -19,15 +19,31 @@ export function isGeneralMember(position?: string | null) {
   )
 }
 
-export function resolveGroupTagImage(caregroup?: string | null): string {
+export function resolveGroupTagImage(
+  caregroup?: string | null,
+  position?: string | null
+): string {
+  const pos = (position || "").trim().toUpperCase()
   const norm = (caregroup || "").trim().toUpperCase()
+
+  if (
+    pos.includes("SUPERVIS") ||
+    pos.includes("HEAD SHEPHERD") ||
+    norm.includes("SUPERVIS") ||
+    !caregroup ||
+    caregroup === "Unassigned"
+  ) {
+    return "/tags/SUPERVISOR.jpeg"
+  }
+
   if (norm.includes("DIKAIOSIS") || norm.includes("DIK")) return "/tags/DIKAIOSIS.jpeg"
   if (norm.includes("DOXASMOS") || norm.includes("DOX")) return "/tags/DOXASMOS.jpeg"
   if (norm.includes("HAGIASMOS") || norm.includes("HAG")) return "/tags/HAGIASMOS.jpeg"
   if (norm.includes("HUIOTHESIA") || norm.includes("HUIO")) return "/tags/HUIOTHESIA.jpeg"
   if (norm.includes("PALINGENESIA") || norm.includes("PALIGENESIA") || norm.includes("PAL"))
     return "/tags/PALINGENESIA.jpeg"
-  return "/tags/DIKAIOSIS.jpeg"
+
+  return "/tags/SUPERVISOR.jpeg"
 }
 
 export default function MorTagFront({
@@ -43,9 +59,11 @@ export default function MorTagFront({
   height?: string | number
   id?: string
 }) {
-  const groupImgPath = resolveGroupTagImage(member.caregroup)
+  const groupImgPath = resolveGroupTagImage(member.caregroup, member.position)
   const safeName = (member.fullName || "Attendee").trim().toUpperCase()
-  const isLeader = !isGeneralMember(member.position)
+  const pos = (member.position || "").trim().toUpperCase()
+  const isSupervisor = pos.includes("SUPERVIS") || pos.includes("HEAD SHEPHERD")
+  const isLeader = !isGeneralMember(member.position) && !isSupervisor
   const isEmmanuel = safeName.includes("EMMANUEL") && safeName.includes("DAUDA")
 
   // Aspect ratio is 4960 / 6992 = ~0.70938

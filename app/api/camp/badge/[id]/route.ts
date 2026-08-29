@@ -8,19 +8,38 @@ export const dynamic = "force-dynamic"
 
 const groupImageBase64Cache: Record<string, string> = {}
 
-function resolveGroupFilename(caregroup?: string | null): string {
+function resolveGroupFilename(
+  caregroup?: string | null,
+  position?: string | null
+): string {
+  const pos = (position || "").trim().toUpperCase()
   const norm = (caregroup || "").trim().toUpperCase()
+
+  if (
+    pos.includes("SUPERVIS") ||
+    pos.includes("HEAD SHEPHERD") ||
+    norm.includes("SUPERVIS") ||
+    !caregroup ||
+    caregroup === "Unassigned"
+  ) {
+    return "SUPERVISOR.jpeg"
+  }
+
   if (norm.includes("DIKAIOSIS") || norm.includes("DIK")) return "DIKAIOSIS.jpeg"
   if (norm.includes("DOXASMOS") || norm.includes("DOX")) return "DOXASMOS.jpeg"
   if (norm.includes("HAGIASMOS") || norm.includes("HAG")) return "HAGIASMOS.jpeg"
   if (norm.includes("HUIOTHESIA") || norm.includes("HUIO")) return "HUIOTHESIA.jpeg"
   if (norm.includes("PALINGENESIA") || norm.includes("PALIGENESIA") || norm.includes("PAL"))
     return "PALINGENESIA.jpeg"
-  return "DIKAIOSIS.jpeg"
+
+  return "SUPERVISOR.jpeg"
 }
 
-function getGroupPhotoBase64(caregroup?: string | null): string {
-  const filename = resolveGroupFilename(caregroup)
+function getGroupPhotoBase64(
+  caregroup?: string | null,
+  position?: string | null
+): string {
+  const filename = resolveGroupFilename(caregroup, position)
   if (groupImageBase64Cache[filename]) return groupImageBase64Cache[filename]
 
   try {
@@ -55,7 +74,7 @@ export async function GET(
       return new NextResponse("Attendee not found", { status: 404 })
     }
 
-    const photoData = getGroupPhotoBase64(member.caregroup)
+    const photoData = getGroupPhotoBase64(member.caregroup, member.position)
 
     // Aspect ratio: 4960 / 6992 = ~0.70938
     const TAG_W = 54
@@ -106,7 +125,9 @@ export async function GET(
 
     const safeName = (member.fullName || "Attendee").trim().toUpperCase()
     const pos = (member.position || "").trim().toUpperCase()
+    const isSupervisor = pos.includes("SUPERVIS") || pos.includes("HEAD SHEPHERD")
     const isLeader =
+      !isSupervisor &&
       pos.includes("LEADER") &&
       !pos.includes("GENERAL") &&
       pos !== "MEMBER" &&

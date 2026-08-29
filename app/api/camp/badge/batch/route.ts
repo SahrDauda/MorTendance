@@ -9,14 +9,28 @@ export const dynamic = "force-dynamic"
 // Cache group background images in memory on server
 const backgroundCache: Record<string, { data: string; alias: string }> = {}
 
-function getCachedTagImage(caregroup: string | null): { data: string; alias: string } | null {
-  const cg = (caregroup || "").toLowerCase()
+function getCachedTagImage(
+  caregroup?: string | null,
+  position?: string | null
+): { data: string; alias: string } | null {
+  const pos = (position || "").trim().toUpperCase()
+  const cg = (caregroup || "").trim().toUpperCase()
+
   let filename = "DIKAIOSIS.jpeg"
-  if (cg.includes("dox")) filename = "DOXASMOS.jpeg"
-  else if (cg.includes("hag")) filename = "HAGIASMOS.jpeg"
-  else if (cg.includes("huio")) filename = "HUIOTHESIA.jpeg"
-  else if (cg.includes("pal")) filename = "PALINGENESIA.jpeg"
-  else if (cg.includes("dik")) filename = "DIKAIOSIS.jpeg"
+  if (
+    pos.includes("SUPERVIS") ||
+    pos.includes("HEAD SHEPHERD") ||
+    cg.includes("SUPERVIS") ||
+    !caregroup ||
+    caregroup === "Unassigned"
+  ) {
+    filename = "SUPERVISOR.jpeg"
+  } else if (cg.includes("DOX")) filename = "DOXASMOS.jpeg"
+  else if (cg.includes("HAG")) filename = "HAGIASMOS.jpeg"
+  else if (cg.includes("HUIO")) filename = "HUIOTHESIA.jpeg"
+  else if (cg.includes("PAL")) filename = "PALINGENESIA.jpeg"
+  else if (cg.includes("DIK")) filename = "DIKAIOSIS.jpeg"
+  else filename = "SUPERVISOR.jpeg"
 
   if (!backgroundCache[filename]) {
     try {
@@ -105,12 +119,12 @@ export async function POST(req: NextRequest) {
       compress: true,
     })
 
-    members.forEach((member, index) => {
+    members.forEach((member: any, index: number) => {
       if (index > 0) {
         doc.addPage([TAG_W, TAG_H], "portrait")
       }
 
-      const imgInfo = getCachedTagImage(member.caregroup)
+      const imgInfo = getCachedTagImage(member.caregroup, member.position)
 
       // 1. High-Res Group Background Image
       if (imgInfo) {
@@ -150,7 +164,9 @@ export async function POST(req: NextRequest) {
 
       const safeName = (member.fullName || "Attendee").trim().toUpperCase()
       const pos = (member.position || "").trim().toUpperCase()
+      const isSupervisor = pos.includes("SUPERVIS") || pos.includes("HEAD SHEPHERD")
       const isLeader =
+        !isSupervisor &&
         pos.includes("LEADER") &&
         !pos.includes("GENERAL") &&
         pos !== "MEMBER" &&
