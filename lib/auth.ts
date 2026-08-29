@@ -20,10 +20,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .safeParse(credentials)
 
           if (parsedCredentials.success) {
-            const { email, password } = parsedCredentials.data
+            const email = parsedCredentials.data.email.toLowerCase().trim()
+            const { password } = parsedCredentials.data
 
             console.log("Attempting login for:", email)
-            const user = await db.user.findUnique({ where: { email } })
+            const user = await db.user.findFirst({
+              where: {
+                email: {
+                  equals: email,
+                  mode: "insensitive",
+                },
+              },
+            })
             if (!user) {
               console.log("User not found:", email)
               return null

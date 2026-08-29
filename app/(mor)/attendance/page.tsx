@@ -206,7 +206,7 @@ export default async function AttendancePage() {
                 leaders={leaders as any}
                 recentSessions={recentSessions as any}
                 userRole={session.user.role}
-					saturdayOverview={saturdayOverview as any}
+                todaysSaturdayGroupIds={saturdayOverview?.map((s: any) => s.groupId) || []}
                 branches={branches as any}
                 initialDate={today.getTime()}
             />
