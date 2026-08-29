@@ -516,14 +516,77 @@ export function CampMembersClient({ userRole }: { userRole: string }) {
             Auto-Assign Rooms
           </Button> */}
 
-          <Button
-            variant="secondary"
-            className="gap-2 font-semibold bg-secondary hover:bg-secondary/80 text-secondary-foreground shadow-sm"
-            onClick={() => setBatchExportOpen(true)}
-          >
-            <Printer className="w-4 h-4 text-primary" />
-            Export All ({filteredMembers.length})
-          </Button>
+          {/* Export All Dropdown (Styled matching Badge Tag) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-10 px-3.5 bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 gap-2 shadow-sm font-semibold text-xs rounded-xl"
+              >
+                <Download className="w-4 h-4 text-teal-400" />
+                <span>Export All ({filteredMembers.length})</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60 bg-slate-950 text-white border-slate-800 p-1.5 shadow-2xl rounded-2xl">
+              <DropdownMenuLabel className="text-[10px] uppercase font-bold text-slate-400 px-2 py-1">
+                Batch Export ({filteredMembers.length} Attendees)
+              </DropdownMenuLabel>
+              
+              <DropdownMenuItem
+                className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
+                onClick={async () => {
+                  if (filteredMembers.length === 0) {
+                    toast.error("No attendees to export")
+                    return
+                  }
+                  toast.info(`Generating batch PDF for ${filteredMembers.length} attendees...`)
+                  try {
+                    const ids = filteredMembers.map((m) => m.id).filter(Boolean)
+                    const response = await fetch("/api/camp/badge/batch", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ids }),
+                    })
+                    if (!response.ok) throw new Error("Failed to generate batch PDF")
+                    const blob = await response.blob()
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement("a")
+                    a.href = url
+                    a.download = `MOR_Camp_2026_Badges_${filteredMembers.length}_Attendees.pdf`
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    window.URL.revokeObjectURL(url)
+                    toast.success("Downloaded all badges as PDF")
+                  } catch (e) {
+                    toast.error("Failed to download batch PDF")
+                  }
+                }}
+              >
+                <span className="w-2 h-2 rounded-full bg-teal-400" />
+                <span>Download All as PDF</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
+                onClick={() => setBatchExportOpen(true)}
+              >
+                <Printer className="w-3.5 h-3.5 text-sky-400" />
+                <span>Print All (Filtered)</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="bg-slate-800 my-1" />
+
+              <DropdownMenuItem
+                className="cursor-pointer hover:bg-slate-800 focus:bg-slate-800 text-xs font-semibold gap-2 text-slate-200 py-2 rounded-xl"
+                onClick={() => setBatchExportOpen(true)}
+              >
+                <Eye className="w-3.5 h-3.5 text-purple-400" />
+                <span>Preview & Single Cards</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="outline"
