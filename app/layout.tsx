@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   authors: [{ name: "MOR Team" }],
   creator: "MOR",
   generator: "MOR System",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -69,6 +69,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="manifest" href="/manifest.webmanifest" />
       </head>
       <body className={`${inter.className} antialiased min-h-screen bg-background selection:bg-primary/20 overflow-x-hidden`}>
         <SessionProvider>

@@ -12,6 +12,26 @@ export interface QueuedCheckIn {
   createdAt: number
 }
 
+// Import the Dexie DB and helper
+import { db, bulkAddAttendance } from "@/lib/local-db"
+
+// Helper to write a single attendance record to IndexedDB
+const persistAttendanceInDB = async (item: QueuedCheckIn) => {
+  try {
+    await db.attendance.put({
+      id: item.id,
+      memberId: item.memberId,
+      session: item.session,
+      isPresent: item.isPresent,
+      isLate: item.isLate,
+      scannedAt: item.scannedAt,
+      recordedBy: item.recordedBy ?? null,
+    })
+  } catch (e) {
+    console.warn("Failed to persist offline attendance in IndexedDB", e)
+  }
+}
+
 const ROSTER_CACHE_KEY_PREFIX = "mor_roster_cache_"
 const OFFLINE_QUEUE_KEY = "mor_offline_checkins_queue"
 
@@ -56,6 +76,8 @@ export function enqueueOfflineCheckIn(item: QueuedCheckIn): void {
     )
     filtered.push(item)
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(filtered))
+    // Also persist to IndexedDB for durability
+    persistAttendanceInDB(item)
   } catch (err) {
     console.error("Failed to enqueue offline check-in:", err)
   }
@@ -88,6 +110,34 @@ export function clearSyncedItems(syncedIds: string[]): void {
   }
 }
 
+/**
+ * Sync the offline queue with the server when online.
+ * Uses the existing bulk attendance endpoint.
+ */
+export async function syncOfflineQueue(): Promise<void> {
+  if (!isClient()) return;
+  if (navigator.onLine === false) return;
+
+  const queue = getOfflineQueue();
+  if (queue.length === 0) return;
+
+  try {
+    const resp = await fetch("/api/camp/attendance/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checkIns: queue }),
+    });
+    if (!resp.ok) throw new Error(`Sync failed: ${resp.status}`);
+
+    // Successful – clear sent items
+    const syncedIds = queue.map((i) => i.id);
+    clearSyncedItems(syncedIds);
+    console.info("[offline-store] Synced", syncedIds.length, "check‑ins");
+  } catch (err) {
+    console.warn("[offline-store] Unable to sync offline queue now – will retry later", err);
+  }
+}
+
 // 6. Overlay local offline queue onto loaded roster members
 export function applyOfflineQueueToMembers(
   members: any[],
@@ -115,4 +165,37 @@ export function applyOfflineQueueToMembers(
   })
 
   return { mergedMembers: merged, pendingCount: queue.length }
+}
+
+// Flush offline queue to server when back online
+export async function flushOfflineQueue(): Promise<void> {
+  if (!isClient()) return
+  const queue = getOfflineQueue()
+  if (queue.length === 0) return
+  try {
+    const res = await fetch("/api/camp/attendance/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SYNC_OFFLINE_QUEUE", items: queue }),
+    })
+    const json = await res.json()
+    if (json.success) {
+      // Remove synced items from localStorage queue
+      clearSyncedItems(queue.map((i) => i.id))
+      // Also clean them from IndexedDB
+      await db.attendance.bulkDelete(queue.map((i) => i.id))
+      console.log("✅ Offline queue synced successfully")
+    } else {
+      console.warn("Server rejected offline sync:", json.error)
+    }
+  } catch (e) {
+    console.warn("Failed to sync offline queue:", e)
+  }
+}
+
+if (isClient()) {
+  window.addEventListener("online", () => {
+    console.log("🌐 Online – attempting to flush offline queue")
+    flushOfflineQueue()
+  })
 }

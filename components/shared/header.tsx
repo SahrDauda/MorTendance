@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useState, useEffect } from "react"
 import { Logo } from "./logo"
+import { InstallPWAButton } from "./InstallPWAButton"
 import { ROUTES } from "@/lib/constants"
 import { useSession } from "@/lib/hooks/use-session"
 import { signOut } from "next-auth/react"
@@ -82,6 +83,7 @@ export function Header() {
                   </Avatar>
                   <span className="sr-only">User menu</span>
                 </Button>
+                <InstallPWAButton />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5 shadow-xl">
                 <DropdownMenuLabel className="font-normal p-2">

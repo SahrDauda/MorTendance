@@ -2,12 +2,20 @@ import type React from "react"
 import { Sidebar } from "@/components/shared/sidebar"
 import { Header } from "@/components/shared/header"
 import { MobileNav } from "@/components/shared/mobile-nav"
-
+import { useEffect } from "react"
+import { syncOfflineQueue } from "@/lib/offline-store"
 export default function MorLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  useEffect(() => {
+    const handler = () => syncOfflineQueue();
+    window.addEventListener("online", handler);
+    if (navigator.onLine) syncOfflineQueue();
+    return () => window.removeEventListener("online", handler);
+  }, []);
+
   return (
     <div className="relative min-h-screen bg-background flex flex-col overflow-x-hidden">
       <Header />
