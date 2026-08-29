@@ -229,3 +229,34 @@ export function getPreviousSession(currentSessionName: string): CampSessionDef |
   }
   return null
 }
+
+/**
+ * Automatically computes whether check-in is late for a session
+ * based on standard Sierra Leone time (UTC+0 / GMT).
+ */
+export function isCheckInLate(sessionNameOrId: string, checkInDate = new Date()): boolean {
+  const session = getSessionDef(sessionNameOrId)
+  if (!session) return false
+
+  const cutoffStr = session.teachingStartTime
+  if (!cutoffStr) return false
+
+  const match = cutoffStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) return false
+
+  let cutoffHours = parseInt(match[1], 10)
+  const cutoffMinutes = parseInt(match[2], 10)
+  const period = match[3].toUpperCase()
+
+  if (period === "PM" && cutoffHours !== 12) cutoffHours += 12
+  if (period === "AM" && cutoffHours === 12) cutoffHours = 0
+
+  const cutoffMinutesOfDay = cutoffHours * 60 + cutoffMinutes
+
+  // Sierra Leone is UTC+0 (GMT)
+  const checkInHours = checkInDate.getUTCHours()
+  const checkInMinutes = checkInDate.getUTCMinutes()
+  const checkInMinutesOfDay = checkInHours * 60 + checkInMinutes
+
+  return checkInMinutesOfDay > cutoffMinutesOfDay
+}
