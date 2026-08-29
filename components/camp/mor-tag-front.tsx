@@ -67,7 +67,9 @@ export default function MorTagFront({
 
   const rawBranch = (member.branch || "HQ").trim()
   const displayBranch =
-    rawBranch.toLowerCase() === "headquarters" ? "HQ" : rawBranch.toUpperCase()
+    rawBranch.toLowerCase() === "hq" || rawBranch.toLowerCase() === "headquarters"
+      ? "HEADQUARTERS"
+      : rawBranch.toUpperCase()
 
   return (
     <div
@@ -130,7 +132,7 @@ export default function MorTagFront({
             fontFamily:
               "'Barlow Condensed', 'Arial Black', 'Impact', Arial, sans-serif",
             fontSize: compact ? "1.6mm" : "8px",
-            padding: compact ? "0.3mm 2mm" : "1.5px 7px",
+            padding: compact ? "0.3mm 2.2mm" : "1.5px 8px",
             borderRadius: "999px",
             letterSpacing: "0.8px",
             textTransform: "uppercase",
@@ -138,7 +140,7 @@ export default function MorTagFront({
             whiteSpace: "nowrap",
           }}
         >
-          BRANCH: {displayBranch}
+          {displayBranch}
         </div>
       </div>
 

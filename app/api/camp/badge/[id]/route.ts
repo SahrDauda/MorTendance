@@ -73,16 +73,18 @@ export async function GET(
       doc.addImage(photoData, "JPEG", 0, 0, TAG_W, TAG_H, "", "FAST")
     }
 
-    // 2. Branch Indicator directly above Group Name (Y: ~59.8%)
+    // 2. Location Indicator directly above Group Name (Y: ~59.8%)
     const rawBranch = (member.branch || "HQ").trim()
     const displayBranch =
-      rawBranch.toLowerCase() === "headquarters" ? "HQ" : rawBranch.toUpperCase()
-    const branchText = `BRANCH: ${displayBranch}`
+      rawBranch.toLowerCase() === "hq" || rawBranch.toLowerCase() === "headquarters"
+        ? "HEADQUARTERS"
+        : rawBranch.toUpperCase()
+    const branchText = displayBranch
 
     doc.setFont("Helvetica", "bold")
-    doc.setFontSize(5.2)
+    doc.setFontSize(5.0)
     const branchTextWidth = doc.getTextWidth(branchText)
-    const branchPillW = branchTextWidth + 5.5
+    const branchPillW = branchTextWidth + 5.0
     const branchPillH = 3.0
     const branchY = TAG_H * 0.598
 

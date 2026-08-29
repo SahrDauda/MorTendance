@@ -113,14 +113,14 @@ export async function downloadAttendeeBadge(attendee: BadgeAttendeeData): Promis
           font-weight: 800;
           font-family: 'Barlow Condensed', 'Arial Black', 'Impact', Arial, sans-serif;
           font-size: 1.6mm;
-          padding: 0.3mm 2mm;
+          padding: 0.3mm 2.2mm;
           border-radius: 999px;
           letter-spacing: 0.8px;
           text-transform: uppercase;
           box-shadow: 0 1px 3px rgba(0,0,0,0.3);
           white-space: nowrap;
         ">
-          BRANCH: ${(attendee.branch || "HQ").toLowerCase() === "headquarters" ? "HQ" : (attendee.branch || "HQ").toUpperCase()}
+          ${(attendee.branch || "HQ").toLowerCase() === "hq" || (attendee.branch || "HQ").toLowerCase() === "headquarters" ? "HEADQUARTERS" : (attendee.branch || "HQ").toUpperCase()}
         </div>
       </div>
 
