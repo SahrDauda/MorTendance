@@ -79,7 +79,6 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
   const [loading, setLoading] = useState(true)
 
   // Modals
-  const [addGroupOpen, setAddGroupOpen] = useState(false)
   const [editGroupOpen, setEditGroupOpen] = useState(false)
   const [deleteGroupOpen, setDeleteGroupOpen] = useState(false)
   const [selectedGroup, setSelectedGroup] = useState<CampGroup | null>(null)
@@ -135,41 +134,7 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
     fetchData()
   }, [])
 
-  // Create Group
-  const handleAddGroup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!groupForm.name.trim()) {
-      toast.error("Please enter a group name")
-      return
-    }
 
-    try {
-      setSubmitting(true)
-      const res = await fetch("/api/camp/groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: groupForm.name.trim(),
-          leader: groupForm.leader ? groupForm.leader.trim() : null,
-          color: groupForm.color ? groupForm.color.trim() : null,
-        }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        toast.success(`Group "${data.data.name}" added successfully!`)
-        setAddGroupOpen(false)
-        setGroupForm({ name: "", leader: "", color: "" })
-        await fetchData()
-      } else {
-        toast.error(data.error || "Failed to save group")
-      }
-    } catch (err) {
-      toast.error("An error occurred while creating group")
-    } finally {
-      setSubmitting(false)
-    }
-  }
 
   // Edit Group
   const handleEditGroup = async (e: React.FormEvent) => {
@@ -352,41 +317,18 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
             <div>
               <h2 className="text-lg font-bold text-foreground">Active Camp Groups</h2>
               <p className="text-xs text-muted-foreground">
-                Fellowship groups created for MOR Camp 2026
+                Official camp fellowship groups for MOR Camp 2026
               </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                className="bg-primary text-white gap-2 font-semibold shadow-sm"
-                onClick={() => {
-                  setGroupForm({ name: "", leader: "", color: "" })
-                  setAddGroupOpen(true)
-                }}
-              >
-                <Plus className="w-4 h-4" />
-                Add Group
-              </Button>
             </div>
           </div>
 
           {groups.length === 0 ? (
             <Card className="p-12 text-center border-dashed">
               <Users className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-              <h3 className="text-lg font-bold text-foreground">No Camp Groups Yet</h3>
-              <p className="text-sm text-muted-foreground max-w-sm mx-auto mt-1 mb-4">
-                Click &quot;Add Group&quot; to create your first camp fellowship group.
+              <h3 className="text-lg font-bold text-foreground">No Camp Groups Found</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto mt-1">
+                Loading official camp groups...
               </p>
-              <Button
-                className="bg-primary text-white gap-2"
-                onClick={() => {
-                  setGroupForm({ name: "", leader: "", color: "" })
-                  setAddGroupOpen(true)
-                }}
-              >
-                <Plus className="w-4 h-4" />
-                Add First Group
-              </Button>
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -528,79 +470,6 @@ export function CampGroupsClient({ userRole }: { userRole: string }) {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Add Group Modal */}
-      <Dialog open={addGroupOpen} onOpenChange={setAddGroupOpen}>
-        <DialogContent className="max-w-md bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">Add Camp Group</DialogTitle>
-            <DialogDescription>
-              Create a new fellowship group for MOR Camp 2026.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleAddGroup} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="groupName">Group Name *</Label>
-              <Input
-                id="groupName"
-                placeholder="e.g. Doxasmus, Huiothesiia"
-                value={groupForm.name}
-                onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-                required
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="groupLeader">Group Leader (Optional)</Label>
-              <Select
-                value={groupForm.leader || "NONE"}
-                onValueChange={(val) =>
-                  setGroupForm({ ...groupForm, leader: val === "NONE" ? "" : val })
-                }
-              >
-                <SelectTrigger id="groupLeader" className="w-full">
-                  <SelectValue placeholder="Select leader from registered attendees" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="NONE">-- No Leader Assigned --</SelectItem>
-                  {groupForm.leader && !availableLeaders.some((m) => m.fullName === groupForm.leader) && (
-                    <SelectItem value={groupForm.leader}>
-                      {groupForm.leader} (Current)
-                    </SelectItem>
-                  )}
-                  {availableLeaders.length === 0 ? (
-                    <div className="p-2.5 text-xs text-muted-foreground text-center">
-                      No attendees with role &quot;Leader&quot; found.
-                    </div>
-                  ) : (
-                    availableLeaders.map((m) => (
-                      <SelectItem key={m.id} value={m.fullName}>
-                        ⭐ {m.fullName} ({m.badgeId}{m.branch ? ` • ${m.branch}` : ""})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <DialogFooter className="pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setAddGroupOpen(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="bg-primary text-white" disabled={submitting}>
-                {submitting ? "Saving..." : "Save Group"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Group Modal */}
       <Dialog open={editGroupOpen} onOpenChange={setEditGroupOpen}>
