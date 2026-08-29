@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Users, Sparkles, QrCode, BedDouble } from "lucide-react"
+import { Home, Users, Sparkles, ClipboardCheck, BedDouble } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ROUTES } from "@/lib/constants"
 
@@ -70,7 +70,7 @@ export function MobileNav() {
                 : "bg-gradient-to-tr from-slate-900 via-slate-800 to-primary shadow-slate-900/40 hover:scale-105"
             )}
           >
-            <QrCode className="w-6 h-6 animate-pulse" />
+            <ClipboardCheck className="w-6 h-6 animate-pulse" />
           </Link>
           <span
             className={cn(
